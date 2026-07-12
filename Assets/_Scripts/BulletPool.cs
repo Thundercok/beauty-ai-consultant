@@ -88,6 +88,13 @@ public class BulletPool : MonoBehaviour
 
     private GameObject CreateNewBullet()
     {
+        if (bulletPrefab == null)
+        {
+#if UNITY_EDITOR
+            bulletPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/Undertale/UndertaleBullet.prefab");
+#endif
+        }
+
         if (bulletPrefab != null)
         {
             return Instantiate(bulletPrefab);

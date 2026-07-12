@@ -1,119 +1,188 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.Collections;
 
 public class PlayerSoul : MonoBehaviour
 {
     public static PlayerSoul Instance;
-    public float speed = 5f;
+    
+    [Header("Movement")]
+    public float speed = 4f;
+    private bool isMenuSnappingMode = true;
+
+    [Header("Stats")]
     public int maxHP = 20;
     public int currentHP;
 
-    [Header("Survival Settings")]
-    public float survivalTime = 20f;
-    private bool isWon = false;
+    private SpriteRenderer spriteRenderer;
+    private bool isInvulnerable = false;
+    public float invulnDuration = 1.0f;
 
     void Awake()
     {
         Instance = this;
         currentHP = maxHP;
 
-        // Automatically assign tag so bullet spawner and bullets can find it
+        // Automatically assign tag
         gameObject.tag = "Player";
 
-        // Dynamically add SpriteRenderer and assign a generated heart sprite if none exists
-        SpriteRenderer sr = GetComponent<SpriteRenderer>();
-        if (sr == null)
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        if (spriteRenderer == null)
         {
-            sr = gameObject.AddComponent<SpriteRenderer>();
-            sr.sprite = CreateHeartSprite();
-            sr.sortingOrder = 10; // Draw on top
+            spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
+            spriteRenderer.sprite = CreateHeartSprite();
+            spriteRenderer.sortingOrder = 10; // Draw on top of box
         }
     }
 
     void Start()
     {
-        // Initialize HP Bar if it exists in the scene
-        if (HPBar.Instance != null)
-        {
-            HPBar.Instance.OnDamageTaken(currentHP, maxHP);
-        }
-        UpdateSurvivalUI();
+        UpdateHPUI();
     }
 
     void Update()
     {
-        if (isWon)
+        // In GameOver or Victory states, ignore free movement
+        if (UndertaleBattleManager.Instance != null && 
+            (UndertaleBattleManager.Instance.currentState == UndertaleBattleManager.BattleState.GameOver ||
+             UndertaleBattleManager.Instance.currentState == UndertaleBattleManager.BattleState.Victory))
         {
-            if (Input.GetKeyDown(KeyCode.R))
+            // If Game Over, check for manual reload key 'R'
+            if (UndertaleBattleManager.Instance.currentState == UndertaleBattleManager.BattleState.GameOver)
             {
-                SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+                if (Input.GetKeyDown(KeyCode.R))
+                {
+                    SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+                }
             }
             return;
         }
 
-        Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
-        Vector2 nextPos = (Vector2)transform.position + input * speed * Time.deltaTime;
+        // If in menu mode, input is handled by UndertaleBattleManager snapping
+        if (isMenuSnappingMode) return;
 
-        if (BattleBox.Instance != null)
+        // Free movement in Dodge Mode (Arrow keys & WASD)
+        float moveX = 0f;
+        float moveY = 0f;
+
+        if (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A)) moveX = -1f;
+        else if (Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.D)) moveX = 1f;
+
+        if (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.W)) moveY = 1f;
+        else if (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S)) moveY = -1f;
+
+        Vector2 direction = new Vector2(moveX, moveY);
+        if (direction.magnitude > 0.01f)
         {
-            transform.position = BattleBox.Instance.ClampToBox(nextPos);
-            
-            // Survival countdown ticks down while in the BattleBox
-            survivalTime -= Time.deltaTime;
-            if (survivalTime <= 0f)
+            // Snappy movement (constant speed, even diagonally)
+            direction.Normalize();
+            Vector2 nextPos = (Vector2)transform.position + direction * speed * Time.deltaTime;
+
+            if (BattleBox.Instance != null)
             {
-                WinSurvival();
+                transform.position = BattleBox.Instance.ClampToBox(nextPos);
             }
             else
             {
-                UpdateSurvivalUI();
+                transform.position = nextPos;
             }
         }
-        else
+    }
+
+    public void SetMenuSnappingMode(bool enabled)
+    {
+        isMenuSnappingMode = enabled;
+        // Make soul heart color red (normal) or transparent if hidden (e.g. FightExecute)
+        if (spriteRenderer != null)
         {
-            transform.position = nextPos;
+            spriteRenderer.enabled = true;
+            spriteRenderer.color = Color.red;
         }
     }
 
     public void TakeDamage(int dmg)
     {
-        if (isWon) return;
+        if (isInvulnerable) return;
+        
+        // If in victory/game over, ignore
+        if (UndertaleBattleManager.Instance != null && 
+            (UndertaleBattleManager.Instance.currentState == UndertaleBattleManager.BattleState.Victory ||
+             UndertaleBattleManager.Instance.currentState == UndertaleBattleManager.BattleState.GameOver))
+        {
+            return;
+        }
 
         currentHP -= dmg;
-        if (HPBar.Instance != null)
+        if (currentHP < 0) currentHP = 0;
+
+        UpdateHPUI();
+
+        // Play procedural hurt audio
+        if (RetroSoundGenerator.Instance != null)
         {
-            HPBar.Instance.OnDamageTaken(currentHP, maxHP);
+            RetroSoundGenerator.Instance.PlayHurt();
         }
 
         if (currentHP <= 0)
         {
-            GameOver();
+            Die();
         }
-    }
-
-    void UpdateSurvivalUI()
-    {
-        if (UIManager.Instance != null && UIManager.Instance.grazeText != null)
+        else
         {
-            int grazeCount = ScoreManager.Instance != null ? ScoreManager.Instance.grazeCount : 0;
-            UIManager.Instance.grazeText.text = $"Graze: {grazeCount} | Survive: {Mathf.CeilToInt(survivalTime)}s";
+            StartCoroutine(FlashInvulnerableRoutine());
         }
     }
 
-    void WinSurvival()
+    public void Heal(int amt)
     {
-        isWon = true;
-        Debug.Log("Survival Victory!");
-        if (UIManager.Instance != null && UIManager.Instance.grazeText != null)
+        currentHP += amt;
+        if (currentHP > maxHP) currentHP = maxHP;
+        UpdateHPUI();
+    }
+
+    private void UpdateHPUI()
+    {
+        if (HPBar.Instance != null)
         {
-            UIManager.Instance.grazeText.text = "VICTORY! You survived! Press R to Restart.";
+            HPBar.Instance.OnDamageTaken(currentHP, maxHP);
         }
     }
 
-    void GameOver()
+    private void Die()
     {
-        Debug.Log("Player Soul Died! Reloading Scene.");
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        if (UndertaleBattleManager.Instance != null)
+        {
+            UndertaleBattleManager.Instance.TriggerGameOver();
+        }
+        // Change color to fractured grey or disable renderer
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = Color.gray;
+        }
+    }
+
+    private IEnumerator FlashInvulnerableRoutine()
+    {
+        isInvulnerable = true;
+        float elapsed = 0f;
+        bool visible = true;
+
+        while (elapsed < invulnDuration)
+        {
+            visible = !visible;
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.color = visible ? Color.red : new Color(1, 0, 0, 0.2f);
+            }
+            yield return new WaitForSeconds(0.08f);
+            elapsed += 0.08f;
+        }
+
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = Color.red;
+        }
+        isInvulnerable = false;
     }
 
     Sprite CreateHeartSprite()
@@ -121,7 +190,6 @@ public class PlayerSoul : MonoBehaviour
         Texture2D tex = new Texture2D(16, 16);
         tex.filterMode = FilterMode.Point;
         
-        // 16x16 pixel heart grid (0 = transparent, 1 = red)
         int[,] heartGrid = new int[16, 16] {
             {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
             {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
@@ -146,7 +214,7 @@ public class PlayerSoul : MonoBehaviour
             for (int x = 0; x < 16; x++)
             {
                 int gridVal = heartGrid[15 - y, x];
-                tex.SetPixel(x, y, gridVal == 1 ? Color.red : Color.clear);
+                tex.SetPixel(x, y, gridVal == 1 ? Color.white : Color.clear); // Create white texture so sprite color is easily tinted
             }
         }
         tex.Apply();

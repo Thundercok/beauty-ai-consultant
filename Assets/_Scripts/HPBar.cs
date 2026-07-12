@@ -1,23 +1,37 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class HPBar : MonoBehaviour
 {
     public static HPBar Instance;
 
     public Image fillBar;
+    public TextMeshProUGUI statsText; // Renders e.g. "CHARA   LV 1   HP"
+    public TextMeshProUGUI hpNumbersText; // Renders e.g. "20 / 20"
+
     private float targetFill = 1f;
-    private float lerpSpeed = 3f;
+    private float lerpSpeed = 5f;
 
     void Awake()
     {
         Instance = this;
 
-        // In Unity, a Filled Image MUST have a sprite assigned,
-        // otherwise the fillAmount property is ignored and it stays 100% filled.
-        if (fillBar != null && fillBar.sprite == null)
+        if (fillBar != null)
         {
-            fillBar.sprite = CreateWhiteSprite();
+            if (fillBar.sprite == null)
+            {
+                fillBar.sprite = CreateWhiteSprite();
+            }
+            
+            // Set colors to Undertale standard: Yellow for health, dark red for background
+            fillBar.color = Color.yellow;
+            
+            Image bgBar = GetComponent<Image>();
+            if (bgBar != null)
+            {
+                bgBar.color = new Color(0.7f, 0f, 0f); // Dark red background
+            }
         }
     }
 
@@ -26,6 +40,17 @@ public class HPBar : MonoBehaviour
         if (maxHP <= 0) return;
         targetFill = (float)currentHP / maxHP;
         targetFill = Mathf.Clamp01(targetFill);
+
+        // Update name, LV and HP text
+        if (statsText != null)
+        {
+            statsText.text = "CHARA   LV 1      HP";
+        }
+
+        if (hpNumbersText != null)
+        {
+            hpNumbersText.text = $"{currentHP} / {maxHP}";
+        }
     }
 
     void Update()

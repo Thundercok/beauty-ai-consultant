@@ -6,12 +6,24 @@ public class Phase1Spawner : MonoBehaviour
     public float spawnInterval = 0.8f;
     public float bulletSpeed = 2f;
 
-    void Start()
+    private Coroutine spawnCoroutine;
+
+    public void StartSpawning()
     {
-        StartCoroutine(RunPhase1());
+        if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
+        spawnCoroutine = StartCoroutine(RunPhase1());
     }
 
-    public IEnumerator RunPhase1()
+    public void StopSpawning()
+    {
+        if (spawnCoroutine != null)
+        {
+            StopCoroutine(spawnCoroutine);
+            spawnCoroutine = null;
+        }
+    }
+
+    private IEnumerator RunPhase1()
     {
         while (true)
         {
@@ -22,7 +34,6 @@ public class Phase1Spawner : MonoBehaviour
             }
             else
             {
-                // Fallback: spawn on a random edge of a screen area (e.g. from -10 to 10)
                 float spawnX = Random.Range(-10f, 10f);
                 float spawnY = Random.Range(-10f, 10f);
                 if (Random.value > 0.5f)
@@ -41,7 +52,6 @@ public class Phase1Spawner : MonoBehaviour
                 GameObject b = BulletPool.Instance.Get(spawnPos);
                 if (b != null)
                 {
-                    // Find player dynamically (prioritize PlayerSoul, fallback to any tagged Player)
                     Transform playerTarget = null;
                     if (PlayerSoul.Instance != null)
                     {
@@ -56,7 +66,7 @@ public class Phase1Spawner : MonoBehaviour
                         }
                     }
 
-                    Vector2 dirToPlayer = Vector2.down; // default fallback
+                    Vector2 dirToPlayer = Vector2.down; // default
                     if (playerTarget != null)
                     {
                         dirToPlayer = ((Vector2)playerTarget.position - spawnPos).normalized;
@@ -65,7 +75,12 @@ public class Phase1Spawner : MonoBehaviour
                     Bullet bulletScript = b.GetComponent<Bullet>();
                     if (bulletScript != null)
                     {
-                        bulletScript.velocity = dirToPlayer * bulletSpeed;
+                        // Add some slight randomness to bullet trajectories to make dodging interesting!
+                        Vector2 offsetDir = dirToPlayer;
+                        float randomAngle = Random.Range(-15f, 15f);
+                        offsetDir = Quaternion.Euler(0, 0, randomAngle) * dirToPlayer;
+
+                        bulletScript.velocity = offsetDir * bulletSpeed;
                     }
                 }
             }
