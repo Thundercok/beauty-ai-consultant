@@ -37,8 +37,11 @@ public class CameraFollow : MonoBehaviour
         }
         else
         {
-            // UFO Scene: Static camera centered at (0, 0)
-            transform.position = new Vector3(0f, 0f, -10f);
+            // UFO Scene: Static camera centered at (0, 0) if not parented
+            if (transform.parent == null)
+            {
+                transform.position = new Vector3(0f, 0f, -10f);
+            }
 
             // We do NOT override cam.orthographicSize in UFO mode.
             // This allows you to change the Camera's size directly in the Inspector.

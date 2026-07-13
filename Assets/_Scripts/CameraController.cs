@@ -7,7 +7,17 @@ public class CameraController : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        
+        if (transform.parent == null)
+        {
+            GameObject ufo = GameObject.FindWithTag("Player") ?? GameObject.Find("UFO") ?? GameObject.Find("UFO_0");
+            if (ufo != null)
+            {
+                transform.SetParent(ufo.transform);
+                transform.localPosition = new Vector3(0, 0, -10);
+                transform.localRotation = Quaternion.identity;
+                Debug.Log("CameraController: Dynamically parented Main Camera to UFO.");
+            }
+        }
     }
 
     // Update is called once per frame
