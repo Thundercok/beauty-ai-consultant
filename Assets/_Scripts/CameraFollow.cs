@@ -28,7 +28,7 @@ public class CameraFollow : MonoBehaviour
         if (BattleBox.Instance != null)
         {
             // Lock camera statically on the BattleBox center
-            transform.position = new Vector3(BattleBox.Instance.center.x, BattleBox.Instance.center.y, -10f);
+            transform.position = new Vector3(BattleBox.Instance.Center.x, BattleBox.Instance.Center.y, -10f);
 
             if (cam != null)
             {

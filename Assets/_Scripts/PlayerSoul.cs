@@ -4,51 +4,65 @@ using System.Collections;
 
 public class PlayerSoul : MonoBehaviour
 {
-    public static PlayerSoul Instance;
+    public static PlayerSoul Instance { get; private set; }
     
-    [Header("Movement")]
-    public float speed = 4f;
-    private bool isMenuSnappingMode = true;
+    [Header("Movement Settings")]
+    [SerializeField] private float _speed = 4f;
+    [SerializeField] private float _invulnDuration = 1.0f;
 
-    [Header("Stats")]
-    public int maxHP = 20;
-    public int currentHP;
+    [Header("Stats Settings")]
+    [SerializeField] private int _maxHP = 20;
 
-    private SpriteRenderer spriteRenderer;
-    private bool isInvulnerable = false;
-    public float invulnDuration = 1.0f;
+    private int _currentHP;
+    private bool _isMenuSnappingMode = true;
+    private bool _isInvulnerable = false;
+    private SpriteRenderer _spriteRenderer;
 
-    void Awake()
+    // Public Properties
+    public float Speed => _speed;
+    public int MaxHP => _maxHP;
+    public int CurrentHP => _currentHP;
+    public bool IsMenuSnappingMode => _isMenuSnappingMode;
+
+    private void Awake()
     {
-        Instance = this;
-        currentHP = maxHP;
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        _currentHP = _maxHP;
 
         // Automatically assign tag
         gameObject.tag = "Player";
 
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        if (spriteRenderer == null)
+        _spriteRenderer = GetComponent<SpriteRenderer>();
+        if (_spriteRenderer == null)
         {
-            spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
-            spriteRenderer.sprite = CreateHeartSprite();
-            spriteRenderer.sortingOrder = 10; // Draw on top of box
+            _spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
         }
+        _spriteRenderer.sortingOrder = 100; // Draw on top of box and Canvas UI
     }
 
-    void Start()
+    private void Start()
     {
         UpdateHPUI();
     }
 
-    void Update()
+    private void Update()
     {
         // In GameOver or Victory states, ignore free movement
         if (UndertaleBattleManager.Instance != null && 
-            (UndertaleBattleManager.Instance.currentState == UndertaleBattleManager.BattleState.GameOver ||
-             UndertaleBattleManager.Instance.currentState == UndertaleBattleManager.BattleState.Victory))
+            (UndertaleBattleManager.Instance.CurrentState == UndertaleBattleManager.BattleState.GameOver ||
+             UndertaleBattleManager.Instance.CurrentState == UndertaleBattleManager.BattleState.Victory))
         {
             // If Game Over, check for manual reload key 'R'
-            if (UndertaleBattleManager.Instance.currentState == UndertaleBattleManager.BattleState.GameOver)
+            if (UndertaleBattleManager.Instance.CurrentState == UndertaleBattleManager.BattleState.GameOver)
             {
                 if (Input.GetKeyDown(KeyCode.R))
                 {
@@ -59,7 +73,7 @@ public class PlayerSoul : MonoBehaviour
         }
 
         // If in menu mode, input is handled by UndertaleBattleManager snapping
-        if (isMenuSnappingMode) return;
+        if (_isMenuSnappingMode) return;
 
         // Free movement in Dodge Mode (Arrow keys & WASD)
         float moveX = 0f;
@@ -76,7 +90,7 @@ public class PlayerSoul : MonoBehaviour
         {
             // Snappy movement (constant speed, even diagonally)
             direction.Normalize();
-            Vector2 nextPos = (Vector2)transform.position + direction * speed * Time.deltaTime;
+            Vector2 nextPos = (Vector2)transform.position + direction * _speed * Time.deltaTime;
 
             if (BattleBox.Instance != null)
             {
@@ -91,39 +105,39 @@ public class PlayerSoul : MonoBehaviour
 
     public void SetMenuSnappingMode(bool enabled)
     {
-        isMenuSnappingMode = enabled;
+        _isMenuSnappingMode = enabled;
         // Make soul heart color red (normal) or transparent if hidden (e.g. FightExecute)
-        if (spriteRenderer != null)
+        if (_spriteRenderer != null)
         {
-            spriteRenderer.enabled = true;
-            spriteRenderer.color = Color.red;
+            _spriteRenderer.enabled = true;
+            _spriteRenderer.color = Color.red;
         }
     }
 
     public void TakeDamage(int dmg)
     {
-        if (isInvulnerable) return;
+        if (_isInvulnerable) return;
         
         // If in victory/game over, ignore
         if (UndertaleBattleManager.Instance != null && 
-            (UndertaleBattleManager.Instance.currentState == UndertaleBattleManager.BattleState.Victory ||
-             UndertaleBattleManager.Instance.currentState == UndertaleBattleManager.BattleState.GameOver))
+            (UndertaleBattleManager.Instance.CurrentState == UndertaleBattleManager.BattleState.Victory ||
+             UndertaleBattleManager.Instance.CurrentState == UndertaleBattleManager.BattleState.GameOver))
         {
             return;
         }
 
-        currentHP -= dmg;
-        if (currentHP < 0) currentHP = 0;
+        _currentHP -= dmg;
+        if (_currentHP < 0) _currentHP = 0;
 
         UpdateHPUI();
 
-        // Play procedural hurt audio
-        if (RetroSoundGenerator.Instance != null)
+        // Play hurt audio
+        if (SoundManager.Instance != null)
         {
-            RetroSoundGenerator.Instance.PlayHurt();
+            SoundManager.Instance.PlayHurt();
         }
 
-        if (currentHP <= 0)
+        if (_currentHP <= 0)
         {
             Die();
         }
@@ -135,8 +149,8 @@ public class PlayerSoul : MonoBehaviour
 
     public void Heal(int amt)
     {
-        currentHP += amt;
-        if (currentHP > maxHP) currentHP = maxHP;
+        _currentHP += amt;
+        if (_currentHP > _maxHP) _currentHP = _maxHP;
         UpdateHPUI();
     }
 
@@ -144,7 +158,7 @@ public class PlayerSoul : MonoBehaviour
     {
         if (HPBar.Instance != null)
         {
-            HPBar.Instance.OnDamageTaken(currentHP, maxHP);
+            HPBar.Instance.OnDamageTaken(_currentHP, _maxHP);
         }
     }
 
@@ -155,69 +169,62 @@ public class PlayerSoul : MonoBehaviour
             UndertaleBattleManager.Instance.TriggerGameOver();
         }
         // Change color to fractured grey or disable renderer
-        if (spriteRenderer != null)
+        if (_spriteRenderer != null)
         {
-            spriteRenderer.color = Color.gray;
+            _spriteRenderer.color = Color.gray;
         }
     }
 
     private IEnumerator FlashInvulnerableRoutine()
     {
-        isInvulnerable = true;
+        _isInvulnerable = true;
         float elapsed = 0f;
         bool visible = true;
 
-        while (elapsed < invulnDuration)
+        while (elapsed < _invulnDuration)
         {
             visible = !visible;
-            if (spriteRenderer != null)
+            if (_spriteRenderer != null)
             {
-                spriteRenderer.color = visible ? Color.red : new Color(1, 0, 0, 0.2f);
+                _spriteRenderer.color = visible ? Color.red : new Color(1, 0, 0, 0.2f);
             }
             yield return new WaitForSeconds(0.08f);
             elapsed += 0.08f;
         }
 
-        if (spriteRenderer != null)
+        if (_spriteRenderer != null)
         {
-            spriteRenderer.color = Color.red;
+            _spriteRenderer.color = Color.red;
         }
-        isInvulnerable = false;
+        _isInvulnerable = false;
     }
 
-    Sprite CreateHeartSprite()
+    public void TriggerShield(float duration)
     {
-        Texture2D tex = new Texture2D(16, 16);
-        tex.filterMode = FilterMode.Point;
-        
-        int[,] heartGrid = new int[16, 16] {
-            {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-            {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-            {0,0,1,1,1,0,0,0,0,0,1,1,1,0,0,0},
-            {0,1,1,1,1,1,0,0,0,1,1,1,1,1,0,0},
-            {0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,0},
-            {0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0},
-            {0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0},
-            {0,0,1,1,1,1,1,1,1,1,1,1,1,0,0,0},
-            {0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0},
-            {0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0},
-            {0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0},
-            {0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0},
-            {0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0},
-            {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-            {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-            {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-        };
+        StartCoroutine(ShieldRoutine(duration));
+    }
 
-        for (int y = 0; y < 16; y++)
+    private IEnumerator ShieldRoutine(float duration)
+    {
+        _isInvulnerable = true;
+        float elapsed = 0f;
+        bool toggle = true;
+
+        while (elapsed < duration)
         {
-            for (int x = 0; x < 16; x++)
+            toggle = !toggle;
+            if (_spriteRenderer != null)
             {
-                int gridVal = heartGrid[15 - y, x];
-                tex.SetPixel(x, y, gridVal == 1 ? Color.white : Color.clear); // Create white texture so sprite color is easily tinted
+                _spriteRenderer.color = toggle ? Color.yellow : new Color(1f, 0.92f, 0.016f, 0.3f);
             }
+            yield return new WaitForSeconds(0.1f);
+            elapsed += 0.1f;
         }
-        tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, 16, 16), new Vector2(0.5f, 0.5f), 16f);
+
+        if (_spriteRenderer != null)
+        {
+            _spriteRenderer.color = Color.red;
+        }
+        _isInvulnerable = false;
     }
 }

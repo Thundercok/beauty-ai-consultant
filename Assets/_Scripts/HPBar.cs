@@ -4,28 +4,34 @@ using TMPro;
 
 public class HPBar : MonoBehaviour
 {
-    public static HPBar Instance;
+    public static HPBar Instance { get; private set; }
 
-    public Image fillBar;
-    public TextMeshProUGUI statsText; // Renders e.g. "CHARA   LV 1   HP"
-    public TextMeshProUGUI hpNumbersText; // Renders e.g. "20 / 20"
+    [Header("UI References")]
+    [SerializeField] private Image _fillBar;
+    [SerializeField] private TextMeshProUGUI _statsText; // Renders e.g. "CHARA   LV 1   HP"
+    [SerializeField] private TextMeshProUGUI _hpNumbersText; // Renders e.g. "20 / 20"
 
-    private float targetFill = 1f;
-    private float lerpSpeed = 5f;
+    [Header("Settings")]
+    [SerializeField] private float _lerpSpeed = 5f;
 
-    void Awake()
+    private float _targetFill = 1f;
+
+    private void Awake()
     {
-        Instance = this;
-
-        if (fillBar != null)
+        if (Instance == null)
         {
-            if (fillBar.sprite == null)
-            {
-                fillBar.sprite = CreateWhiteSprite();
-            }
-            
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        if (_fillBar != null)
+        {
             // Set colors to Undertale standard: Yellow for health, dark red for background
-            fillBar.color = Color.yellow;
+            _fillBar.color = Color.yellow;
             
             Image bgBar = GetComponent<Image>();
             if (bgBar != null)
@@ -35,43 +41,49 @@ public class HPBar : MonoBehaviour
         }
     }
 
+    private void Update()
+    {
+        if (_fillBar != null)
+        {
+            _fillBar.fillAmount = Mathf.Lerp(_fillBar.fillAmount, _targetFill, Time.deltaTime * _lerpSpeed);
+        }
+    }
+
     public void OnDamageTaken(int currentHP, int maxHP)
     {
         if (maxHP <= 0) return;
-        targetFill = (float)currentHP / maxHP;
-        targetFill = Mathf.Clamp01(targetFill);
+        _targetFill = (float)currentHP / maxHP;
+        _targetFill = Mathf.Clamp01(_targetFill);
 
-        // Update name, LV and HP text
-        if (statsText != null)
+        // Update name, LV, HP, and Graze/Score text
+        if (_statsText != null)
         {
-            statsText.text = "CHARA   LV 1      HP";
+            int score = ScoreManager.Instance != null ? ScoreManager.Instance.grazeCount : 0;
+            _statsText.text = $"CHARA   LV 1   HP   (GRAZE: {score})";
         }
 
-        if (hpNumbersText != null)
+        if (_hpNumbersText != null)
         {
-            hpNumbersText.text = $"{currentHP} / {maxHP}";
-        }
-    }
-
-    void Update()
-    {
-        if (fillBar != null)
-        {
-            fillBar.fillAmount = Mathf.Lerp(fillBar.fillAmount, targetFill, Time.deltaTime * lerpSpeed);
+            _hpNumbersText.text = $"{currentHP} / {maxHP}";
         }
     }
 
-    private Sprite CreateWhiteSprite()
+    // Properties for editor setup script to assign dynamically if needed
+    public Image FillBar
     {
-        Texture2D tex = new Texture2D(2, 2);
-        for (int y = 0; y < 2; y++)
-        {
-            for (int x = 0; x < 2; x++)
-            {
-                tex.SetPixel(x, y, Color.white);
-            }
-        }
-        tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, 2, 2), new Vector2(0.5f, 0.5f), 100f);
+        get => _fillBar;
+        set => _fillBar = value;
+    }
+
+    public TextMeshProUGUI StatsText
+    {
+        get => _statsText;
+        set => _statsText = value;
+    }
+
+    public TextMeshProUGUI HPNumbersText
+    {
+        get => _hpNumbersText;
+        set => _hpNumbersText = value;
     }
 }

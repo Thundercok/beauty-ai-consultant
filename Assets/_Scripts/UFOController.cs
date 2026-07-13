@@ -8,6 +8,7 @@ public class UFOController : MonoBehaviour
 
     [Header("Movement Settings")]
     public float speed = 10;
+    public float maxVelocity = 12f;
     private Rigidbody2D rb;
 
     [Header("Gameplay Variables")]
@@ -19,6 +20,9 @@ public class UFOController : MonoBehaviour
     [Header("Health Settings")]
     public int maxHP = 20;
     public int currentHP;
+    public float invulnDuration = 1.0f;
+    private bool isInvulnerable = false;
+    private SpriteRenderer spriteRenderer;
 
     [Header("UI References")]
     public TextMeshProUGUI scoreText;
@@ -32,6 +36,7 @@ public class UFOController : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
         currentHP = maxHP;
         UpdateUI();
 
@@ -54,6 +59,12 @@ public class UFOController : MonoBehaviour
         float h = Input.GetAxis("Horizontal");
         float v = Input.GetAxis("Vertical");
         rb.AddForce(new Vector2(h, v) * speed);
+
+        // Clamp velocity to prevent infinite acceleration and improve control
+        if (rb.linearVelocity.magnitude > maxVelocity)
+        {
+            rb.linearVelocity = rb.linearVelocity.normalized * maxVelocity;
+        }
 
         CalculateTimer();
     }
@@ -86,7 +97,7 @@ public class UFOController : MonoBehaviour
 
     public void TakeDamage(int dmg)
     {
-        if (isGameOver) return;
+        if (isGameOver || isInvulnerable) return;
 
         currentHP -= dmg;
         if (HPBar.Instance != null)
@@ -94,11 +105,44 @@ public class UFOController : MonoBehaviour
             HPBar.Instance.OnDamageTaken(currentHP, maxHP);
         }
 
+        if (SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlayHurt();
+        }
+
         if (currentHP <= 0)
         {
             currentHP = 0;
             PlayerDied();
         }
+        else
+        {
+            StartCoroutine(FlashInvulnerableRoutine());
+        }
+    }
+
+    private System.Collections.IEnumerator FlashInvulnerableRoutine()
+    {
+        isInvulnerable = true;
+        float elapsed = 0f;
+        bool visible = true;
+
+        while (elapsed < invulnDuration)
+        {
+            visible = !visible;
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.color = visible ? Color.white : new Color(1f, 1f, 1f, 0.2f);
+            }
+            yield return new WaitForSeconds(0.08f);
+            elapsed += 0.08f;
+        }
+
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = Color.white;
+        }
+        isInvulnerable = false;
     }
 
     void OnTriggerEnter2D(Collider2D other)
@@ -113,6 +157,11 @@ public class UFOController : MonoBehaviour
 
             score++;
             UpdateUI();
+
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.PlaySelect();
+            }
         }
 
         if (other.CompareTag("Enemy"))

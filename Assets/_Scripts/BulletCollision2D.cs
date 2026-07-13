@@ -46,6 +46,13 @@ public class Bullet : MonoBehaviour
             {
                 ScoreManager.Instance.AddGraze();
             }
+
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.PlayTextBlip(); // Play short retro tick SFX
+            }
+
+            CreateGrazeText("+1", playerTarget.position + Vector3.up * 0.3f);
         }
 
         // Hit logic
@@ -99,5 +106,47 @@ public class Bullet : MonoBehaviour
                 }
             }
         }
+    }
+
+    private void CreateGrazeText(string text, Vector3 position)
+    {
+        GameObject go = new GameObject("GrazeText");
+        go.transform.position = position;
+
+        Canvas canvas = FindFirstObjectByType<Canvas>();
+        if (canvas != null)
+        {
+            go.transform.SetParent(canvas.transform, true);
+        }
+
+        TMPro.TextMeshProUGUI tmp = go.AddComponent<TMPro.TextMeshProUGUI>();
+        tmp.text = text;
+        tmp.color = new Color(0.9f, 0.9f, 0.9f, 0.8f);
+        tmp.fontSize = 14;
+        tmp.fontStyle = TMPro.FontStyles.Bold;
+        tmp.alignment = TMPro.TextAlignmentOptions.Center;
+
+        RectTransform rt = go.GetComponent<RectTransform>();
+        if (rt != null)
+        {
+            rt.sizeDelta = new Vector2(80, 30);
+        }
+
+        StartCoroutine(FloatAndDestroyGraze(go, tmp));
+    }
+
+    private IEnumerator FloatAndDestroyGraze(GameObject go, TMPro.TextMeshProUGUI text)
+    {
+        float duration = 0.5f;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            if (go == null || text == null) yield break;
+            elapsed += Time.deltaTime;
+            go.transform.position += Vector3.up * Time.deltaTime * 0.4f;
+            text.color = new Color(text.color.r, text.color.g, text.color.b, 0.8f - (elapsed / duration) * 0.8f);
+            yield return null;
+        }
+        Destroy(go);
     }
 }

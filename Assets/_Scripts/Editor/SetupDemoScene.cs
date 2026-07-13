@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -10,8 +11,24 @@ public static class SetupDemoScene
     [MenuItem("Tools/Setup UFO Demo Scene")]
     public static void CreateUFODemoScene()
     {
-        // 1. Setup Camera (create if completely deleted)
-        Camera mainCam = Camera.main;
+        // 0. Open the Scene or create it if missing
+        string scenePath = "Assets/_Scenes/00_Scene.unity";
+        if (!System.IO.File.Exists(scenePath))
+        {
+            UnityEngine.SceneManagement.Scene newScene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+            EditorSceneManager.SaveScene(newScene, scenePath);
+        }
+        UnityEngine.SceneManagement.Scene activeScene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+
+        // Remove default Directional Light since we want an ambient retro look
+        GameObject dirLight = GameObject.Find("Directional Light");
+        if (dirLight != null)
+        {
+            Object.DestroyImmediate(dirLight);
+        }
+
+        // 1. Setup Camera
+        Camera mainCam = GameObject.FindFirstObjectByType<Camera>();
         if (mainCam == null)
         {
             GameObject camGo = new GameObject("Main Camera", typeof(Camera), typeof(AudioListener));
@@ -23,26 +40,30 @@ public static class SetupDemoScene
         if (mainCam != null)
         {
             mainCam.transform.position = new Vector3(0, 0, -10);
+            mainCam.orthographic = true;
+            mainCam.orthographicSize = 10f; // Perfect size to view the boundaries
+            mainCam.backgroundColor = Color.black;
+            mainCam.clearFlags = CameraClearFlags.SolidColor;
             if (mainCam.GetComponent<CameraFollow>() == null)
             {
                 mainCam.gameObject.AddComponent<CameraFollow>();
             }
         }
 
-        // 2. Setup Background (create if completely deleted)
+        // 2. Setup Background
         GameObject bg = GameObject.Find("Background_0");
         if (bg == null)
         {
             bg = new GameObject("Background_0");
-            SpriteRenderer bgSr = bg.AddComponent<SpriteRenderer>();
-            Sprite bgSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Assets/Background.png");
-            if (bgSprite != null)
-            {
-                bgSr.sprite = bgSprite;
-            }
-            bgSr.sortingOrder = -10; // Render behind everything
-            Debug.Log("Background_0 not found. Created a new Background_0.");
         }
+        SpriteRenderer bgSr = bg.GetComponent<SpriteRenderer>();
+        if (bgSr == null) bgSr = bg.AddComponent<SpriteRenderer>();
+        Sprite bgSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Assets/Background.png");
+        if (bgSprite != null)
+        {
+            bgSr.sprite = bgSprite;
+        }
+        bgSr.sortingOrder = -10; // Render behind everything
 
         // 3. Create Boundary Colliders (solid box colliders surrounding the play area)
         GameObject boundariesGo = GameObject.Find("Boundaries");
@@ -86,36 +107,43 @@ public static class SetupDemoScene
         if (ufo == null)
         {
             ufo = new GameObject("UFO");
-            ufo.tag = "Player";
-            
-            // Add SpriteRenderer
-            SpriteRenderer sr = ufo.AddComponent<SpriteRenderer>();
-            Sprite ufoSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Assets/UFO.png");
-            if (ufoSprite != null)
-            {
-                sr.sprite = ufoSprite;
-            }
-
-            // Add Collider & Rigidbody
-            ufo.AddComponent<CircleCollider2D>();
-            Rigidbody2D rb = ufo.AddComponent<Rigidbody2D>();
-            rb.gravityScale = 0f;
-            rb.linearDamping = 1.5f; // drag
-            
-            // Add UFOController
-            ufo.AddComponent<UFOController>();
-            Debug.Log("Created UFO Player ship.");
         }
+        ufo.tag = "Player";
+        
+        SpriteRenderer sr = ufo.GetComponent<SpriteRenderer>();
+        if (sr == null) sr = ufo.AddComponent<SpriteRenderer>();
+        Sprite ufoSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Assets/UFO.png");
+        if (ufoSprite != null)
+        {
+            sr.sprite = ufoSprite;
+        }
+
+        CircleCollider2D ufoCol = ufo.GetComponent<CircleCollider2D>();
+        if (ufoCol == null) ufoCol = ufo.AddComponent<CircleCollider2D>();
+        ufoCol.isTrigger = false;
+
+        Rigidbody2D rb = ufo.GetComponent<Rigidbody2D>();
+        if (rb == null) rb = ufo.AddComponent<Rigidbody2D>();
+        rb.gravityScale = 0f;
+        rb.linearDamping = 1.5f; // drag
+        
+        UFOController ufoCtrl = ufo.GetComponent<UFOController>();
+        if (ufoCtrl == null) ufoCtrl = ufo.AddComponent<UFOController>();
+        
+        // Good default settings
+        ufoCtrl.speed = 15f;
+        ufoCtrl.requiredCoinsToWin = 15;
+        ufoCtrl.timeRemaining = 60f;
+        ufoCtrl.maxHP = 20;
 
         // 5. Create Canvas and UI
         GameObject canvasGo = GameObject.Find("Canvas");
         if (canvasGo == null)
         {
             canvasGo = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-            Canvas canvas = canvasGo.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            Debug.Log("Canvas not found. Created a new Canvas.");
         }
+        Canvas canvas = canvasGo.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
 
         // Create Score Text (TMP)
         GameObject scoreTextGo = GameObject.Find("ScoreText");
@@ -123,25 +151,24 @@ public static class SetupDemoScene
         {
             scoreTextGo = new GameObject("ScoreText", typeof(RectTransform));
             scoreTextGo.transform.SetParent(canvasGo.transform, false);
-            TextMeshProUGUI tmp = scoreTextGo.AddComponent<TextMeshProUGUI>();
-            tmp.fontSize = 24;
-            tmp.color = Color.white;
-            tmp.alignment = TextAlignmentOptions.TopLeft;
-            tmp.text = "Coins: 0 / 15";
-            
-            RectTransform rect = scoreTextGo.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0, 1);
-            rect.anchorMax = new Vector2(0, 1);
-            rect.pivot = new Vector2(0, 1);
-            rect.anchoredPosition = new Vector2(20, -20);
-            rect.sizeDelta = new Vector2(300, 50);
+        }
+        TextMeshProUGUI scoreTmp = scoreTextGo.GetComponent<TextMeshProUGUI>();
+        if (scoreTmp == null) scoreTmp = scoreTextGo.AddComponent<TextMeshProUGUI>();
+        scoreTmp.fontSize = 24;
+        scoreTmp.color = Color.white;
+        scoreTmp.alignment = TextAlignmentOptions.TopLeft;
+        scoreTmp.text = "Coins: 0 / 15";
+        
+        RectTransform scoreRect = scoreTextGo.GetComponent<RectTransform>();
+        scoreRect.anchorMin = new Vector2(0, 1);
+        scoreRect.anchorMax = new Vector2(0, 1);
+        scoreRect.pivot = new Vector2(0, 1);
+        scoreRect.anchoredPosition = new Vector2(20, -20);
+        scoreRect.sizeDelta = new Vector2(300, 50);
 
-            // Hook up reference to UFOController
-            UFOController ufoCtrl = ufo.GetComponent<UFOController>();
-            if (ufoCtrl != null)
-            {
-                ufoCtrl.scoreText = tmp;
-            }
+        if (ufoCtrl != null)
+        {
+            ufoCtrl.scoreText = scoreTmp;
         }
 
         // Create Timer Text (TMP)
@@ -150,24 +177,24 @@ public static class SetupDemoScene
         {
             timerTextGo = new GameObject("TimerText", typeof(RectTransform));
             timerTextGo.transform.SetParent(canvasGo.transform, false);
-            TextMeshProUGUI tmp = timerTextGo.AddComponent<TextMeshProUGUI>();
-            tmp.fontSize = 24;
-            tmp.color = Color.white;
-            tmp.alignment = TextAlignmentOptions.TopRight;
-            tmp.text = "Time: 60s";
+        }
+        TextMeshProUGUI timerTmp = timerTextGo.GetComponent<TextMeshProUGUI>();
+        if (timerTmp == null) timerTmp = timerTextGo.AddComponent<TextMeshProUGUI>();
+        timerTmp.fontSize = 24;
+        timerTmp.color = Color.white;
+        timerTmp.alignment = TextAlignmentOptions.TopRight;
+        timerTmp.text = "Time: 60s";
 
-            RectTransform rect = timerTextGo.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(1, 1);
-            rect.anchorMax = new Vector2(1, 1);
-            rect.pivot = new Vector2(1, 1);
-            rect.anchoredPosition = new Vector2(-20, -20);
-            rect.sizeDelta = new Vector2(300, 50);
+        RectTransform timerRect = timerTextGo.GetComponent<RectTransform>();
+        timerRect.anchorMin = new Vector2(1, 1);
+        timerRect.anchorMax = new Vector2(1, 1);
+        timerRect.pivot = new Vector2(1, 1);
+        timerRect.anchoredPosition = new Vector2(-20, -20);
+        timerRect.sizeDelta = new Vector2(300, 50);
 
-            UFOController ufoCtrl = ufo.GetComponent<UFOController>();
-            if (ufoCtrl != null)
-            {
-                ufoCtrl.timerText = tmp;
-            }
+        if (ufoCtrl != null)
+        {
+            ufoCtrl.timerText = timerTmp;
         }
 
         // Create HPBar UI under Canvas
@@ -176,72 +203,163 @@ public static class SetupDemoScene
         {
             hpBarGo = new GameObject("HPBar", typeof(RectTransform));
             hpBarGo.transform.SetParent(canvasGo.transform, false);
-            HPBar hpBarScript = hpBarGo.AddComponent<HPBar>();
-
-            RectTransform rect = hpBarGo.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.5f, 0);
-            rect.anchorMax = new Vector2(0.5f, 0);
-            rect.pivot = new Vector2(0.5f, 0);
-            rect.anchoredPosition = new Vector2(0, 30);
-            rect.sizeDelta = new Vector2(200, 20);
-
-            // Add background Image
-            Image bgImg = hpBarGo.AddComponent<Image>();
-            bgImg.color = Color.gray;
-
-            // Add fill Image
-            GameObject fillGo = new GameObject("Fill", typeof(RectTransform));
-            fillGo.transform.SetParent(hpBarGo.transform, false);
-            Image fillImg = fillGo.AddComponent<Image>();
-            fillImg.color = Color.green;
-            fillImg.type = Image.Type.Filled;
-            fillImg.fillMethod = Image.FillMethod.Horizontal;
-            fillImg.fillOrigin = (int)Image.OriginHorizontal.Left;
-
-            RectTransform fillRect = fillGo.GetComponent<RectTransform>();
-            fillRect.anchorMin = Vector2.zero;
-            fillRect.anchorMax = Vector2.one;
-            fillRect.sizeDelta = Vector2.zero;
-
-            hpBarScript.fillBar = fillImg;
         }
+        HPBar hpBarScript = hpBarGo.GetComponent<HPBar>();
+        if (hpBarScript == null) hpBarScript = hpBarGo.AddComponent<HPBar>();
 
-        // 6. Create GameManager
+        RectTransform hpBarRect = hpBarGo.GetComponent<RectTransform>();
+        hpBarRect.anchorMin = new Vector2(0.5f, 0);
+        hpBarRect.anchorMax = new Vector2(0.5f, 0);
+        hpBarRect.pivot = new Vector2(0.5f, 0);
+        hpBarRect.anchoredPosition = new Vector2(0, 30);
+        hpBarRect.sizeDelta = new Vector2(200, 20);
+
+        Image hpBarBgImg = hpBarGo.GetComponent<Image>();
+        if (hpBarBgImg == null) hpBarBgImg = hpBarGo.AddComponent<Image>();
+        hpBarBgImg.color = Color.gray;
+
+        // Find or create Fill child GameObject
+        GameObject fillGo = null;
+        Transform fillTransform = hpBarGo.transform.Find("Fill");
+        if (fillTransform != null) fillGo = fillTransform.gameObject;
+        if (fillGo == null)
+        {
+            fillGo = new GameObject("Fill", typeof(RectTransform));
+            fillGo.transform.SetParent(hpBarGo.transform, false);
+        }
+        Image fillImg = fillGo.GetComponent<Image>();
+        if (fillImg == null) fillImg = fillGo.AddComponent<Image>();
+        fillImg.color = Color.green;
+        fillImg.type = Image.Type.Filled;
+        fillImg.fillMethod = Image.FillMethod.Horizontal;
+        fillImg.fillOrigin = (int)Image.OriginHorizontal.Left;
+
+        RectTransform fillRect = fillGo.GetComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.sizeDelta = Vector2.zero;
+
+        hpBarScript.FillBar = fillImg;
+
+        // 6. Setup SoundManager in scene
+        GameObject soundGo = GameObject.Find("SoundManager");
+        if (soundGo == null)
+        {
+            soundGo = new GameObject("SoundManager");
+        }
+        SoundManager soundManager = soundGo.GetComponent<SoundManager>();
+        if (soundManager == null) soundManager = soundGo.AddComponent<SoundManager>();
+        
+        AudioSource sfxSource = soundGo.GetComponent<AudioSource>();
+        if (sfxSource == null) sfxSource = soundGo.AddComponent<AudioSource>();
+        soundManager.AudioSource = sfxSource;
+
+        soundManager.SelectClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Assets/Undertale/SFX/snd_select.wav");
+        soundManager.TextClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Assets/Undertale/SFX/snd_text.wav");
+        soundManager.SlashClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Assets/Undertale/SFX/snd_slash.wav");
+        soundManager.HurtClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Assets/Undertale/SFX/snd_hurt.wav");
+
+        // 7. Setup Background Music (BGMPlayer) in scene
+        GameObject bgmGo = GameObject.Find("BGMPlayer");
+        if (bgmGo == null)
+        {
+            bgmGo = new GameObject("BGMPlayer");
+        }
+        AudioSource bgmSource = bgmGo.GetComponent<AudioSource>();
+        if (bgmSource == null) bgmSource = bgmGo.AddComponent<AudioSource>();
+        bgmSource.clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Assets/Undertale/ScatteredAndLost.mp3");
+        bgmSource.loop = true;
+        bgmSource.playOnAwake = true;
+        bgmSource.volume = 0.5f;
+
+        // 8. Create GameManager
         GameObject gm = GameObject.Find("GameManager");
         if (gm == null)
         {
             gm = new GameObject("GameManager");
-            GameManager gmScript = gm.AddComponent<GameManager>();
-            gmScript.pickupPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/pickupPrefab.prefab");
-            gmScript.enemyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/EnemyPrefab.prefab");
-            Debug.Log("Created GameManager.");
         }
+        GameManager gmScript = gm.GetComponent<GameManager>();
+        if (gmScript == null) gmScript = gm.AddComponent<GameManager>();
+        gmScript.pickupPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/pickupPrefab.prefab");
+        gmScript.enemyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/EnemyPrefab.prefab");
 
-        // 7. Create Phase1Spawner
+        // 9. Clean up redundant Phase1Spawner if it exists in UFO Scene
         GameObject spawner = GameObject.Find("Phase1Spawner");
-        if (spawner == null)
+        if (spawner != null)
         {
-            spawner = new GameObject("Phase1Spawner");
-            spawner.AddComponent<Phase1Spawner>();
+            Object.DestroyImmediate(spawner);
+            Debug.Log("Removed redundant Phase1Spawner from UFO scene.");
         }
 
-        // 8. Create EventSystem if missing
+        // 10. Create EventSystem if missing
         if (GameObject.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
         {
             new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.EventSystems.StandaloneInputModule));
         }
 
-        Debug.Log("UFO Demo Scene setup completed successfully!");
+        // 11. Save the Scene
+        EditorSceneManager.MarkSceneDirty(activeScene);
+        EditorSceneManager.SaveScene(activeScene);
+
+        Debug.Log("UFO Demo Scene setup completed successfully and saved!");
     }
 
     [MenuItem("Tools/Setup Undertale Demo Scene")]
     public static void CreateUndertaleDemoScene()
     {
-        // 0. Ensure physical PNG assets and Prefab assets exist in project directories
+        // 0. Ensure assets and directory structure exist
         EnsureUndertaleAssetsAndPrefabsExist();
 
-        // 1. Setup Camera
-        Camera mainCam = Camera.main;
+        // 1. Open the Scene or create it if missing
+        string scenePath = "Assets/_Scenes/01_Underta.unity";
+        if (!System.IO.File.Exists(scenePath))
+        {
+            UnityEngine.SceneManagement.Scene newScene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+            EditorSceneManager.SaveScene(newScene, scenePath);
+        }
+        UnityEngine.SceneManagement.Scene activeScene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+
+        // Remove default Directional Light since Undertale is ambient-dark
+        GameObject dirLight = GameObject.Find("Directional Light");
+        if (dirLight != null)
+        {
+            Object.DestroyImmediate(dirLight);
+        }
+
+        // Deep clean the scene from any broken references, ScoreManager, and RetroSoundGenerator
+        var allObjects = new System.Collections.Generic.List<GameObject>();
+        foreach (GameObject root in activeScene.GetRootGameObjects())
+        {
+            GetChildGameObjectsRecursively(root, allObjects);
+        }
+
+        foreach (GameObject go in allObjects)
+        {
+            if (go == null) continue;
+
+            bool isBrokenPrefab = PrefabUtility.IsPartOfPrefabInstance(go) && PrefabUtility.GetCorrespondingObjectFromSource(go) == null;
+            bool isWrongObject = go.name == "ScoreManager" || go.name == "RetroSoundGenerator";
+
+            if (isBrokenPrefab || isWrongObject)
+            {
+                Debug.Log($"[Cleanup] Destroying invalid/broken object in scene: {go.name}");
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        // CRITICAL CLEAR: Destroy old setup components to enforce clean prefab connections and correct SpriteRenderers!
+        string[] objectsToClear = { "PlayerSoul", "BattleBox", "SoundManager", "MrOshino", "Canvas", "Phase1Spawner", "UndertaleBattleManager", "ScoreManager" };
+        foreach (string objName in objectsToClear)
+        {
+            GameObject existingGo = GameObject.Find(objName);
+            if (existingGo != null)
+            {
+                Object.DestroyImmediate(existingGo);
+            }
+        }
+
+        // 2. Setup Camera
+        Camera mainCam = GameObject.FindFirstObjectByType<Camera>();
         if (mainCam == null)
         {
             GameObject camGo = new GameObject("Main Camera", typeof(Camera), typeof(AudioListener));
@@ -257,6 +375,7 @@ public static class SetupDemoScene
             mainCam.orthographicSize = 3.5f;
             mainCam.backgroundColor = Color.black;
             mainCam.clearFlags = CameraClearFlags.SolidColor;
+            mainCam.cullingMask = -1; // Render everything
             
             // Remove CameraFollow since the camera is static for the battle
             CameraFollow follow = mainCam.GetComponent<CameraFollow>();
@@ -266,94 +385,90 @@ public static class SetupDemoScene
             }
         }
 
-        // 2. Setup RetroSoundGenerator from Prefab
-        GameObject soundGo = GameObject.Find("RetroSoundGenerator");
-        if (soundGo == null)
-        {
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/Undertale/RetroSoundGenerator.prefab");
-            if (prefab != null)
-            {
-                soundGo = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
-                soundGo.name = "RetroSoundGenerator";
-            }
-            else
-            {
-                soundGo = new GameObject("RetroSoundGenerator", typeof(RetroSoundGenerator));
-            }
-            Debug.Log("Instantiated RetroSoundGenerator.");
-        }
+        // 3. Setup SoundManager
+        GameObject soundGo = new GameObject("SoundManager");
+        SoundManager soundManager = soundGo.AddComponent<SoundManager>();
 
-        // 3. Create BattleBox from Prefab
-        GameObject boxGo = GameObject.Find("BattleBox");
-        if (boxGo == null)
+        AudioSource sfxSource = soundGo.AddComponent<AudioSource>();
+        soundManager.AudioSource = sfxSource;
+
+        // Assign standard WAV audio clips
+        soundManager.SelectClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Assets/Undertale/SFX/snd_select.wav");
+        soundManager.TextClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Assets/Undertale/SFX/snd_text.wav");
+        soundManager.SlashClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Assets/Undertale/SFX/snd_slash.wav");
+        soundManager.HurtClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Assets/Undertale/SFX/snd_hurt.wav");
+
+        // 4. Create BattleBox from Prefab
+        GameObject boxGo;
+        GameObject prefabBox = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/Undertale/BattleBox.prefab");
+        if (prefabBox != null)
         {
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/Undertale/BattleBox.prefab");
-            if (prefab != null)
-            {
-                boxGo = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
-                boxGo.name = "BattleBox";
-                boxGo.transform.position = new Vector3(315, 2.5f, 0);
-            }
-            else
-            {
-                boxGo = new GameObject("BattleBox", typeof(BattleBox));
-                boxGo.transform.position = new Vector3(315, 2.5f, 0);
-            }
-            Debug.Log("Instantiated BattleBox Prefab.");
+            boxGo = PrefabUtility.InstantiatePrefab(prefabBox) as GameObject;
+            boxGo.name = "BattleBox";
+            boxGo.transform.position = new Vector3(315, 2.5f, 0);
+        }
+        else
+        {
+            boxGo = new GameObject("BattleBox", typeof(BattleBox));
+            boxGo.transform.position = new Vector3(315, 2.5f, 0);
         }
         BattleBox box = boxGo.GetComponent<BattleBox>();
-        box.size = new Vector2(8.5f, 2.5f);
-        box.targetSize = new Vector2(8.5f, 2.5f);
+        box.Size = new Vector2(8.5f, 2.5f);
+        box.TargetSize = new Vector2(8.5f, 2.5f);
 
-        // 4. Create PlayerSoul from Prefab
-        GameObject soulGo = GameObject.Find("PlayerSoul");
-        if (soulGo == null)
+        // 5. Create PlayerSoul from Prefab (Ensures correct fresh SpriteRenderer settings!)
+        GameObject soulGo;
+        GameObject prefabSoul = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/Undertale/PlayerSoul.prefab");
+        if (prefabSoul != null)
         {
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/Undertale/PlayerSoul.prefab");
-            if (prefab != null)
-            {
-                soulGo = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
-                soulGo.name = "PlayerSoul";
-                soulGo.transform.position = new Vector3(315, 2.5f, 0);
-            }
-            else
-            {
-                soulGo = new GameObject("PlayerSoul", typeof(PlayerSoul));
-                soulGo.transform.position = new Vector3(315, 2.5f, 0);
-            }
-            Debug.Log("Instantiated PlayerSoul Prefab.");
+            soulGo = PrefabUtility.InstantiatePrefab(prefabSoul) as GameObject;
+            soulGo.name = "PlayerSoul";
+            soulGo.transform.position = new Vector3(315, 2.5f, 0);
+        }
+        else
+        {
+            soulGo = new GameObject("PlayerSoul", typeof(PlayerSoul));
+            soulGo.transform.position = new Vector3(315, 2.5f, 0);
         }
         PlayerSoul soul = soulGo.GetComponent<PlayerSoul>();
 
-        // 5. Create Enemy "Froggit" from Prefab
-        GameObject enemyGo = GameObject.Find("Froggit");
-        if (enemyGo == null)
+        // 6. Create Enemy "MrOshino" Visual Representation
+        GameObject enemyGo;
+        GameObject prefabEnemy = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/Undertale/Froggit.prefab");
+        if (prefabEnemy != null)
         {
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/Undertale/Froggit.prefab");
-            if (prefab != null)
-            {
-                enemyGo = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
-                enemyGo.name = "Froggit";
-                enemyGo.transform.position = new Vector3(315, 4.3f, 0);
-            }
-            else
-            {
-                enemyGo = new GameObject("Froggit", typeof(SpriteRenderer));
-                enemyGo.transform.position = new Vector3(315, 4.3f, 0);
-            }
-            Debug.Log("Instantiated Froggit Prefab.");
+            enemyGo = PrefabUtility.InstantiatePrefab(prefabEnemy) as GameObject;
+            enemyGo.name = "MrOshino";
+            enemyGo.transform.position = new Vector3(315, 4.0f, 0);
+        }
+        else
+        {
+            enemyGo = new GameObject("MrOshino", typeof(SpriteRenderer));
+            enemyGo.transform.position = new Vector3(315, 4.0f, 0);
         }
         SpriteRenderer enemySr = enemyGo.GetComponent<SpriteRenderer>();
 
-        // 6. Create Canvas & UI Elements
-        GameObject canvasGo = GameObject.Find("Canvas");
-        if (canvasGo == null)
+        // Load the customized sliced Oshino sprite assets
+        Sprite standSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Assets/Undertale/Oshino/Oshino_Stand.png");
+        Sprite breathe1Sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Assets/Undertale/Oshino/Oshino_Breathe_1.png");
+        Sprite breathe2Sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Assets/Undertale/Oshino/Oshino_Breathe_2.png");
+        Sprite woundedSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Assets/Undertale/Oshino/Oshino_Wounded.png");
+        Sprite defeatedSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Assets/Undertale/Oshino/Oshino_Defeated.png");
+
+        if (enemySr != null && standSprite != null)
         {
-            canvasGo = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-            Debug.Log("Created Canvas.");
+            enemySr.sprite = standSprite;
         }
+
+        // 7. Create Canvas & UI Elements
+        GameObject canvasGo = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         Canvas canvas = canvasGo.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        
+        // Set RenderMode to ScreenSpaceCamera and wire camera
+        canvas.renderMode = RenderMode.ScreenSpaceCamera;
+        canvas.worldCamera = mainCam;
+        canvas.planeDistance = 15f; // Canvas at Z = 5 (safely behind sprites at Z = 0)
+        canvas.sortingOrder = -10; // Renders behind sprites
 
         CanvasScaler scaler = canvasGo.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -362,31 +477,22 @@ public static class SetupDemoScene
         scaler.matchWidthOrHeight = 0.5f;
 
         // Create UIRoot
-        GameObject uiRootGo = GameObject.Find("UndertaleUIRoot");
-        if (uiRootGo == null)
-        {
-            uiRootGo = new GameObject("UndertaleUIRoot", typeof(RectTransform));
-            uiRootGo.transform.SetParent(canvasGo.transform, false);
-        }
+        GameObject uiRootGo = new GameObject("UndertaleUIRoot", typeof(RectTransform));
+        uiRootGo.transform.SetParent(canvasGo.transform, false);
         RectTransform uiRootRt = uiRootGo.GetComponent<RectTransform>();
         uiRootRt.anchorMin = Vector2.zero;
         uiRootRt.anchorMax = Vector2.one;
         uiRootRt.sizeDelta = Vector2.zero;
 
         // Create Dialogue Text Area
-        GameObject dialogueGo = GameObject.Find("DialogueText");
-        if (dialogueGo == null)
-        {
-            dialogueGo = new GameObject("DialogueText", typeof(RectTransform));
-            dialogueGo.transform.SetParent(uiRootGo.transform, false);
-        }
-        TextMeshProUGUI dialogueText = dialogueGo.GetComponent<TextMeshProUGUI>();
-        if (dialogueText == null) dialogueText = dialogueGo.AddComponent<TextMeshProUGUI>();
+        GameObject dialogueGo = new GameObject("DialogueText", typeof(RectTransform));
+        dialogueGo.transform.SetParent(uiRootGo.transform, false);
+        TextMeshProUGUI dialogueText = dialogueGo.AddComponent<TextMeshProUGUI>();
         dialogueText.fontSize = 20;
         dialogueText.color = Color.white;
         dialogueText.fontStyle = FontStyles.Bold;
         dialogueText.alignment = TextAlignmentOptions.TopLeft;
-        dialogueText.text = "* Froggit blocks the way!";
+        dialogueText.text = "* Mr. Oshino blocks the way!";
         
         RectTransform dialogueRt = dialogueGo.GetComponent<RectTransform>();
         dialogueRt.anchorMin = new Vector2(0.5f, 0.5f);
@@ -403,12 +509,8 @@ public static class SetupDemoScene
         for (int i = 0; i < 4; i++)
         {
             string bName = "Button_" + btnNames[i];
-            GameObject btnGo = GameObject.Find(bName);
-            if (btnGo == null)
-            {
-                btnGo = new GameObject(bName, typeof(RectTransform), typeof(Image));
-                btnGo.transform.SetParent(uiRootGo.transform, false);
-            }
+            GameObject btnGo = new GameObject(bName, typeof(RectTransform), typeof(Image));
+            btnGo.transform.SetParent(uiRootGo.transform, false);
             
             RectTransform btnRt = btnGo.GetComponent<RectTransform>();
             btnRt.anchorMin = new Vector2(0.5f, 0.5f);
@@ -418,21 +520,15 @@ public static class SetupDemoScene
             btnRt.sizeDelta = new Vector2(115f, 40f);
 
             Image img = btnGo.GetComponent<Image>();
-            img.color = Color.black;
+            img.color = Color.clear;
             
-            Outline outline = btnGo.GetComponent<Outline>();
-            if (outline == null) outline = btnGo.AddComponent<Outline>();
+            Outline outline = btnGo.AddComponent<Outline>();
             outline.effectColor = btnColors[i];
             outline.effectDistance = new Vector2(2, 2);
 
-            GameObject lblGo = GameObject.Find(bName + "_Label");
-            if (lblGo == null)
-            {
-                lblGo = new GameObject(bName + "_Label", typeof(RectTransform));
-                lblGo.transform.SetParent(btnGo.transform, false);
-            }
-            TextMeshProUGUI label = lblGo.GetComponent<TextMeshProUGUI>();
-            if (label == null) label = lblGo.AddComponent<TextMeshProUGUI>();
+            GameObject lblGo = new GameObject(bName + "_Label", typeof(RectTransform));
+            lblGo.transform.SetParent(btnGo.transform, false);
+            TextMeshProUGUI label = lblGo.AddComponent<TextMeshProUGUI>();
             label.text = btnNames[i];
             label.color = btnColors[i];
             label.fontSize = 22;
@@ -446,12 +542,8 @@ public static class SetupDemoScene
         }
 
         // Setup Stats Row
-        GameObject statsRowGo = GameObject.Find("StatsRow");
-        if (statsRowGo == null)
-        {
-            statsRowGo = new GameObject("StatsRow", typeof(RectTransform));
-            statsRowGo.transform.SetParent(uiRootGo.transform, false);
-        }
+        GameObject statsRowGo = new GameObject("StatsRow", typeof(RectTransform));
+        statsRowGo.transform.SetParent(uiRootGo.transform, false);
         RectTransform statsRowRt = statsRowGo.GetComponent<RectTransform>();
         statsRowRt.anchorMin = new Vector2(0.5f, 0.5f);
         statsRowRt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -459,14 +551,9 @@ public static class SetupDemoScene
         statsRowRt.anchoredPosition = new Vector2(0, -115f);
         statsRowRt.sizeDelta = new Vector2(540f, 30f);
 
-        GameObject statsTextGo = GameObject.Find("StatsText");
-        if (statsTextGo == null)
-        {
-            statsTextGo = new GameObject("StatsText", typeof(RectTransform));
-            statsTextGo.transform.SetParent(statsRowGo.transform, false);
-        }
-        TextMeshProUGUI statsText = statsTextGo.GetComponent<TextMeshProUGUI>();
-        if (statsText == null) statsText = statsTextGo.AddComponent<TextMeshProUGUI>();
+        GameObject statsTextGo = new GameObject("StatsText", typeof(RectTransform));
+        statsTextGo.transform.SetParent(statsRowGo.transform, false);
+        TextMeshProUGUI statsText = statsTextGo.AddComponent<TextMeshProUGUI>();
         statsText.text = "CHARA   LV 1      HP";
         statsText.fontSize = 18;
         statsText.color = Color.white;
@@ -479,12 +566,8 @@ public static class SetupDemoScene
         statsTextRt.anchoredPosition = new Vector2(10f, 0);
         statsTextRt.sizeDelta = new Vector2(250f, 30f);
 
-        GameObject hpBarGo = GameObject.Find("HPBar");
-        if (hpBarGo == null)
-        {
-            hpBarGo = new GameObject("HPBar", typeof(RectTransform), typeof(Image));
-            hpBarGo.transform.SetParent(statsRowGo.transform, false);
-        }
+        GameObject hpBarGo = new GameObject("HPBar", typeof(RectTransform), typeof(Image));
+        hpBarGo.transform.SetParent(statsRowGo.transform, false);
         RectTransform hpBarRt = hpBarGo.GetComponent<RectTransform>();
         hpBarRt.anchorMin = new Vector2(0.5f, 0.5f);
         hpBarRt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -495,16 +578,11 @@ public static class SetupDemoScene
         Image bgImg = hpBarGo.GetComponent<Image>();
         bgImg.color = new Color(0.7f, 0f, 0f);
 
-        HPBar hpBar = hpBarGo.GetComponent<HPBar>();
-        if (hpBar == null) hpBar = hpBarGo.AddComponent<HPBar>();
-        hpBar.statsText = statsText;
+        HPBar hpBar = hpBarGo.AddComponent<HPBar>();
+        hpBar.StatsText = statsText;
 
-        GameObject fillGo = GameObject.Find("HPBar_Fill");
-        if (fillGo == null)
-        {
-            fillGo = new GameObject("HPBar_Fill", typeof(RectTransform), typeof(Image));
-            fillGo.transform.SetParent(hpBarGo.transform, false);
-        }
+        GameObject fillGo = new GameObject("HPBar_Fill", typeof(RectTransform), typeof(Image));
+        fillGo.transform.SetParent(hpBarGo.transform, false);
         RectTransform fillRt = fillGo.GetComponent<RectTransform>();
         fillRt.anchorMin = Vector2.zero;
         fillRt.anchorMax = Vector2.one;
@@ -516,16 +594,11 @@ public static class SetupDemoScene
         fillImg.fillMethod = Image.FillMethod.Horizontal;
         fillImg.fillOrigin = (int)Image.OriginHorizontal.Left;
         
-        hpBar.fillBar = fillImg;
+        hpBar.FillBar = fillImg;
 
-        GameObject hpNumsGo = GameObject.Find("HPNumbersText");
-        if (hpNumsGo == null)
-        {
-            hpNumsGo = new GameObject("HPNumbersText", typeof(RectTransform));
-            hpNumsGo.transform.SetParent(statsRowGo.transform, false);
-        }
-        TextMeshProUGUI hpNumsText = hpNumsGo.GetComponent<TextMeshProUGUI>();
-        if (hpNumsText == null) hpNumsText = hpNumsGo.AddComponent<TextMeshProUGUI>();
+        GameObject hpNumsGo = new GameObject("HPNumbersText", typeof(RectTransform));
+        hpNumsGo.transform.SetParent(statsRowGo.transform, false);
+        TextMeshProUGUI hpNumsText = hpNumsGo.AddComponent<TextMeshProUGUI>();
         hpNumsText.text = "20 / 20";
         hpNumsText.fontSize = 18;
         hpNumsText.color = Color.white;
@@ -538,15 +611,11 @@ public static class SetupDemoScene
         hpNumsRt.anchoredPosition = new Vector2(-10f, 0);
         hpNumsRt.sizeDelta = new Vector2(100f, 30f);
 
-        hpBar.hpNumbersText = hpNumsText;
+        hpBar.HPNumbersText = hpNumsText;
 
-        // 7. Create FIGHT Target Slider Panel
-        GameObject sliderPanelGo = GameObject.Find("FightTargetPanel");
-        if (sliderPanelGo == null)
-        {
-            sliderPanelGo = new GameObject("FightTargetPanel", typeof(RectTransform), typeof(Image));
-            sliderPanelGo.transform.SetParent(uiRootGo.transform, false);
-        }
+        // 8. Create FIGHT Target Slider Panel
+        GameObject sliderPanelGo = new GameObject("FightTargetPanel", typeof(RectTransform), typeof(Image));
+        sliderPanelGo.transform.SetParent(uiRootGo.transform, false);
         RectTransform sliderPanelRt = sliderPanelGo.GetComponent<RectTransform>();
         sliderPanelRt.anchorMin = new Vector2(0.5f, 0.5f);
         sliderPanelRt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -557,17 +626,12 @@ public static class SetupDemoScene
         Image sliderPanelImg = sliderPanelGo.GetComponent<Image>();
         sliderPanelImg.color = Color.black;
         
-        Outline sliderOutline = sliderPanelGo.GetComponent<Outline>();
-        if (sliderOutline == null) sliderOutline = sliderPanelGo.AddComponent<Outline>();
+        Outline sliderOutline = sliderPanelGo.AddComponent<Outline>();
         sliderOutline.effectColor = Color.white;
         sliderOutline.effectDistance = new Vector2(2, 2);
 
-        GameObject targetMarkerGo = GameObject.Find("TargetMarker");
-        if (targetMarkerGo == null)
-        {
-            targetMarkerGo = new GameObject("TargetMarker", typeof(RectTransform), typeof(Image));
-            targetMarkerGo.transform.SetParent(sliderPanelGo.transform, false);
-        }
+        GameObject targetMarkerGo = new GameObject("TargetMarker", typeof(RectTransform), typeof(Image));
+        targetMarkerGo.transform.SetParent(sliderPanelGo.transform, false);
         RectTransform markerRt = targetMarkerGo.GetComponent<RectTransform>();
         markerRt.anchorMin = new Vector2(0.5f, 0.5f);
         markerRt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -576,12 +640,8 @@ public static class SetupDemoScene
         markerRt.sizeDelta = new Vector2(6f, 96f);
         targetMarkerGo.GetComponent<Image>().color = Color.red;
 
-        GameObject sliderBarGo = GameObject.Find("SliderBar");
-        if (sliderBarGo == null)
-        {
-            sliderBarGo = new GameObject("SliderBar", typeof(RectTransform), typeof(Image));
-            sliderBarGo.transform.SetParent(sliderPanelGo.transform, false);
-        }
+        GameObject sliderBarGo = new GameObject("SliderBar", typeof(RectTransform), typeof(Image));
+        sliderBarGo.transform.SetParent(sliderPanelGo.transform, false);
         RectTransform sliderBarRt = sliderBarGo.GetComponent<RectTransform>();
         sliderBarRt.anchorMin = new Vector2(0.5f, 0.5f);
         sliderBarRt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -590,43 +650,59 @@ public static class SetupDemoScene
         sliderBarRt.sizeDelta = new Vector2(12f, 94f);
         sliderBarGo.GetComponent<Image>().color = Color.white;
 
-        // 8. Create Phase1Spawner
-        GameObject spawnerGo = GameObject.Find("Phase1Spawner");
-        if (spawnerGo == null)
-        {
-            spawnerGo = new GameObject("Phase1Spawner");
-            Debug.Log("Created Phase1Spawner.");
-        }
-        Phase1Spawner spawner = spawnerGo.GetComponent<Phase1Spawner>();
-        if (spawner == null) spawner = spawnerGo.AddComponent<Phase1Spawner>();
-
-        // 9. Setup UndertaleBattleManager GameObject
-        GameObject managerGo = GameObject.Find("UndertaleBattleManager");
-        if (managerGo == null)
-        {
-            managerGo = new GameObject("UndertaleBattleManager");
-            Debug.Log("Created UndertaleBattleManager.");
-        }
-        UndertaleBattleManager manager = managerGo.GetComponent<UndertaleBattleManager>();
-        if (manager == null) manager = managerGo.AddComponent<UndertaleBattleManager>();
+        // 9. Create Phase1Spawner
+        GameObject spawnerGo = new GameObject("Phase1Spawner");
+        Phase1Spawner spawner = spawnerGo.AddComponent<Phase1Spawner>();
         
-        manager.playerSoul = soul;
-        manager.battleBox = box;
-        manager.bulletSpawner = spawner;
-        manager.dialogueText = dialogueText;
-        manager.statsTextGo = statsRowGo;
-        manager.enemyTransform = enemyGo.transform;
-        manager.enemySpriteRenderer = enemySr;
-        manager.fightTargetPanel = sliderPanelGo;
-        manager.sliderBar = sliderBarRt;
+        GameObject pickupPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Prefabs/pickupPrefab.prefab");
+        if (pickupPrefab != null)
+        {
+            spawner.PickupPrefab = pickupPrefab;
+        }
+        else
+        {
+            Debug.LogWarning("UFO pickupPrefab not found at Assets/_Prefabs/pickupPrefab.prefab");
+        }
 
-        // 10. EventSystem
+        // 10. Setup UndertaleBattleManager GameObject
+        GameObject managerGo = new GameObject("UndertaleBattleManager");
+        UndertaleBattleManager manager = managerGo.AddComponent<UndertaleBattleManager>();
+        
+        // WIRE THE SERIALIZED INSPECTOR REFERENCES DIRECTLY (Industry Standard Practice)
+        manager.PlayerSoul = soul;
+        manager.BattleBox = box;
+        manager.BulletSpawner = spawner;
+        manager.DialogueText = dialogueText;
+        manager.StatsTextGo = statsRowGo;
+        manager.EnemyTransform = enemyGo.transform;
+        manager.EnemySpriteRenderer = enemySr;
+        manager.FightTargetPanel = sliderPanelGo;
+        manager.SliderBar = sliderBarRt;
+
+        // Wire Mr. Oshino specific sprites
+        manager.OshinoStand = standSprite;
+        manager.OshinoBreathe1 = breathe1Sprite;
+        manager.OshinoBreathe2 = breathe2Sprite;
+        manager.OshinoWounded = woundedSprite;
+        manager.OshinoDefeated = defeatedSprite;
+
+        // Wire BGM clip
+        AudioSource bgmSource = managerGo.AddComponent<AudioSource>();
+        AudioClip bgmClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Assets/Undertale/ScatteredAndLost.mp3");
+        manager.BGMSource = bgmSource;
+        manager.BGMClip = bgmClip;
+
+        // 11. EventSystem
         if (GameObject.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
         {
             new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.EventSystems.StandaloneInputModule));
         }
 
-        Debug.Log("Undertale turn-based battle scene setup completed successfully!");
+        // 12. Save the scene file directly to serialize everything in Unity
+        EditorSceneManager.MarkSceneDirty(activeScene);
+        EditorSceneManager.SaveScene(activeScene);
+
+        Debug.Log("Undertale turn-based battle scene setup completed and pre-saved successfully!");
     }
 
     private static void EnsureUndertaleAssetsAndPrefabsExist()
@@ -641,7 +717,7 @@ public static class SetupDemoScene
             System.IO.Directory.CreateDirectory("Assets/_Prefabs/Undertale");
         }
 
-        // 2. Generate and save textures
+        // 2. Generate and save textures (Heart and Bullet)
         EnsureTexture("Assets/_Assets/Undertale/HeartSprite.png", 16, 16, (x, y) => {
             int[,] grid = new int[16, 16] {
                 {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
@@ -662,38 +738,18 @@ public static class SetupDemoScene
                 {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
             };
             return grid[15 - y, x] == 1 ? Color.white : Color.clear;
-        }, 16f);
+        }, 48f);
 
         EnsureTexture("Assets/_Assets/Undertale/BulletSprite.png", 16, 16, (x, y) => {
             float dist = Vector2.Distance(new Vector2(x, y), new Vector2(7.5f, 7.5f));
             return dist <= 7.5f ? Color.white : Color.clear;
-        }, 16f);
-
-        EnsureTexture("Assets/_Assets/Undertale/FroggitSprite.png", 32, 32, (x, y) => {
-            bool isFrog = false;
-            // Head
-            if (y >= 14 && y <= 24 && x >= 8 && x <= 24) isFrog = true;
-            // Eyes
-            if (y >= 22 && y <= 26 && ((x >= 9 && x <= 13) || (x >= 19 && x <= 23))) isFrog = true;
-            // Body
-            if (y >= 4 && y <= 15 && x >= 6 && x <= 26) isFrog = true;
-            // Legs
-            if (y >= 2 && y <= 8 && ((x >= 4 && x <= 8) || (x >= 24 && x <= 28))) isFrog = true;
-            
-            // Pupils (black dots on eyes)
-            if (y >= 23 && y <= 25 && (x == 11 || x == 21)) isFrog = false;
-            // Mouth (black line)
-            if (y == 18 && x >= 12 && x <= 20) isFrog = false;
-            
-            return isFrog ? Color.white : Color.clear;
-        }, 8f);
+        }, 48f);
 
         AssetDatabase.Refresh();
 
         // 3. Ensure Prefabs exist
         Sprite heartSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Assets/Undertale/HeartSprite.png");
         Sprite bulletSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Assets/Undertale/BulletSprite.png");
-        Sprite froggitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Assets/Undertale/FroggitSprite.png");
 
         // PlayerSoul Prefab
         string soulPath = "Assets/_Prefabs/Undertale/PlayerSoul.prefab";
@@ -703,7 +759,7 @@ public static class SetupDemoScene
             SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = heartSprite;
             sr.color = Color.red;
-            sr.sortingOrder = 10;
+            sr.sortingOrder = 100; // Force high sorting order on the prefab directly
             go.AddComponent<CircleCollider2D>().isTrigger = true;
             Rigidbody2D rb = go.AddComponent<Rigidbody2D>();
             rb.bodyType = RigidbodyType2D.Kinematic;
@@ -727,26 +783,14 @@ public static class SetupDemoScene
             Debug.Log("Created BattleBox prefab.");
         }
 
-        // RetroSoundGenerator Prefab
-        string soundPath = "Assets/_Prefabs/Undertale/RetroSoundGenerator.prefab";
-        if (AssetDatabase.LoadAssetAtPath<GameObject>(soundPath) == null)
-        {
-            GameObject go = new GameObject("RetroSoundGenerator_Temp");
-            go.AddComponent<RetroSoundGenerator>();
-            
-            PrefabUtility.SaveAsPrefabAsset(go, soundPath);
-            Object.DestroyImmediate(go);
-            Debug.Log("Created RetroSoundGenerator prefab.");
-        }
-
-        // UndertaleBullet Prefab
+        // UndertaleBullet Prefab (WHITE color to match Undertale style)
         string bulletPath = "Assets/_Prefabs/Undertale/UndertaleBullet.prefab";
         if (AssetDatabase.LoadAssetAtPath<GameObject>(bulletPath) == null)
         {
             GameObject go = new GameObject("UndertaleBullet_Temp");
             SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = bulletSprite;
-            sr.color = Color.red;
+            sr.color = Color.white; // White bullet color
             sr.sortingOrder = 5;
             go.AddComponent<CircleCollider2D>().isTrigger = true;
             go.AddComponent<Bullet>();
@@ -756,13 +800,12 @@ public static class SetupDemoScene
             Debug.Log("Created UndertaleBullet prefab.");
         }
 
-        // Froggit Prefab
+        // Froggit/Enemy Prefab (used as MrOshino visual shell)
         string froggitPath = "Assets/_Prefabs/Undertale/Froggit.prefab";
         if (AssetDatabase.LoadAssetAtPath<GameObject>(froggitPath) == null)
         {
             GameObject go = new GameObject("Froggit_Temp");
             SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = froggitSprite;
             sr.color = Color.white;
             sr.sortingOrder = 3;
             
@@ -774,30 +817,45 @@ public static class SetupDemoScene
 
     private static void EnsureTexture(string path, int width, int height, System.Func<int, int, Color> colorFunc, float ppu)
     {
-        if (System.IO.File.Exists(path)) return;
-
-        Texture2D tex = new Texture2D(width, height);
-        tex.filterMode = FilterMode.Point;
-        for (int y = 0; y < height; y++)
+        if (!System.IO.File.Exists(path))
         {
-            for (int x = 0; x < width; x++)
+            Texture2D tex = new Texture2D(width, height);
+            tex.filterMode = FilterMode.Point;
+            for (int y = 0; y < height; y++)
             {
-                tex.SetPixel(x, y, colorFunc(x, y));
+                for (int x = 0; x < width; x++)
+                {
+                    tex.SetPixel(x, y, colorFunc(x, y));
+                }
             }
+            tex.Apply();
+            byte[] bytes = tex.EncodeToPNG();
+            System.IO.File.WriteAllBytes(path, bytes);
+            AssetDatabase.ImportAsset(path);
         }
-        tex.Apply();
-        byte[] bytes = tex.EncodeToPNG();
-        System.IO.File.WriteAllBytes(path, bytes);
-        AssetDatabase.ImportAsset(path);
 
         TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
-        if (importer != null)
+        if (importer != null && importer.spritePixelsPerUnit != ppu)
         {
             importer.textureType = TextureImporterType.Sprite;
             importer.spritePixelsPerUnit = ppu;
             importer.filterMode = FilterMode.Point;
             importer.textureCompression = TextureImporterCompression.Uncompressed;
             importer.SaveAndReimport();
+        }
+    }
+
+    private static void GetChildGameObjectsRecursively(GameObject go, System.Collections.Generic.List<GameObject> list)
+    {
+        if (go == null) return;
+        list.Add(go);
+        for (int i = 0; i < go.transform.childCount; i++)
+        {
+            Transform child = go.transform.GetChild(i);
+            if (child != null && child.gameObject != null)
+            {
+                GetChildGameObjectsRecursively(child.gameObject, list);
+            }
         }
     }
 }

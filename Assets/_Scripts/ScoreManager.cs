@@ -7,6 +7,12 @@ public class ScoreManager {
 
     public void AddGraze() {
         grazeCount++;
-        UIManager.Instance?.UpdateGrazeText(grazeCount); // push
+        UIManager.Instance?.UpdateGrazeText(grazeCount); // push to UFO UI
+        
+        // Push to Undertale HPBar UI too!
+        if (HPBar.Instance != null && PlayerSoul.Instance != null)
+        {
+            HPBar.Instance.OnDamageTaken(PlayerSoul.Instance.CurrentHP, PlayerSoul.Instance.MaxHP);
+        }
     }
 }
