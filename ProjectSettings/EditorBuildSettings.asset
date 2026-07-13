@@ -12,6 +12,15 @@ EditorBuildSettings:
     path: Assets/_Scenes/01_Underta.unity
     guid: e58408ce8def54275b6c3bba019fc6e2
   - enabled: 1
+    path: Assets/_Scenes/13_UFO_Pickups_CameraControl.unity
+    guid: 94d2ea87e2e4f4f1993b996fc04b21b7
+  - enabled: 1
+    path: Assets/_Scenes/14_UFO_Pickups_UI.unity
+    guid: d7a6c9d1d54db4ef996a668ecf21b830
+  - enabled: 1
+    path: Assets/_Scenes/15_UFO_Pickups_UI-Complete.unity
+    guid: f92de9ea3ce8a4429ae5487b4871e372
+  - enabled: 1
     path: Assets/_Scenes/Scene.unity
     guid: 8c9cfa26abfee488c85f1582747f6a02
   m_configObjects:

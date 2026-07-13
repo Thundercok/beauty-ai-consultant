@@ -27,7 +27,7 @@ public static class SetupDemoScene
             Object.DestroyImmediate(dirLight);
         }
 
-        // 1. Setup Camera
+        // 1. Setup Camera (without adding CameraFollow, but adding CameraController)
         Camera mainCam = GameObject.FindFirstObjectByType<Camera>();
         if (mainCam == null)
         {
@@ -39,15 +39,21 @@ public static class SetupDemoScene
 
         if (mainCam != null)
         {
+            // Remove CameraFollow to prevent conflict with direct parenting
+            CameraFollow follow = mainCam.GetComponent<CameraFollow>();
+            if (follow != null)
+            {
+                Object.DestroyImmediate(follow);
+            }
+
+            CameraController camCtrl = mainCam.GetComponent<CameraController>();
+            if (camCtrl == null) camCtrl = mainCam.gameObject.AddComponent<CameraController>();
+
             mainCam.transform.position = new Vector3(0, 0, -10);
             mainCam.orthographic = true;
             mainCam.orthographicSize = 10f; // Perfect size to view the boundaries
             mainCam.backgroundColor = Color.black;
             mainCam.clearFlags = CameraClearFlags.SolidColor;
-            if (mainCam.GetComponent<CameraFollow>() == null)
-            {
-                mainCam.gameObject.AddComponent<CameraFollow>();
-            }
         }
 
         // 2. Setup Background
@@ -130,13 +136,18 @@ public static class SetupDemoScene
         UFOController ufoCtrl = ufo.GetComponent<UFOController>();
         if (ufoCtrl == null) ufoCtrl = ufo.AddComponent<UFOController>();
         
-        // Good default settings
         ufoCtrl.speed = 15f;
-        ufoCtrl.requiredCoinsToWin = 15;
-        ufoCtrl.timeRemaining = 60f;
         ufoCtrl.maxHP = 20;
 
-        // 5. Create Canvas and UI
+        // Parent camera under UFO for tracking (Phase I)
+        if (mainCam != null)
+        {
+            mainCam.transform.SetParent(ufo.transform);
+            mainCam.transform.localPosition = new Vector3(0, 0, -10);
+            mainCam.transform.localRotation = Quaternion.identity;
+        }
+
+        // 5. Create Canvas and UI (Phase III)
         GameObject canvasGo = GameObject.Find("Canvas");
         if (canvasGo == null)
         {
@@ -145,56 +156,83 @@ public static class SetupDemoScene
         Canvas canvas = canvasGo.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
 
-        // Create Score Text (TMP)
-        GameObject scoreTextGo = GameObject.Find("ScoreText");
-        if (scoreTextGo == null)
+        // Configure Canvas Scaler: Scale With Screen Size, Target 1920x1080 (Phase III)
+        CanvasScaler canvasScaler = canvasGo.GetComponent<CanvasScaler>();
+        if (canvasScaler == null) canvasScaler = canvasGo.AddComponent<CanvasScaler>();
+        canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        canvasScaler.referenceResolution = new Vector2(1920, 1080);
+        canvasScaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        canvasScaler.matchWidthOrHeight = 0.5f;
+
+        // Clean up legacy text elements if present
+        GameObject legacyScore = GameObject.Find("ScoreText");
+        if (legacyScore != null) Object.DestroyImmediate(legacyScore);
+        GameObject legacyTimer = GameObject.Find("TimerText");
+        if (legacyTimer != null) Object.DestroyImmediate(legacyTimer);
+
+        // Load the customized Orange Juice font asset (Slide 20)
+        TMP_FontAsset customFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/Fonts/orange juice 2.0 SDF.asset");
+
+        // Create Remaining Qty Text (TMP) (Slide 25)
+        GameObject remainingQtyGo = GameObject.Find("Remaining Qty");
+        if (remainingQtyGo == null)
         {
-            scoreTextGo = new GameObject("ScoreText", typeof(RectTransform));
-            scoreTextGo.transform.SetParent(canvasGo.transform, false);
+            remainingQtyGo = new GameObject("Remaining Qty", typeof(RectTransform));
+            remainingQtyGo.transform.SetParent(canvasGo.transform, false);
         }
-        TextMeshProUGUI scoreTmp = scoreTextGo.GetComponent<TextMeshProUGUI>();
-        if (scoreTmp == null) scoreTmp = scoreTextGo.AddComponent<TextMeshProUGUI>();
-        scoreTmp.fontSize = 24;
-        scoreTmp.color = Color.white;
-        scoreTmp.alignment = TextAlignmentOptions.TopLeft;
-        scoreTmp.text = "Coins: 0 / 15";
+        TextMeshProUGUI remainingQtyTmp = remainingQtyGo.GetComponent<TextMeshProUGUI>();
+        if (remainingQtyTmp == null) remainingQtyTmp = remainingQtyGo.AddComponent<TextMeshProUGUI>();
+        remainingQtyTmp.fontSize = 150;
+        remainingQtyTmp.color = new Color32(0, 255, 42, 255); // Green (Slide 25)
+        remainingQtyTmp.alignment = TextAlignmentOptions.TopLeft;
+        remainingQtyTmp.text = "6";
+        if (customFont != null) remainingQtyTmp.font = customFont;
         
-        RectTransform scoreRect = scoreTextGo.GetComponent<RectTransform>();
-        scoreRect.anchorMin = new Vector2(0, 1);
-        scoreRect.anchorMax = new Vector2(0, 1);
-        scoreRect.pivot = new Vector2(0, 1);
-        scoreRect.anchoredPosition = new Vector2(20, -20);
-        scoreRect.sizeDelta = new Vector2(300, 50);
+        RectTransform remainingRect = remainingQtyGo.GetComponent<RectTransform>();
+        remainingRect.anchorMin = new Vector2(0, 1);
+        remainingRect.anchorMax = new Vector2(0, 1);
+        remainingRect.pivot = new Vector2(0.5f, 0.5f); // Slide 25: Pivot center
+        remainingRect.anchoredPosition = new Vector2(280, -100); // Slide 25
+        remainingRect.sizeDelta = new Vector2(200, 120); // Slide 25
 
         if (ufoCtrl != null)
         {
-            ufoCtrl.scoreText = scoreTmp;
+            ufoCtrl.Status_Message = remainingQtyTmp;
         }
 
-        // Create Timer Text (TMP)
-        GameObject timerTextGo = GameObject.Find("TimerText");
-        if (timerTextGo == null)
+        // Create Mission Complete Text (TMP) (Slide 26)
+        GameObject missionCompleteGo = GameObject.Find("Mission Complete");
+        if (missionCompleteGo == null)
         {
-            timerTextGo = new GameObject("TimerText", typeof(RectTransform));
-            timerTextGo.transform.SetParent(canvasGo.transform, false);
+            missionCompleteGo = new GameObject("Mission Complete", typeof(RectTransform));
+            missionCompleteGo.transform.SetParent(canvasGo.transform, false);
         }
-        TextMeshProUGUI timerTmp = timerTextGo.GetComponent<TextMeshProUGUI>();
-        if (timerTmp == null) timerTmp = timerTextGo.AddComponent<TextMeshProUGUI>();
-        timerTmp.fontSize = 24;
-        timerTmp.color = Color.white;
-        timerTmp.alignment = TextAlignmentOptions.TopRight;
-        timerTmp.text = "Time: 60s";
-
-        RectTransform timerRect = timerTextGo.GetComponent<RectTransform>();
-        timerRect.anchorMin = new Vector2(1, 1);
-        timerRect.anchorMax = new Vector2(1, 1);
-        timerRect.pivot = new Vector2(1, 1);
-        timerRect.anchoredPosition = new Vector2(-20, -20);
-        timerRect.sizeDelta = new Vector2(300, 50);
+        TextMeshProUGUI missionCompleteTmp = missionCompleteGo.GetComponent<TextMeshProUGUI>();
+        if (missionCompleteTmp == null) missionCompleteTmp = missionCompleteGo.AddComponent<TextMeshProUGUI>();
+        missionCompleteTmp.fontSize = 120;
+        missionCompleteTmp.color = Color.red; // Red (Slide 26)
+        missionCompleteTmp.alignment = TextAlignmentOptions.Center;
+        missionCompleteTmp.text = ""; // Empty initially (Slide 27)
+        if (customFont != null) missionCompleteTmp.font = customFont;
+        
+        RectTransform completeRect = missionCompleteGo.GetComponent<RectTransform>();
+        completeRect.anchorMin = new Vector2(0.5f, 0.5f);
+        completeRect.anchorMax = new Vector2(0.5f, 0.5f);
+        completeRect.pivot = new Vector2(0.5f, 0.5f);
+        completeRect.anchoredPosition = new Vector2(437, 177); // Slide 26
+        completeRect.sizeDelta = new Vector2(800, 200); // Slide 26
 
         if (ufoCtrl != null)
         {
-            ufoCtrl.timerText = timerTmp;
+            ufoCtrl.Disp_Win = missionCompleteTmp;
+        }
+
+        // Try to auto-detect a playtest target in the scene
+        GameObject trackTargetGo = GameObject.Find("Pickup (2)") ?? GameObject.Find("Pickup") ?? GameObject.FindWithTag("Pickup");
+        if (trackTargetGo != null && ufoCtrl != null)
+        {
+            ufoCtrl.TrackTarget = trackTargetGo;
+            Debug.Log($"Auto-assigned TrackTarget to: {trackTargetGo.name}");
         }
 
         // Create HPBar UI under Canvas
@@ -300,6 +338,17 @@ public static class SetupDemoScene
         // 11. Save the Scene
         EditorSceneManager.MarkSceneDirty(activeScene);
         EditorSceneManager.SaveScene(activeScene);
+
+        // Copy the scene to match the target slide filenames (Slide 1, 13, 23)
+        string activeScenePath = activeScene.path;
+        if (!string.IsNullOrEmpty(activeScenePath))
+        {
+            string dirPath = System.IO.Path.GetDirectoryName(activeScenePath);
+            AssetDatabase.CopyAsset(activeScenePath, $"{dirPath}/13_UFO_Pickups_CameraControl.unity");
+            AssetDatabase.CopyAsset(activeScenePath, $"{dirPath}/14_UFO_Pickups_UI.unity");
+            AssetDatabase.CopyAsset(activeScenePath, $"{dirPath}/15_UFO_Pickups_UI-Complete.unity");
+            Debug.Log("Copied setup scenes to 13, 14, and 15 successfully!");
+        }
 
         Debug.Log("UFO Demo Scene setup completed successfully and saved!");
     }

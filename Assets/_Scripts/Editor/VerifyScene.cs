@@ -13,6 +13,9 @@ public static class VerifyScene
         string[] scenes = {
             "Assets/_Scenes/00_Scene.unity",
             "Assets/_Scenes/01_Underta.unity",
+            "Assets/_Scenes/13_UFO_Pickups_CameraControl.unity",
+            "Assets/_Scenes/14_UFO_Pickups_UI.unity",
+            "Assets/_Scenes/15_UFO_Pickups_UI-Complete.unity",
             "Assets/_Scenes/Scene.unity",
             "Assets/Project UFO.unity"
         };
@@ -67,7 +70,7 @@ public static class VerifyScene
         UFOController ufo = go.GetComponent<UFOController>();
         if (ufo != null)
         {
-            Debug.Log($"{indent}  [UFOController Ref Check] Speed: {ufo.speed}, ScoreText: {(ufo.scoreText != null ? "Assigned" : "NULL")}, TimerText: {(ufo.timerText != null ? "Assigned" : "NULL")}, HPBar.Instance: {(HPBar.Instance != null ? "Exists" : "NULL")}");
+            Debug.Log($"{indent}  [UFOController Ref Check] Speed: {ufo.speed}, Status_Message: {(ufo.Status_Message != null ? "Assigned" : "NULL")}, Disp_Win: {(ufo.Disp_Win != null ? "Assigned" : "NULL")}, HPBar.Instance: {(HPBar.Instance != null ? "Exists" : "NULL")}");
         }
 
         GameManager gm = go.GetComponent<GameManager>();

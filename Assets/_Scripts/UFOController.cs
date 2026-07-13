@@ -1,44 +1,43 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
-using TMPro;
-using UnityEngine.SceneManagement;
+using UnityEngine.UI; // For UI elements like Button, Text, etc.
+using TMPro; // Import the TextMeshPro namespace
 
 public class UFOController : MonoBehaviour
 {
     public static UFOController Instance;
 
-    [Header("Movement Settings")]
+    //private float speed = 10;
     public float speed = 10;
-    public float maxVelocity = 12f;
-    private Rigidbody2D rb;
+    Rigidbody2D Rigidbody;
 
-    [Header("Gameplay Variables")]
-    public int score = 0;
-    public int requiredCoinsToWin = 15;
-    public float timeRemaining = 60f;
-    private bool isGameOver = false;
+    public TextMeshProUGUI Status_Message; // Status of the game
+    int Qty_Pickup = 6; // Initial numbers of Pickup
+    public TextMeshProUGUI Disp_Win; // Message for mission complete
 
-    [Header("Health Settings")]
+    public GameObject TrackTarget; // Pickup(2)
+
+    // Keep compatibility for other systems
+    [Header("Compatibility Settings")]
     public int maxHP = 20;
     public int currentHP;
     public float invulnDuration = 1.0f;
     private bool isInvulnerable = false;
     private SpriteRenderer spriteRenderer;
 
-    [Header("UI References")]
-    public TextMeshProUGUI scoreText;
-    public TextMeshProUGUI timerText;
-
     void Awake()
     {
         Instance = this;
     }
 
+    // Start is called before the first frame update
     void Start()
     {
-        rb = GetComponent<Rigidbody2D>();
+        Rigidbody = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         currentHP = maxHP;
-        UpdateUI();
+        Qty_Pickup = 6; // Initial numbers of Pickup
 
         // Initialize HP Bar UI if it exists in the scene
         if (HPBar.Instance != null)
@@ -47,57 +46,61 @@ public class UFOController : MonoBehaviour
         }
     }
 
+    // Update is called once per frame
     void Update()
     {
-        if (isGameOver)
-        {
-            if (Input.GetKeyDown(KeyCode.R))
-                SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-            return;
-        }
+        float X_Move = Input.GetAxis("Horizontal");
+        float Y_Move = Input.GetAxis("Vertical");
 
-        float h = Input.GetAxis("Horizontal");
-        float v = Input.GetAxis("Vertical");
-        rb.AddForce(new Vector2(h, v) * speed);
+        Vector2 Movement = new Vector2(X_Move, Y_Move);
 
-        // Clamp velocity to prevent infinite acceleration and improve control
-        if (rb.linearVelocity.magnitude > maxVelocity)
-        {
-            rb.linearVelocity = rb.linearVelocity.normalized * maxVelocity;
-        }
+        //Rigidbody.AddForce(Movement*speed*Time.deltaTime*5);
+        Rigidbody.AddForce(Movement * speed);
 
-        CalculateTimer();
+        //transform.position = TrackTarget.transform.position;
     }
 
-    void CalculateTimer()
+    private void OnCollisionEnter2D(Collision2D BeHit)
     {
-        if (timeRemaining > 0)
-        {
-            timeRemaining -= Time.deltaTime;
-            UpdateUI();
-        }
-        else
-        {
-            timeRemaining = 0;
-            CheckEndGameConditions();
-        }
+        HandlePickupCollision(BeHit.gameObject);
     }
 
-    void UpdateUI()
+    private void OnTriggerEnter2D(Collider2D other)
     {
-        if (scoreText != null)
+        HandlePickupCollision(other.gameObject);
+    }
+
+    private void HandlePickupCollision(GameObject go)
+    {
+        if (go.CompareTag("Pickup"))
         {
-            scoreText.text = "Coins: " + score + " / " + requiredCoinsToWin;
-        }
-        if (timerText != null)
-        {
-            timerText.text = "Time: " + Mathf.CeilToInt(timeRemaining) + "s";
+            Destroy(go);
+            //BeHit.gameObject.SetActive(false);
+            Qty_Pickup = Qty_Pickup - 1;
+            
+            if (Status_Message != null)
+            {
+                Status_Message.text = Qty_Pickup.ToString();
+            }
+
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.PlaySelect();
+            }
+
+            if (Qty_Pickup == 0) // Mission complete
+            {
+                if (Disp_Win != null)
+                {
+                    Disp_Win.text = "You Win!";
+                }
+            }
         }
     }
 
     public void TakeDamage(int dmg)
     {
-        if (isGameOver || isInvulnerable) return;
+        if (Qty_Pickup == 0 || isInvulnerable) return;
 
         currentHP -= dmg;
         if (HPBar.Instance != null)
@@ -145,59 +148,15 @@ public class UFOController : MonoBehaviour
         isInvulnerable = false;
     }
 
-    void OnTriggerEnter2D(Collider2D other)
-    {
-        if (isGameOver) return;
-
-        if (other.CompareTag("Pickup"))
-        {
-            float randomX = Random.Range(-12f, 12f);
-            float randomY = Random.Range(-12f, 12f);
-            other.transform.position = new Vector3(randomX, randomY, 0f);
-
-            score++;
-            UpdateUI();
-
-            if (SoundManager.Instance != null)
-            {
-                SoundManager.Instance.PlaySelect();
-            }
-        }
-
-        if (other.CompareTag("Enemy"))
-        {
-            TakeDamage(5); // Deduct 5 HP on contact with an enemy
-        }
-    }
-
-    void CheckEndGameConditions()
-    {
-        isGameOver = true;
-        if (rb != null)
-        {
-            rb.linearVelocity = Vector2.zero;
-        }
-
-        if (score >= requiredCoinsToWin)
-        {
-            if (scoreText != null) scoreText.text = "VICTORY! Clean run.";
-            if (timerText != null) timerText.text = "Press R to Restart";
-        }
-        else
-        {
-            if (scoreText != null) scoreText.text = "FAILED! Not enough coins.";
-            if (timerText != null) timerText.text = "Press R to Retry";
-        }
-    }
-
     public void PlayerDied()
     {
-        isGameOver = true;
-        if (rb != null)
+        if (Rigidbody != null)
         {
-            rb.linearVelocity = Vector2.zero;
+            Rigidbody.linearVelocity = Vector2.zero;
         }
-        if (scoreText != null) scoreText.text = "WASTED! You died.";
-        if (timerText != null) timerText.text = "Press R to Retry";
+        if (Disp_Win != null)
+        {
+            Disp_Win.text = "You Died!";
+        }
     }
 }

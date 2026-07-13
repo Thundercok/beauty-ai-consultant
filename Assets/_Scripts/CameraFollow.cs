@@ -52,7 +52,7 @@ public class CameraInitializer
     static void OnSceneLoad()
     {
         Camera mainCam = Camera.main;
-        if (mainCam != null && mainCam.GetComponent<CameraFollow>() == null)
+        if (mainCam != null && mainCam.GetComponent<CameraFollow>() == null && mainCam.GetComponent<CameraController>() == null && mainCam.transform.parent == null)
         {
             mainCam.gameObject.AddComponent<CameraFollow>();
             Debug.Log("CameraFollow (Fixed) component automatically added to Main Camera.");
