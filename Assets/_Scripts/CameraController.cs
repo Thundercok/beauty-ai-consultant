@@ -21,4 +21,11 @@ public class CameraController : MonoBehaviour
         Vector2 UFO_pos = transform.position;
         Debug.Log("Now the UFO is located at " + UFO_pos);
     }
+
+    // LateUpdate is called after all Update functions and physics updates
+    void LateUpdate()
+    {
+        // Lock world-space rotation to prevent physics-induced parent spin from rotating the camera
+        transform.eulerAngles = Vector2.zero;
+    }
 }
