@@ -3,7 +3,7 @@
 
 GlowUpAdvisor is an AI-powered computer vision and colorimetry platform for personalized beauty consultation. Given a single selfie photograph, GlowUpAdvisor analyzes facial geometry (478 MediaPipe 3D landmarks) and skin colorimetry (D65 CIELAB + $ITA^\circ$) to provide customized makeup technique guidance and match real-world cosmetic SKUs via vectorized CIEDE2000 ($\Delta E_{00}$).
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Thundercok/project/blob/main/makeup_app_ml.ipynb)
 
 ---
 
