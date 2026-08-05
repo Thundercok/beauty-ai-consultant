@@ -1,0 +1,135 @@
+{
+  "face_shape": {
+    "primary": "Diamond",
+    "secondary": "Oval",
+    "probabilities": {
+      "Oval": 5.825604630594186e-14,
+      "Round": 2.1423897250407468e-15,
+      "Square": 1.1807058365522124e-15,
+      "Heart": 1.3104000969522012e-16,
+      "Oblong": 5.200015987872045e-15,
+      "Diamond": 3.4594251108983844e-10
+    },
+    "ratios": {
+      "r1": 1.1644857588994368,
+      "r2": 0.8374500275343574,
+      "r3": 0.14041191132662836
+    }
+  },
+  "skin_metrics": {
+    "ITA_deg": 47.835761232279616,
+    "ITA_category": "Light (Fitzpatrick II)",
+    "L_star": 70.98039215686275,
+    "a_star": 8.0,
+    "b_star": 19.0,
+    "Melanin_index": 22.213590621948242,
+    "Hemoglobin_index": 0.7145435810089111
+  },
+  "season": {
+    "season": "Light Spring",
+    "undertone": "Warm (Golden)"
+  },
+  "lip_metrics": {
+    "lip_border_L": 71.76470588235294,
+    "lip_darkness_index": 0.39215686274509665,
+    "coverage_requirement": "Viền môi sáng (Dùng Tint bóng được)",
+    "recommended_texture": "Juicy Tint"
+  },
+  "advice": {
+    "profile": {
+      "face_shape": "Diamond",
+      "season": "Light Spring",
+      "occasion": "office",
+      "texture": "oily"
+    },
+    "techniques": {
+      "contour": "Tạo khối nhẹ dọc theo viền hàm diamond & dưới gò má.",
+      "blush": "Đánh má hồng tán nhẹ tự nhiên.",
+      "lip": "MLBB Almond Rose / Warm Fig (#C86B5A)",
+      "eyes": "Bảng mắt tông Nâu Cam Đất mờ",
+      "avoid": [
+        "Tông son lì đậm cũ kỹ",
+        "Đánh khối quá tay",
+        "Màu sắc chọi với undertone da"
+      ]
+    },
+    "execution_parameters": {
+      "intensity": "Thanh lịch chỉn chu (0.6)",
+      "texture_style": "Blur Water Tint / Satin",
+      "eye_depth": "Tạo hốc mắt nhẹ tự nhiên",
+      "prep": "Kem lót kiềm dầu Niacinamide Matte Primer",
+      "setting": "Phấn phủ Translucent Bake Powder vùng T-zone"
+    }
+  },
+  "matched_products": {
+    "lipsticks": [
+      {
+        "brand": "Peripera",
+        "name": "Ink Velvet 22",
+        "shade": "Bouquet Nude",
+        "texture": "Powder Matte",
+        "hex": "#B0483E",
+        "delta_e": 5.14,
+        "match_tier": "Close Alternative"
+      },
+      {
+        "brand": "Peripera",
+        "name": "Ink Velvet 17",
+        "shade": "Rosy Nude",
+        "texture": "Powder Matte",
+        "hex": "#C15C52",
+        "delta_e": 5.5,
+        "match_tier": "Close Alternative"
+      },
+      {
+        "brand": "Merzy",
+        "name": "The Watery Dew Tint WD14",
+        "shade": "With Zenia",
+        "texture": "Water Stain",
+        "hex": "#B8544D",
+        "delta_e": 5.59,
+        "match_tier": "Close Alternative"
+      }
+    ],
+    "blushes": [
+      {
+        "brand": "Romand",
+        "name": "Better Than Cheek 01",
+        "shade": "Tangerine Chip",
+        "texture": "Powder Blush",
+        "hex": "#E8A6A1",
+        "delta_e": 0.0,
+        "match_tier": "Exact Match"
+      },
+      {
+        "brand": "Peripera",
+        "name": "Pure Blushed Sunshine 01",
+        "shade": "Calm Pink",
+        "texture": "Powder Blush",
+        "hex": "#E6A299",
+        "delta_e": 2.13,
+        "match_tier": "Close Alternative"
+      }
+    ],
+    "eyeshadows": [
+      {
+        "brand": "Romand",
+        "name": "Better Than Eyes 01",
+        "shade": "Dry Mango Tulip",
+        "texture": "Matte Eyeshadow",
+        "hex": "#C8957F",
+        "delta_e": 0.0,
+        "match_tier": "Exact Match"
+      },
+      {
+        "brand": "3CE",
+        "name": "Multi Eye Color Palette",
+        "shade": "Overtake",
+        "texture": "Matte Eyeshadow",
+        "hex": "#C28B78",
+        "delta_e": 3.11,
+        "match_tier": "Close Alternative"
+      }
+    ]
+  }
+}
