@@ -1,4 +1,9 @@
-from makeup_app.src.advice_engine import SEASON_COLOR_PALETTES, SHAPE_CONTOUR_RULES, advice_coverage, get_asian_advice
+from beauty_ai.advice_engine import (
+    SEASON_COLOR_PALETTES,
+    SHAPE_CONTOUR_RULES,
+    advice_coverage,
+    get_asian_advice,
+)
 
 
 def test_advice_engine_covers_every_shape_season_pair():

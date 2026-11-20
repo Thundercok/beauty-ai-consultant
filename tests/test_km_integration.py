@@ -1,6 +1,6 @@
 import numpy as np
 
-from makeup_app.src.kubelka_munk import kubelka_munk_lip_blend
+from beauty_ai.kubelka_munk import kubelka_munk_lip_blend
 
 
 def test_km_zero_thickness_keeps_substrate():

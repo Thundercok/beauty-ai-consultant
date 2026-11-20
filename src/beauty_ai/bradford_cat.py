@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import numpy as np
 
-
 WHITEPOINTS = {
     "D50": np.array([0.96422, 1.00000, 0.82521]),
     "D65": np.array([0.95047, 1.00000, 1.08883]),

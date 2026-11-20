@@ -4,22 +4,30 @@
 import argparse
 import json
 import os
-import sys
 
 import cv2
-import mediapipe as mp
 import numpy as np
 import pandas as pd
 
-from makeup_app.src.face_analysis import (
-    classify_face_shape, classify_season, compute_skin_metrics, extract_lip_metrics,
-    resolve_glowup_profile, skin_roi_gray_world_wb,
+from beauty_ai.face_analysis import (
+    classify_face_shape,
+    classify_season,
+    compute_skin_metrics,
+    extract_lip_metrics,
+    resolve_glowup_profile,
+    skin_roi_gray_world_wb,
 )
-from makeup_app.src.product_matcher import match_products
-from makeup_app.src.skin_roi_v2 import extract_skin_cielab_v2
+from beauty_ai.product_matcher import match_products
+from beauty_ai.skin_roi_v2 import extract_skin_cielab_v2
 
 
 def extract_face_mesh(img_rgb: np.ndarray) -> np.ndarray:
+    try:
+        import mediapipe as mp
+    except ImportError as exc:
+        raise RuntimeError(
+            "mediapipe is required for face landmark extraction. Install with `uv sync --extra vision`."
+        ) from exc
     face_mesh = mp.solutions.face_mesh
     with face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1, refine_landmarks=True, min_detection_confidence=0.5) as detector:
         result = detector.process(img_rgb)
@@ -40,7 +48,7 @@ def main() -> None:
     parser.add_argument("--image", "-i", required=True, help="Path to a selfie")
     parser.add_argument("--occasion", "-o", choices=["daily", "office", "glam"], default="office")
     parser.add_argument("--texture", "-t", choices=["oily", "dry", "combination"], default="combination")
-    parser.add_argument("--db", default="makeup_app/data/product_database.csv")
+    parser.add_argument("--db", default="data/product_database.csv")
     parser.add_argument("--catalog-illuminant", choices=["D50", "D65"], default="D65", help="Source illuminant for catalogue Lab data; normal sRGB hex is D65.")
     parser.add_argument("--output-json", default=None)
     args = parser.parse_args()

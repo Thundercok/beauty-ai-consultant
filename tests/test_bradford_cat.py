@@ -1,7 +1,7 @@
 import numpy as np
 
-from makeup_app.src.bradford_cat import adapt_lab_bradford, adapt_xyz_bradford, bradford_d50_to_d65
-from makeup_app.src.product_matcher import ciede2000
+from beauty_ai.bradford_cat import adapt_lab_bradford, adapt_xyz_bradford, bradford_d50_to_d65
+from beauty_ai.product_matcher import ciede2000
 
 
 def test_bradford_maps_reference_white_to_reference_white():

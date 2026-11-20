@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import numpy as np
 
-
 TEXTURE_KS_MAP = {
     "Juicy Tint": {"scattering": 0.45, "thickness": 0.55, "km_type": "translucent"},
     "Dewy Balm": {"scattering": 0.60, "thickness": 0.72, "km_type": "sheer"},

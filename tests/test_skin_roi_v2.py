@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from makeup_app.src.skin_roi_v2 import SKIN_LANDMARKS, extract_skin_cielab_v2
+from beauty_ai.skin_roi_v2 import SKIN_LANDMARKS, extract_skin_cielab_v2
 
 
 def test_skin_roi_filters_dark_non_skin_pixels_and_returns_robust_metrics():

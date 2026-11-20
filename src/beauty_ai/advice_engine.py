@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 SHAPE_CONTOUR_RULES = {
     "Oval": {"contour": "Nhấn thật mỏng dưới gò má và sát chân tóc để giữ tỷ lệ cân đối.", "blush": "Tán từ tâm gò má chếch nhẹ ra thái dương, không kéo thấp quá mũi.", "liner": "Kẻ đuôi ngắn, nâng rất nhẹ theo đường mi tự nhiên."},
     "Round": {"contour": "Tạo bóng ở thái dương, dưới gò má và góc hàm để tăng chiều dọc.", "blush": "Đánh chéo 45° từ má ngoài hướng lên thái dương; tránh vòng tròn ở giữa má.", "liner": "Kéo đuôi liner mảnh 2–3 mm để tạo hiệu ứng dài hơn."},

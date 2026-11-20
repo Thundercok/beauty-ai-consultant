@@ -26,7 +26,8 @@ def skin_roi_gray_world_wb(img_bgr: np.ndarray, skin_mask: np.ndarray | None = N
 
 def classify_face_shape(points: np.ndarray) -> dict:
     """Tier-A baseline classifier.  Its hand-tuned parameters remain unvalidated."""
-    distance = lambda first, second: np.linalg.norm(points[first, :2] - points[second, :2])
+    def distance(first: int, second: int) -> float:
+        return float(np.linalg.norm(points[first, :2] - points[second, :2]))
     ratios = np.array([
         distance(10, 152) / (distance(234, 454) + 1e-6),
         distance(172, 397) / (distance(234, 454) + 1e-6),
@@ -88,7 +89,7 @@ def compute_skin_metrics(lab_sample: dict, img_bgr: np.ndarray) -> dict:
     else:
         category = "Dark (Fitzpatrick VI)"
     pixels = img_bgr[lab_sample["mask"] > 0].astype(float) + 1.0
-    blue, green, red = pixels[:, 0], pixels[:, 1], pixels[:, 2]
+    green, red = pixels[:, 1], pixels[:, 2]
     return {"ITA_deg": float(ita), "ITA_category": category, "L_star": float(l_star), "a_star": float(a_star), "b_star": float(b_star), "Melanin_index": float(np.mean(100.0 * np.log10(255.0 / red))), "Hemoglobin_index": float(np.mean(100.0 * np.log10(red / green)))}
 
 
