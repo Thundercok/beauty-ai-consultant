@@ -21,9 +21,9 @@
 
 ## 1. Overview
 
-**Beauty AI Consultant** is a standalone Python toolkit for image-based beauty analysis and cosmetic color recommendation. It combines facial landmark analysis, skin-region sampling, colorimetric matching, and physically motivated lip-color rendering to support more consistent product exploration.
+**Beauty AI Consultant** is a standalone Python toolkit for image-based beauty analysis and cosmetic color recommendation. It started from a very practical everyday problem — trying to buy the right makeup shades (lipstick, blush, cushion foundation) for my girlfriend without guessing blindly under warm store or bedroom lighting, where a swatch on screen can look completely different on actual skin and pigmented lips.
 
-The project focuses on three connected tasks:
+It combines facial landmark analysis, skin-region sampling, colorimetric matching, and physically motivated lip-color rendering to support more consistent product exploration across three connected tasks:
 
 - **Face and skin analysis:** landmark-guided facial measurements, skin-region extraction, and Individual Typology Angle (ITA) estimation.
 - **Cosmetic color matching:** vectorized CIEDE2000 comparison between measured colors and a curated K-beauty product catalogue.
@@ -49,13 +49,17 @@ beauty-ai-consultant/
 │   ├── product_matcher.py     # Vectorized CIEDE2000 product matching
 │   └── skin_roi_v2.py         # Landmark-guided skin ROI extraction
 ├── data/
-│   ├── product_database.csv   # Curated K-beauty and eyewear catalogue
+│   ├── product_database.csv   # 175 curated K-beauty and eyewear SKUs
 │   └── sample_face.jpg
 ├── docs/
+│   ├── RESEARCH_PLAN.md       # Hypotheses, verified failure modes, and experimental roadmap
 │   ├── glowup_comprehensive_report.pdf
 │   ├── glowup_comprehensive_report.tex
 │   ├── makeup_app_technical_report.pdf
 │   └── makeup_app_technical_report.tex
+├── experiments/
+│   ├── exp01_baseline_failure.py      # Identity & multi-illuminant baseline drift benchmark
+│   └── exp02_illuminant_estimation.py # Non-skin, specular, and sclera WB comparison
 ├── notebooks/
 │   └── makeup_app_ml.ipynb
 └── tests/
@@ -105,7 +109,7 @@ Use `--catalog-illuminant D50` only when the catalogue's color measurements are 
 - **Image sensitivity:** camera processing, white balance, exposure, illumination, and image compression can shift measured colors. A reference image cannot guarantee an exact real-world product match.
 - **Not a medical tool:** skin analysis is for cosmetic exploration only; it does not diagnose skin conditions or provide medical advice.
 
-The active research focus is illumination-invariant skin chromophore decomposition (melanin and hemoglobin estimation under uncontrolled indoor lighting). This remains an ongoing research direction, not a validated production capability.
+The active research focus is illumination-invariant skin chromophore decomposition (melanin and hemoglobin estimation under uncontrolled indoor lighting). Controlled linear-RGB relighting benchmarks ([exp01](experiments/exp01_baseline_failure.py), [exp02](experiments/exp02_illuminant_estimation.py)) and the step-by-step experimental plan are documented in [docs/RESEARCH_PLAN.md](docs/RESEARCH_PLAN.md). This remains an ongoing research direction, not a validated production capability.
 
 ## 6. Reproducibility & Continuous Integration
 
