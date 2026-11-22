@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from .advice_engine import SEASON_COLOR_PALETTES
 from .bradford_cat import adapt_lab_bradford, lab_to_xyz, xyz_to_lab
 from .kubelka_munk import kubelka_munk_lip_blend
 
@@ -42,6 +43,30 @@ def lab_to_rgb(lab: np.ndarray | list[float]) -> np.ndarray:
     xyz = lab_to_xyz(lab, "D65")
     matrix = np.array([[3.2404542, -1.5371385, -0.4985314], [-0.9692660, 1.8760108, 0.0415560], [0.0556434, -0.2040259, 1.0572252]])
     return _linear_to_srgb(np.asarray(xyz) @ matrix.T)
+
+
+def rgb_to_hex(rgb: np.ndarray | list[float]) -> str:
+    r, g, b = np.clip(np.round(np.asarray(rgb, dtype=float)), 0, 255).astype(int)
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
+def blend_target_colors_lab(season_probabilities: dict[str, float]) -> dict[str, str]:
+    """Blend 12-season target lip/blush/eyeshadow colours continuously in CIELAB.
+
+    Prevents discontinuous shade jumps when a portrait sits near a seasonal boundary.
+    """
+    valid_items = [(name, float(prob)) for name, prob in season_probabilities.items() if name in SEASON_COLOR_PALETTES and prob > 0.0]
+    total = sum(prob for _, prob in valid_items)
+    if total <= 0.0:
+        raise ValueError("season_probabilities must contain positive weight for at least one known season.")
+
+    blended: dict[str, str] = {}
+    for slot, palette_key in (("lip", "lip_hex"), ("blush", "blush_hex"), ("eyeshadow", "eye_hex")):
+        weighted_lab = np.zeros(3, dtype=float)
+        for season_name, prob in valid_items:
+            weighted_lab += (prob / total) * hex_to_lab(SEASON_COLOR_PALETTES[season_name][palette_key])
+        blended[slot] = rgb_to_hex(lab_to_rgb(weighted_lab))
+    return blended
 
 
 def hex_to_lab(hex_str: str) -> np.ndarray:

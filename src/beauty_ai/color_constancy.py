@@ -51,10 +51,52 @@ def planckian_xy(cct_kelvin: float) -> tuple[float, float]:
     return float(x), float(y)
 
 
+def daylight_xy(cct_kelvin: float) -> tuple[float, float]:
+    """CIE 1931 (x, y) chromaticity on the CIE Daylight locus (CIE 15:2004).
+
+    Valid for 4000K <= T <= 25000K; passes through exact CIE D65 at 6504K.
+    """
+    t = float(cct_kelvin)
+    if not 4000.0 <= t <= 25000.0:
+        raise ValueError("cct_kelvin must lie in [4000, 25000] for the CIE Daylight locus.")
+
+    if t <= 7000.0:
+        x = -4.6070e9 / (t**3) + 2.9678e6 / (t**2) + 0.09911e3 / t + 0.244063
+    else:
+        x = -2.0064e9 / (t**3) + 1.9018e6 / (t**2) + 0.24748e3 / t + 0.237040
+    y = -3.000 * (x**2) + 2.870 * x - 0.275
+    return float(x), float(y)
+
+
+def illuminant_locus_xy(cct_kelvin: float) -> tuple[float, float]:
+    """Unified physical illuminant locus: Planckian (<4000K) smoothly blended to CIE Daylight (>=5000K).
+
+    Guarantees C0 continuity across 4000K--5000K and exact passage through CIE D50 (5003K)
+    and CIE D65 (6504K) without the blackbody Duv offset (~1.47 deg at 6504K).
+    """
+    t = float(cct_kelvin)
+    if t <= 4000.0:
+        return planckian_xy(t)
+    if t >= 5000.0:
+        return daylight_xy(t)
+    alpha = (t - 4000.0) / 1000.0
+    xp, yp = planckian_xy(t)
+    xd, yd = daylight_xy(t)
+    return float((1.0 - alpha) * xp + alpha * xd), float((1.0 - alpha) * yp + alpha * yd)
+
+
 def planckian_xyz(cct_kelvin: float) -> np.ndarray:
     """Return Y=1 normalized CIE XYZ tristimulus vector on the Planckian locus."""
     x, y = planckian_xy(cct_kelvin)
     return np.array([x / y, 1.0, (1.0 - x - y) / y], dtype=float)
+
+
+def illuminant_locus_linear_rgb(cct_kelvin: float) -> np.ndarray:
+    """Return Y=1 normalized linear-sRGB illuminant on the unified Planckian--Daylight locus."""
+    x, y = illuminant_locus_xy(cct_kelvin)
+    xyz = np.array([x / y, 1.0, (1.0 - x - y) / y], dtype=float)
+    rgb = _XYZ_TO_SRGB @ xyz
+    return normalize_illuminant_luma(rgb)
 
 
 def normalize_illuminant_luma(rgb_lin: np.ndarray) -> np.ndarray:
@@ -95,10 +137,10 @@ def project_to_planckian_locus(
     raw = normalize_illuminant_luma(raw_illuminant_linear)
     raw_unit = raw / (np.linalg.norm(raw) + 1e-12)
 
-    # Sample uniformly in mireds (1e6 / T) for perceptually even spacing from warm to cool.
+    # Sample uniformly in mireds (1e6 / T) along the unified Planckian--Daylight locus.
     mireds = np.linspace(1e6 / t_max, 1e6 / t_min, num_steps)
     ccts = 1e6 / mireds
-    candidates = np.vstack([planckian_linear_rgb(float(t)) for t in ccts])
+    candidates = np.vstack([illuminant_locus_linear_rgb(float(t)) for t in ccts])
     cand_units = candidates / (np.linalg.norm(candidates, axis=1, keepdims=True) + 1e-12)
 
     dots = np.clip(cand_units @ raw_unit, -1.0, 1.0)

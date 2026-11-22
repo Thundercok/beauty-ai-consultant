@@ -3,24 +3,27 @@ import numpy as np
 from beauty_ai.color_constancy import (
     angular_error_deg,
     apply_bradford_white_balance,
+    illuminant_locus_linear_rgb,
     planckian_linear_rgb,
     project_to_planckian_locus,
 )
 
 
 def test_planckian_locus_ordering_and_daylight_neutrality():
-    warm = planckian_linear_rgb(2700.0)
-    daylight = planckian_linear_rgb(6504.0)
-    cool = planckian_linear_rgb(8500.0)
+    warm = illuminant_locus_linear_rgb(2700.0)
+    daylight = illuminant_locus_linear_rgb(6504.0)
+    cool = illuminant_locus_linear_rgb(8500.0)
 
     assert warm[0] > warm[1] > warm[2]
     assert cool[2] > cool[1] > cool[0]
-    assert angular_error_deg(daylight, np.array([1.0, 1.0, 1.0])) < 1.5
+    # Unified Planckian-Daylight locus passes through CIE D65 to < 0.1 deg
+    assert angular_error_deg(daylight, np.array([1.0, 1.0, 1.0])) < 0.1
+    assert angular_error_deg(planckian_linear_rgb(6504.0), np.array([1.0, 1.0, 1.0])) < 1.6
 
 
 def test_planckian_projection_recovers_temperatures_and_rejects_off_locus_tint():
-    for true_cct in (2700.0, 4000.0, 6500.0, 8000.0):
-        ill = planckian_linear_rgb(true_cct)
+    for true_cct in (2700.0, 4000.0, 6504.0, 8000.0):
+        ill = illuminant_locus_linear_rgb(true_cct)
         proj = project_to_planckian_locus(ill)
         assert abs(proj["cct_kelvin"] - true_cct) < 60.0
         assert proj["off_locus_deg"] < 0.2

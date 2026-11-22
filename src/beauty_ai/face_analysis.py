@@ -11,7 +11,7 @@ from .advice_engine import get_asian_advice
 
 
 def skin_roi_gray_world_wb(img_bgr: np.ndarray, skin_mask: np.ndarray | None = None) -> np.ndarray:
-    """Gray-world white balance, estimated from the supplied skin mask when available."""
+    """Legacy gray-world WB estimated from skin ROI (deprecated: erases true skin undertone; see exp01)."""
     image = img_bgr.astype(np.float32)
     blue, green, red = cv2.split(image)
     if skin_mask is not None and np.count_nonzero(skin_mask) > 100:
@@ -93,19 +93,66 @@ def compute_skin_metrics(lab_sample: dict, img_bgr: np.ndarray) -> dict:
     return {"ITA_deg": float(ita), "ITA_category": category, "L_star": float(l_star), "a_star": float(a_star), "b_star": float(b_star), "Melanin_index": float(np.mean(100.0 * np.log10(255.0 / red))), "Hemoglobin_index": float(np.mean(100.0 * np.log10(red / green)))}
 
 
+# Unvalidated soft Gaussian prototypes in (L*, skin hue angle h_deg = atan2(b*, a*), chroma C*).
+# Replaces discontinuous if/else thresholds so small lighting jitter never flips target colours abruptly.
+SEASON_GAUSSIAN_PROTOTYPES: dict[str, tuple[float, float, float]] = {
+    "Light Spring": (72.0, 60.0, 20.0),
+    "Warm Spring": (64.0, 64.0, 25.0),
+    "Bright Spring": (67.0, 58.0, 27.0),
+    "Light Summer": (72.0, 46.0, 16.0),
+    "Cool Summer": (63.0, 43.0, 17.0),
+    "Soft Summer": (60.0, 49.0, 14.0),
+    "Warm Autumn": (57.0, 65.0, 23.0),
+    "Soft Autumn": (60.0, 58.0, 16.0),
+    "Deep Autumn": (46.0, 60.0, 21.0),
+    "Bright Winter": (66.0, 44.0, 24.0),
+    "Cool Winter": (56.0, 41.0, 20.0),
+    "Deep Winter": (45.0, 44.0, 19.0),
+}
+_SEASON_SIGMA = np.array([9.0, 8.0, 6.0], dtype=float)
+_WARM_SEASONS = {"Light Spring", "Warm Spring", "Bright Spring", "Warm Autumn", "Soft Autumn", "Deep Autumn"}
+
+
 def classify_season(metrics: dict) -> dict:
-    """Unvalidated Tier-A heuristic baseline; Tier B should replace this model."""
-    l_star, a_star, b_star, ita = metrics["L_star"], metrics["a_star"], metrics["b_star"], metrics["ITA_deg"]
-    warm = b_star > 14.0 or b_star / (a_star + 1e-5) > 1.1
-    cool = b_star < 11.0 or b_star / (a_star + 1e-5) < 0.95
-    light, deep = l_star > 62.0 or ita > 40.0, l_star < 50.0 or ita < 20.0
-    if warm:
-        season = "Light Spring" if light else ("Deep Autumn" if deep else ("Warm Spring" if a_star > 14.0 else "Warm Autumn"))
-    elif cool:
-        season = "Light Summer" if light else ("Deep Winter" if deep else ("Cool Winter" if a_star > 14.0 else "Cool Summer"))
+    """Smooth 12-season Gaussian baseline in (L*, hue, chroma); unvalidated against expert ground truth."""
+    l_star = float(metrics["L_star"])
+    a_star = float(metrics["a_star"])
+    b_star = float(metrics["b_star"])
+    hue_deg = math.degrees(math.atan2(b_star, max(a_star, 1e-5)))
+    chroma = math.hypot(a_star, b_star)
+    features = np.array([l_star, hue_deg, chroma], dtype=float)
+
+    log_scores = {
+        name: float(-0.5 * np.sum(((features - np.asarray(proto, dtype=float)) / _SEASON_SIGMA) ** 2))
+        for name, proto in SEASON_GAUSSIAN_PROTOTYPES.items()
+    }
+    max_log = max(log_scores.values())
+    exp_scores = {name: math.exp(val - max_log) for name, val in log_scores.items()}
+    total = sum(exp_scores.values()) + 1e-12
+    probabilities = {name: score / total for name, score in exp_scores.items()}
+
+    ranked = sorted(probabilities, key=probabilities.__getitem__, reverse=True)
+    primary, secondary = ranked[0], ranked[1]
+    warm_prob = sum(probabilities[name] for name in _WARM_SEASONS)
+    if warm_prob >= 0.6:
+        undertone = "Warm (Golden)"
+    elif warm_prob <= 0.4:
+        undertone = "Cool (Pink/Blue)"
     else:
-        season = "Bright Spring" if light else ("Soft Autumn" if b_star >= a_star else "Soft Summer")
-    return {"season": season, "undertone": "Warm (Golden)" if warm else ("Cool (Pink/Blue)" if cool else "Neutral"), "backend": "heuristic_baseline_unvalidated"}
+        undertone = "Neutral"
+
+    return {
+        "season": primary,
+        "secondary_season": secondary,
+        "confidence": round(probabilities[primary], 4),
+        "is_borderline": bool(probabilities[primary] < 0.45),
+        "warm_probability": round(warm_prob, 4),
+        "probabilities": probabilities,
+        "undertone": undertone,
+        "skin_hue_deg": round(hue_deg, 2),
+        "skin_chroma": round(chroma, 2),
+        "backend": "soft_gaussian_baseline_unvalidated",
+    }
 
 
 OCCASION_MODIFIERS = {"daily": {"intensity": "Tự nhiên trong trẻo (0.4)", "texture_style": "Glasting Water Tint / Dewy Balm", "eye_depth": "Nhấn nhẹ mi & phấn nhạt"}, "office": {"intensity": "Thanh lịch chỉn chu (0.6)", "texture_style": "Blur Water Tint / Satin", "eye_depth": "Tạo hốc mắt nhẹ tự nhiên"}, "glam": {"intensity": "Nổi bật cuốn hút (1.0)", "texture_style": "Hazy Lip Clay / Glossy Layering", "eye_depth": "Nhấn nhũ mịn & eyeliner đuôi dài"}}
