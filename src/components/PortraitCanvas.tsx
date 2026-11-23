@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { renderChromophoreHeatmapRgba } from "../lib/beauty/chromophores";
+import { FEATURE_POLYGONS, SKIN_LANDMARKS, computeConvexHull } from "../lib/beauty/neuralLandmarks";
 import type { ConsultationReport, FaceLandmarksBox } from "../lib/beauty/types";
 
 export type ViewportMode = "corrected" | "original" | "roi" | "melanin" | "hemoglobin";
@@ -67,38 +68,63 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
     ctx.putImageData(imageData, 0, 0);
 
     if (showOverlay) {
-      const cx = box.centerX * width;
-      const cy = box.centerY * height;
-      const rx = (box.faceWidth * width) / 2;
-      const ry = (box.faceHeight * height) / 2;
-      const lipCy = box.lipCenterY * height;
-      const lipRx = (box.lipWidth * width) / 2;
-      const lipRy = Math.max(4, ry * 0.11);
-
       ctx.save();
-      ctx.strokeStyle = "rgba(14, 116, 144, 0.9)";
-      ctx.lineWidth = Math.max(1.5, width / 260);
-      ctx.setLineDash([5, 4]);
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-      ctx.stroke();
+      const lineW = Math.max(1, width / 320);
+      if (report.neuralLandmarks && report.neuralLandmarks.length >= 468) {
+        const lms = report.neuralLandmarks;
+        const hullPts = computeConvexHull(
+          SKIN_LANDMARKS.map((idx) => [lms[idx][0], lms[idx][1]] as [number, number])
+        );
 
-      // Lip sampling ellipse
-      ctx.setLineDash([]);
-      ctx.strokeStyle = "rgba(225, 29, 72, 0.9)";
-      ctx.beginPath();
-      ctx.ellipse(cx, lipCy, lipRx, lipRy, 0, 0, Math.PI * 2);
-      ctx.stroke();
+        // Subtle translucent hairline around face perimeter (smooth, non-creepy)
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+        ctx.lineWidth = lineW;
+        ctx.beginPath();
+        hullPts.forEach(([x, y], i) => {
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.stroke();
 
-      // Axis crosshair lines
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - ry);
-      ctx.lineTo(cx, cy + ry);
-      ctx.moveTo(cx - rx, cy);
-      ctx.lineTo(cx + rx, cy);
-      ctx.stroke();
+        // Soft rose lip trace only (no eyeball rings or stick-nose)
+        const lipIndices = FEATURE_POLYGONS[2];
+        ctx.strokeStyle = "rgba(244, 63, 94, 0.45)";
+        ctx.lineWidth = lineW;
+        ctx.beginPath();
+        lipIndices.forEach((lmIdx, i) => {
+          const [x, y] = lms[lmIdx];
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.stroke();
+
+        // Delicate beauty-proportion micro-dots (forehead, cheekbones, jaw, chin, lip corners)
+        const anchorIndices = [10, 234, 454, 172, 397, 152, 61, 291];
+        const dotR = Math.max(1.8, width / 170);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
+        ctx.strokeStyle = "rgba(24, 24, 27, 0.45)";
+        ctx.lineWidth = 0.75;
+        anchorIndices.forEach((lmIdx) => {
+          const [x, y] = lms[lmIdx];
+          ctx.beginPath();
+          ctx.arc(x, y, dotR, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        });
+      } else {
+        const cx = box.centerX * width;
+        const cy = box.centerY * height;
+        const rx = (box.faceWidth * width) / 2;
+        const ry = (box.faceHeight * height) / 2;
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+        ctx.lineWidth = lineW;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.restore();
     }
   }, [report, mode, showOverlay, box]);
@@ -106,18 +132,20 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
   if (!report) {
     return (
       <div
-        className={`flex items-center justify-center bg-zinc-100 border border-zinc-200 text-xs text-zinc-500 ${className}`}
+        className={`flex items-center justify-center bg-zinc-100 border border-zinc-200 text-xs text-zinc-500 h-64 ${className}`}
       >
-        Loading optical sample...
+        Đang nhận diện khuôn mặt và phân tích màu da...
       </div>
     );
   }
 
   return (
-    <canvas
-      ref={canvasRef}
-      className={`block w-full h-auto bg-zinc-950 ${className}`}
-      aria-label="Portrait colorimetry analysis canvas"
-    />
+    <div className="w-full bg-zinc-100 flex items-center justify-center">
+      <canvas
+        ref={canvasRef}
+        className={`block max-w-full w-auto h-auto ${className}`}
+        aria-label="Khung phân tích khuôn mặt và màu da"
+      />
+    </div>
   );
 };

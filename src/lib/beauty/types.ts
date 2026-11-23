@@ -117,6 +117,29 @@ export interface ChromophoreSummary {
   height: number;
 }
 
+export interface RelightingMethodMetric {
+  method: string;
+  label: string;
+  skinLab: [number, number, number];
+  deltaEFromDaylight: number;
+  predictedSeason: SeasonName;
+  undertone: SeasonClassification["undertone"];
+  seasonMatched: boolean;
+}
+
+export interface RelightingExperimentReport {
+  simulatedCctK: number;
+  relitRgba: Uint8ClampedArray;
+  recoveredRgba: Uint8ClampedArray;
+  baselineSeason: SeasonName;
+  baselineLab: [number, number, number];
+  baselineMelaninStd: number;
+  baselineHemoglobinStd: number;
+  relitMelaninStd: number;
+  relitHemoglobinStd: number;
+  methods: RelightingMethodMetric[];
+}
+
 export interface ConsultationReport {
   whiteBalance: WhiteBalanceDiagnostics;
   faceShape: FaceShapeResult;
@@ -148,7 +171,11 @@ export interface ConsultationReport {
       setting: string;
     };
   };
+  landmarkSource: "mediapipe_468" | "fallback_box";
+  landmarkCount: number;
+  neuralLandmarks: Array<[number, number, number]> | null;
   skinMask: Uint8Array;
+  faceHullMask: Uint8Array;
   correctedRgba: Uint8ClampedArray;
   originalRgba: Uint8ClampedArray;
   width: number;
