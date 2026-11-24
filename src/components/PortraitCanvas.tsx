@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { renderChromophoreHeatmapRgba } from "../lib/beauty/chromophores";
-import { FEATURE_POLYGONS, SKIN_LANDMARKS, computeConvexHull } from "../lib/beauty/neuralLandmarks";
 import type { ConsultationReport, FaceLandmarksBox } from "../lib/beauty/types";
+import { PortraitSkeleton } from "./AnalysisSkeleton";
 
 export type ViewportMode = "corrected" | "original" | "roi" | "melanin" | "hemoglobin";
 
@@ -11,6 +11,51 @@ interface PortraitCanvasProps {
   showOverlay: boolean;
   box: FaceLandmarksBox;
   className?: string;
+  containerClassName?: string;
+}
+
+/**
+ * Minimalist, balanced facial proportion points:
+ * Forehead center (10), cheekbone highlights (116, 345),
+ * jaw symmetry (172, 397), chin (152), cupid's bow (0), lip corners (61, 291).
+ * Intentionally omits eye/nostril outlines so the overlay feels calm & editorial.
+ */
+const BEAUTY_GLOW_LANDMARKS = [10, 116, 345, 172, 397, 152, 0, 61, 291];
+const CHEEK_BLOOM_LANDMARKS = [116, 345];
+
+function drawSoftGlowDot(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  dotRadius: number,
+  haloRadius: number,
+  tint: "ivory" | "rose"
+): void {
+  const halo = ctx.createRadialGradient(x, y, 0, x, y, haloRadius);
+  if (tint === "rose") {
+    halo.addColorStop(0, "rgba(255, 241, 242, 0.72)");
+    halo.addColorStop(0.45, "rgba(253, 164, 175, 0.28)");
+    halo.addColorStop(1, "rgba(253, 164, 175, 0)");
+  } else {
+    halo.addColorStop(0, "rgba(255, 252, 248, 0.78)");
+    halo.addColorStop(0.45, "rgba(255, 237, 213, 0.26)");
+    halo.addColorStop(1, "rgba(255, 237, 213, 0)");
+  }
+
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(x, y, haloRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.shadowBlur = Math.max(4, dotRadius * 3);
+  ctx.shadowColor =
+    tint === "rose" ? "rgba(251, 113, 133, 0.65)" : "rgba(255, 247, 237, 0.9)";
+  ctx.fillStyle = tint === "rose" ? "rgba(255, 245, 246, 0.95)" : "rgba(255, 255, 255, 0.94)";
+  ctx.beginPath();
+  ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
@@ -19,6 +64,7 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
   showOverlay,
   box,
   className = "",
+  containerClassName = "bg-zinc-100",
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -69,82 +115,65 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
 
     if (showOverlay) {
       ctx.save();
-      const lineW = Math.max(1, width / 320);
+      const dotR = Math.max(1.8, width / 175);
+      const haloR = Math.max(8, width / 38);
+
       if (report.neuralLandmarks && report.neuralLandmarks.length >= 468) {
         const lms = report.neuralLandmarks;
-        const hullPts = computeConvexHull(
-          SKIN_LANDMARKS.map((idx) => [lms[idx][0], lms[idx][1]] as [number, number])
-        );
 
-        // Subtle translucent hairline around face perimeter (smooth, non-creepy)
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-        ctx.lineWidth = lineW;
-        ctx.beginPath();
-        hullPts.forEach(([x, y], i) => {
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
-        ctx.closePath();
-        ctx.stroke();
-
-        // Soft rose lip trace only (no eyeball rings or stick-nose)
-        const lipIndices = FEATURE_POLYGONS[2];
-        ctx.strokeStyle = "rgba(244, 63, 94, 0.45)";
-        ctx.lineWidth = lineW;
-        ctx.beginPath();
-        lipIndices.forEach((lmIdx, i) => {
+        // 1. Subtle ambient skin-sampling soft bloom over the cheeks
+        const bloomR = Math.max(18, width * 0.08);
+        CHEEK_BLOOM_LANDMARKS.forEach((lmIdx) => {
           const [x, y] = lms[lmIdx];
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
-        ctx.closePath();
-        ctx.stroke();
-
-        // Delicate beauty-proportion micro-dots (forehead, cheekbones, jaw, chin, lip corners)
-        const anchorIndices = [10, 234, 454, 172, 397, 152, 61, 291];
-        const dotR = Math.max(1.8, width / 170);
-        ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
-        ctx.strokeStyle = "rgba(24, 24, 27, 0.45)";
-        ctx.lineWidth = 0.75;
-        anchorIndices.forEach((lmIdx) => {
-          const [x, y] = lms[lmIdx];
+          const bloom = ctx.createRadialGradient(x, y, 0, x, y, bloomR);
+          bloom.addColorStop(0, "rgba(255, 248, 240, 0.2)");
+          bloom.addColorStop(0.55, "rgba(255, 241, 242, 0.08)");
+          bloom.addColorStop(1, "rgba(255, 241, 242, 0)");
+          ctx.fillStyle = bloom;
           ctx.beginPath();
-          ctx.arc(x, y, dotR, 0, Math.PI * 2);
+          ctx.arc(x, y, bloomR, 0, Math.PI * 2);
           ctx.fill();
-          ctx.stroke();
+        });
+
+        // 2. Minimal luminous pearl dots (no wireframe mesh or eye/mouth cages)
+        BEAUTY_GLOW_LANDMARKS.forEach((lmIdx) => {
+          const [x, y] = lms[lmIdx];
+          const isLipPoint = lmIdx === 0 || lmIdx === 61 || lmIdx === 291;
+          drawSoftGlowDot(ctx, x, y, dotR, haloR, isLipPoint ? "rose" : "ivory");
         });
       } else {
+        // Gentle fallback soft-glow dots around estimated face proportions
         const cx = box.centerX * width;
         const cy = box.centerY * height;
         const rx = (box.faceWidth * width) / 2;
         const ry = (box.faceHeight * height) / 2;
 
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-        ctx.lineWidth = lineW;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-        ctx.stroke();
+        const fallbackPts: Array<[number, number, "ivory" | "rose"]> = [
+          [cx, cy - ry * 0.72, "ivory"],
+          [cx - rx * 0.62, cy - ry * 0.05, "ivory"],
+          [cx + rx * 0.62, cy - ry * 0.05, "ivory"],
+          [cx, cy + ry * 0.84, "ivory"],
+          [cx, box.lipCenterY * height, "rose"],
+        ];
+        fallbackPts.forEach(([px, py, tint]) => {
+          drawSoftGlowDot(ctx, px, py, dotR, haloR, tint);
+        });
       }
+
       ctx.restore();
     }
   }, [report, mode, showOverlay, box]);
 
   if (!report) {
-    return (
-      <div
-        className={`flex items-center justify-center bg-zinc-100 border border-zinc-200 text-xs text-zinc-500 h-64 ${className}`}
-      >
-        Đang nhận diện khuôn mặt và phân tích màu da...
-      </div>
-    );
+    return <PortraitSkeleton className={className} />;
   }
 
   return (
-    <div className="w-full bg-zinc-100 flex items-center justify-center">
+    <div className={`w-full flex items-center justify-center ${containerClassName}`}>
       <canvas
         ref={canvasRef}
         className={`block max-w-full w-auto h-auto ${className}`}
-        aria-label="Khung phân tích khuôn mặt và màu da"
+        aria-label="Chân dung phân tích tông da"
       />
     </div>
   );

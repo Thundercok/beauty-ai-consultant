@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import express from "express";
 import { createServer as createViteServer } from "vite";
@@ -101,6 +102,7 @@ async function startServer() {
     res.sendFile(sampleFacePath);
   });
 
+  const httpServer = http.createServer(app);
   const distDir = path.join(rootDir, "dist");
   const isProd = process.env.NODE_ENV === "production" && fs.existsSync(distDir);
 
@@ -111,13 +113,16 @@ async function startServer() {
     });
   } else {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: { server: httpServer },
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
   }
 
-  app.listen(port, "0.0.0.0", () => {
+  httpServer.listen(port, "0.0.0.0", () => {
     console.log(`Beauty AI Consultant listening on http://0.0.0.0:${port}`);
   });
 }

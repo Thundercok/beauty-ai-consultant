@@ -11,7 +11,13 @@ import {
   unsharpMaskLumaRgba,
 } from "./imageEnhancement";
 import { kubelkaMunkLipBlend } from "./kubelkaMunk";
-import { blendTargetColorsLab, ciede2000 } from "./productMatcher";
+import {
+  POPULARITY_HIGHLIGHT_THRESHOLD,
+  blendTargetColorsLab,
+  ciede2000,
+  scoreMatchedProductsPopularity,
+  selectTrendingProducts,
+} from "./productMatcher";
 
 test("Bradford CAT round-trips D50 -> D65 -> D50 accurately", () => {
   const labD50: [number, number, number] = [65.0, 12.0, 18.0];
@@ -190,6 +196,104 @@ test("Adaptive low-light contrast lifts dim portraits and leaves well-lit ones n
   assert.equal(full.enhancedRgba.length, dim.length);
   assert.equal(full.stats.lowLightBoosted, true);
   assert.equal(full.stats.bilateralRadius, 2);
+});
+
+test("selectTrendingProducts ranks matching multi-season popular items with brand diversity", () => {
+  const sampleCatalog = [
+    {
+      id: 1,
+      product_name: "Juicy Lasting Tint 25",
+      brand: "Romand",
+      product_type: "lipstick",
+      texture_type: "Juicy Tint",
+      hex_color: "#D9786D",
+      shade_name: "Bare Grape",
+      undertone: "Neutral",
+      best_seasons: "Light Spring, Soft Summer, Light Summer",
+    },
+    {
+      id: 2,
+      product_name: "Perfect Couple Lip Love 04",
+      brand: "Lemonade",
+      product_type: "lipstick",
+      texture_type: "Matte Lipstick",
+      hex_color: "#D97A65",
+      shade_name: "04 Milk",
+      undertone: "Warm",
+      best_seasons: "Warm Spring, Light Spring",
+    },
+    {
+      id: 3,
+      product_name: "Aesthetic Blush 01",
+      brand: "Lemonade",
+      product_type: "blush",
+      texture_type: "Cream Blush",
+      hex_color: "#F0ACA1",
+      shade_name: "01 Pinky Peach",
+      undertone: "Neutral",
+      best_seasons: "Light Spring, Light Summer",
+    },
+    {
+      id: 4,
+      product_name: "Obscure Shadow",
+      brand: "UnknownBrand",
+      product_type: "eyeshadow",
+      texture_type: "Matte Eyeshadow",
+      hex_color: "#223344",
+      shade_name: "Navy",
+      undertone: "Cool",
+      best_seasons: "Cool Winter",
+    },
+  ];
+
+  const hot = selectTrendingProducts(sampleCatalog, {
+    blendedTargets: { lip: "#D9786D", blush: "#F0ACA1", eyeshadow: "#D7AE87" },
+    skinHex: "#E6C7B5",
+    lipBaseLab: [62, 16, 12],
+    userSeason: "Light Spring",
+    limit: 3,
+  });
+
+  assert.equal(hot.length, 3);
+  assert.ok(hot[0].popularityScore >= hot[1].popularityScore);
+  assert.ok(hot[0].hotReason.length > 0);
+  // Diverse top picks pick Romand + Lemonade before repeating Lemonade
+  assert.notEqual(hot[0].brand, hot[1].brand);
+
+  const scored = scoreMatchedProductsPopularity(
+    [
+      {
+        id: 10,
+        brand: "Romand",
+        name: "Juicy Lasting Tint 25",
+        shade: "Bare Grape",
+        productType: "lipstick",
+        texture: "Juicy Tint",
+        hex: "#D9786D",
+        deltaE: 1.5,
+        matchTier: "Great Match",
+        undertone: "Neutral",
+        bestSeasons: "Light Spring, Soft Summer, Light Summer",
+      },
+      {
+        id: 11,
+        brand: "UnknownBrand",
+        name: "Obscure Shadow",
+        shade: "Navy",
+        productType: "eyeshadow",
+        texture: "Matte Eyeshadow",
+        hex: "#223344",
+        deltaE: 9.8,
+        matchTier: "Close Alternative",
+        undertone: "Cool",
+        bestSeasons: "Cool Winter",
+      },
+    ],
+    "Light Spring"
+  );
+  assert.ok(scored[0].popularityScore >= POPULARITY_HIGHLIGHT_THRESHOLD);
+  assert.equal(scored[0].isPopular, true);
+  assert.equal(scored[1].isPopular, false);
 });
 
 

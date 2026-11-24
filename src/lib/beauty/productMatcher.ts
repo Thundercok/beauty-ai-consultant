@@ -163,3 +163,159 @@ export function matchProducts(
   scored.sort((a, b) => a.deltaE - b.deltaE);
   return scored.slice(0, topK);
 }
+
+export interface TrendingProductItem extends MatchedProduct {
+  hotReason: string;
+  popularityScore: number;
+  isPopular: boolean;
+}
+
+export const POPULARITY_HIGHLIGHT_THRESHOLD = 15.0;
+
+const POPULAR_HOT_BRANDS = new Set([
+  "Lemonade",
+  "OFÉLIA",
+  "M.O.I Cosmetics",
+  "Cỏ Mềm Homelab",
+  "Gilaa",
+  "Black Rouge",
+  "Merzy",
+  "Romand",
+  "Clio",
+  "3CE",
+  "Dior",
+  "YSL",
+  "NARS",
+  "Maybelline",
+]);
+
+const VN_LOCAL_BRANDS = new Set([
+  "Lemonade",
+  "OFÉLIA",
+  "M.O.I Cosmetics",
+  "Cỏ Mềm Homelab",
+  "Gilaa",
+]);
+
+const CULT_FAVORITE_PATTERN =
+  /Quốc Dân|Huyền Thoại|Juicy|Lolli|Air Fit|Lip Glow|Perfect Couple|Neo Cushion|Velvet Lip Tint|Baby Skin/i;
+
+export function scoreMatchedProductsPopularity(
+  items: MatchedProduct[],
+  userSeason: SeasonName
+): TrendingProductItem[] {
+  return items.map((item) => {
+    const colorFitScore = Math.max(0, 12 - item.deltaE);
+    const seasonsList = item.bestSeasons
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const matchesUserSeason = item.bestSeasons.includes(userSeason);
+    const isUniversal = item.bestSeasons === "All Seasons" || seasonsList.length >= 3;
+    const isPopularBrand = POPULAR_HOT_BRANDS.has(item.brand);
+    const isCultLine =
+      CULT_FAVORITE_PATTERN.test(item.name) || CULT_FAVORITE_PATTERN.test(item.shade);
+
+    const popularityScore = Number(
+      (
+        colorFitScore +
+        (matchesUserSeason ? 5.0 : 0) +
+        (isUniversal ? 2.5 : 0) +
+        (isPopularBrand ? 2.5 : 0) +
+        (isCultLine ? 1.5 : 0)
+      ).toFixed(2)
+    );
+
+    let hotReason = "Được ưa chuộng";
+    if (matchesUserSeason && item.deltaE <= 4.5) {
+      hotReason = "Hợp mùa sắc cao";
+    } else if (VN_LOCAL_BRANDS.has(item.brand)) {
+      hotReason = "Phổ biến tại VN";
+    } else if (isUniversal) {
+      hotReason = "Hợp nhiều tông da";
+    } else if (isCultLine) {
+      hotReason = "Dòng bán chạy";
+    }
+
+    return {
+      ...item,
+      hotReason,
+      popularityScore,
+      isPopular: popularityScore >= POPULARITY_HIGHLIGHT_THRESHOLD,
+    };
+  });
+}
+
+export function selectTrendingProducts(
+  products: CatalogProduct[],
+  options: {
+    blendedTargets: { lip: string; blush: string; eyeshadow: string };
+    skinHex: string;
+    lipBaseLab: [number, number, number];
+    userSeason: SeasonName;
+    catalogIlluminant?: IlluminantName;
+    limit?: number;
+  }
+): TrendingProductItem[] {
+  const {
+    blendedTargets,
+    skinHex,
+    lipBaseLab,
+    userSeason,
+    catalogIlluminant = "D65",
+    limit = 6,
+  } = options;
+
+  const makeupTypes = ["lipstick", "blush", "eyeshadow", "foundation", "concealer"];
+  const allMatched: MatchedProduct[] = [];
+
+  for (const type of makeupTypes) {
+    const targetHex =
+      type === "lipstick"
+        ? blendedTargets.lip
+        : type === "blush"
+          ? blendedTargets.blush
+          : type === "eyeshadow"
+            ? blendedTargets.eyeshadow
+            : skinHex;
+
+    allMatched.push(
+      ...matchProducts(targetHex, products, {
+        productType: type,
+        lipBaseLab: type === "lipstick" ? lipBaseLab : undefined,
+        topK: 80,
+        catalogIlluminant,
+      })
+    );
+  }
+
+  const scored = scoreMatchedProductsPopularity(allMatched, userSeason);
+  scored.sort((a, b) => b.popularityScore - a.popularityScore);
+
+  const selected: TrendingProductItem[] = [];
+  const brandCounts = new Map<string, number>();
+  const typeCounts = new Map<string, number>();
+
+  for (const item of scored) {
+    if (selected.length >= limit) break;
+    const bCount = brandCounts.get(item.brand) ?? 0;
+    const tCount = typeCounts.get(item.productType) ?? 0;
+    if (bCount >= 1 || tCount >= 2) continue;
+    selected.push(item);
+    brandCounts.set(item.brand, bCount + 1);
+    typeCounts.set(item.productType, tCount + 1);
+  }
+
+  // Fill remaining slots if strict brand diversity left fewer than `limit`
+  if (selected.length < limit) {
+    const pickedIds = new Set(selected.map((s) => s.id));
+    for (const item of scored) {
+      if (selected.length >= limit) break;
+      if (pickedIds.has(item.id)) continue;
+      selected.push(item);
+      pickedIds.add(item.id);
+    }
+  }
+
+  return selected;
+}

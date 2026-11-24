@@ -1,5 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, RotateCcw, SlidersHorizontal, Upload } from "lucide-react";
+import {
+  Download,
+  Droplets,
+  RotateCcw,
+  ScanFace,
+  ShoppingBag,
+  SlidersHorizontal,
+  Sun,
+  Upload,
+} from "lucide-react";
+import { PortraitSkeleton, ResultsSkeleton } from "./components/AnalysisSkeleton";
 import { CatalogMatcher } from "./components/CatalogMatcher";
 import { KubelkaMunkLab } from "./components/KubelkaMunkLab";
 import { PortraitCanvas, type ViewportMode } from "./components/PortraitCanvas";
@@ -20,7 +30,6 @@ import type {
   CatalogProduct,
   ConsultationReport,
   FaceLandmarksBox,
-  FaceShapeName,
   IlluminantName,
   MatchedProduct,
   OccasionType,
@@ -92,6 +101,10 @@ export default function App() {
   const [showRoiTuning, setShowRoiTuning] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
   const [viewportMode, setViewportMode] = useState<ViewportMode>("corrected");
+  const [studioTab, setStudioTab] = useState<"lighting" | "chromophores" | "advanced">("lighting");
+  const [activeNav, setActiveNav] = useState<"results" | "catalog" | "lip-tryon" | "studio-lab">(
+    "results"
+  );
 
   const [wbMethod, setWbMethod] = useState<WhiteBalanceMethod>("planckian_grey_edge");
   const [occasion, setOccasion] = useState<OccasionType>("office");
@@ -130,6 +143,7 @@ export default function App() {
 
   const loadSamplePortrait = useCallback(() => {
     setImageError(null);
+    setLandmarkStatus("loading");
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
@@ -138,10 +152,12 @@ export default function App() {
         void processLoadedBuffer(buf);
       } catch (err) {
         setImageError(err instanceof Error ? err.message : "Không đọc được ảnh mẫu.");
+        setLandmarkStatus("fallback");
       }
     };
     img.onerror = () => {
       setImageError("Không tải được ảnh mẫu từ máy chủ.");
+      setLandmarkStatus("fallback");
     };
     img.src = "/api/sample-face";
   }, [processLoadedBuffer]);
@@ -166,6 +182,7 @@ export default function App() {
     const file = event.target.files?.[0];
     if (!file) return;
     setImageError(null);
+    setLandmarkStatus("loading");
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = typeof reader.result === "string" ? reader.result : "";
@@ -178,9 +195,13 @@ export default function App() {
           void processLoadedBuffer(buf);
         } catch (err) {
           setImageError(err instanceof Error ? err.message : "Không xử lý được ảnh tải lên.");
+          setLandmarkStatus("fallback");
         }
       };
-      img.onerror = () => setImageError("Tệp ảnh không hợp lệ hoặc bị hỏng.");
+      img.onerror = () => {
+        setImageError("Tệp ảnh không hợp lệ hoặc bị hỏng.");
+        setLandmarkStatus("fallback");
+      };
       img.src = dataUrl;
     };
     reader.readAsDataURL(file);
@@ -197,6 +218,8 @@ export default function App() {
       { wbMethod, occasion, texture, neuralLandmarks }
     );
   }, [imageBuffer, faceBox, wbMethod, occasion, texture, neuralLandmarks]);
+
+  const isProcessingPortrait = !report || landmarkStatus === "loading";
 
   const topMatches = useMemo(() => {
     if (!report || products.length === 0) {
@@ -226,13 +249,6 @@ export default function App() {
     if (!report) return [];
     return (Object.keys(report.season.probabilities) as SeasonName[])
       .map((name) => ({ name, prob: report.season.probabilities[name] }))
-      .sort((a, b) => b.prob - a.prob);
-  }, [report]);
-
-  const sortedShapes = useMemo(() => {
-    if (!report) return [];
-    return (Object.keys(report.faceShape.probabilities) as FaceShapeName[])
-      .map((name) => ({ name, prob: report.faceShape.probabilities[name] }))
       .sort((a, b) => b.prob - a.prob);
   }, [report]);
 
@@ -283,41 +299,46 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAFAFA] text-zinc-900">
-      {/* 3-Zone Top Bar Contract */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-xs border-b border-zinc-200">
-        <div className="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between gap-8">
+    <div className="min-h-screen overflow-x-clip flex flex-col bg-[#FAF9F7] text-zinc-900">
+      {/* 3-Zone Top Bar Contract (compact 56px on mobile, 64px on desktop) */}
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-zinc-200">
+        <div className="max-w-[1320px] mx-auto px-4 sm:px-6 h-14 md:h-16 flex items-center justify-between gap-4 md:gap-8">
           <a
-            href="#colorimetry"
-            className="text-lg font-bold tracking-tight text-zinc-900 whitespace-nowrap shrink-0"
+            href="#results"
+            onClick={() => setActiveNav("results")}
+            className="text-base sm:text-lg font-bold tracking-tight text-zinc-900 whitespace-nowrap shrink-0"
           >
             Beauty AI Consultant
           </a>
 
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-zinc-600">
             <a
-              href="#colorimetry"
+              href="#results"
+              onClick={() => setActiveNav("results")}
               className="hover:text-zinc-900 transition-colors whitespace-nowrap shrink-0"
             >
               Phân tích da
             </a>
             <a
-              href="#relighting"
+              href="#studio-lab"
+              onClick={() => setActiveNav("studio-lab")}
               className="hover:text-zinc-900 transition-colors whitespace-nowrap shrink-0"
             >
-              Thử ánh sáng
+              Quang học &amp; Sắc tố
             </a>
             <a
-              href="#kubelka-munk"
+              href="#lip-tryon"
+              onClick={() => setActiveNav("lip-tryon")}
               className="hover:text-zinc-900 transition-colors whitespace-nowrap shrink-0"
             >
-              Thử màu son
+              Hòa sắc môi
             </a>
             <a
               href="#catalog"
+              onClick={() => setActiveNav("catalog")}
               className="hover:text-zinc-900 transition-colors whitespace-nowrap shrink-0"
             >
-              Sản phẩm
+              Đối chiếu sản phẩm
             </a>
           </nav>
 
@@ -332,244 +353,315 @@ export default function App() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-zinc-900 hover:bg-zinc-800 rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] md:min-h-[38px] px-4 py-2 text-xs font-medium text-white bg-zinc-900 hover:bg-zinc-800 rounded-xl md:rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5" />
-              Tải ảnh của bạn
+              <span>Tải ảnh của bạn</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 max-w-[1400px] w-full mx-auto px-6 py-8 space-y-12">
-        {/* Section 1: Main Consultation */}
-        <section id="colorimetry" className="space-y-6">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-zinc-200 pb-6">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-1.5">
-                01. Phân tích khuôn mặt &amp; Tư vấn Personal Color
+      <main className="flex-1 max-w-[1320px] w-full mx-auto px-4 sm:px-6 pt-3 pb-20 sm:py-6 md:py-8 space-y-8 sm:space-y-10 md:space-y-12">
+        {/* Section 1: Clean Scientific Colorimetry & Face Geometry */}
+        <section id="results" className="scroll-mt-20 space-y-3.5 sm:space-y-5 md:space-y-6">
+          <div className="flex items-center sm:items-end justify-between gap-3 border-b border-zinc-200/80 pb-3 sm:pb-5">
+            <div className="min-w-0">
+              <p className="hidden sm:block text-xs font-medium text-zinc-500 mb-1">
+                01. Phân tích Trắc quang &amp; Tỉ lệ khuôn mặt
               </p>
-              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 max-w-3xl [text-wrap:balance]">
-                Tư vấn màu son, phấn &amp; dáng mặt chuẩn ánh sáng thật
+              <h1 className="text-base sm:text-3xl lg:text-4xl font-bold tracking-tight text-zinc-900 max-w-2xl [text-wrap:balance] leading-snug">
+                <span className="sm:hidden">Phân tích sắc da &amp; ánh sáng</span>
+                <span className="hidden sm:inline">
+                  Phân tích trắc quang sắc da &amp; hình học gương mặt
+                </span>
               </h1>
-              <p className="text-sm text-zinc-600 mt-2 max-w-2xl">
-                Hệ thống tự động nhận diện 478 điểm Mắt, Mũi, Môi và Viền mặt bằng AI, khử ánh đèn
-                phòng bị ám vàng/xanh rồi chọn ra các mã son và mỹ phẩm phù hợp nhất.
+              <p className="hidden sm:block text-sm text-zinc-600 mt-1.5 sm:mt-2 max-w-2xl">
+                Cân bằng ánh đèn theo đường cong Planckian, tách sắc tố da theo định luật
+                Beer-Lambert và phân loại 12 mùa sắc CIELAB trước khi đối chiếu mỹ phẩm.
               </p>
             </div>
-            <div className="flex items-center gap-2.5 shrink-0">
-              <button
-                type="button"
-                onClick={loadSamplePortrait}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-700 bg-white border border-zinc-300 rounded-md hover:bg-zinc-50 transition-colors whitespace-nowrap cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Dùng ảnh mẫu
-              </button>
-              <button
-                type="button"
-                onClick={handleExportJson}
-                disabled={!report}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-900 bg-zinc-100 border border-zinc-300 rounded-md hover:bg-zinc-200 disabled:opacity-50 transition-colors whitespace-nowrap cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Tải báo cáo JSON
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={loadSamplePortrait}
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] md:min-h-[38px] px-3 sm:px-4 py-1.5 sm:py-2 text-xs font-medium text-zinc-700 bg-white border border-zinc-300 rounded-xl md:rounded-md hover:bg-zinc-50 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="sm:hidden">Ảnh mẫu</span>
+              <span className="hidden sm:inline">Dùng ảnh mẫu</span>
+            </button>
           </div>
 
           {(imageError || catalogError) && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-md text-xs">
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl md:rounded-md text-xs">
               {imageError || catalogError}
             </div>
           )}
 
-          {/* Asymmetric Split Console */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Left Portrait & Quick Settings */}
-            <div className="lg:col-span-5 space-y-4">
-              <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
-                <div className="p-2 border-b border-zinc-200 bg-zinc-50 flex items-center justify-between gap-2 overflow-x-auto">
-                  <div className="flex items-center gap-1">
-                    {(
-                      [
-                        ["corrected", "Đã khử ánh đèn"],
-                        ["original", "Ảnh gốc"],
-                        ["roi", "Vùng da đo"],
-                        ["melanin", "Melanin"],
-                        ["hemoglobin", "Hồng ban"],
-                      ] as const
-                    ).map(([id, label]) => (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => setViewportMode(id)}
-                        className={`px-2.5 py-1 text-[11px] font-medium rounded whitespace-nowrap transition-colors cursor-pointer ${
-                          viewportMode === id
-                            ? "bg-zinc-900 text-white"
-                            : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 lg:gap-8 items-start">
+            {/* Left: Obsidian Studio Portrait Mirror & Quick Preferences */}
+            <div className="lg:col-span-5 space-y-3.5 sm:space-y-4">
+              <div className="bg-[#161514] border border-zinc-200/80 rounded-3xl md:rounded-2xl overflow-hidden shadow-md">
+                <div className="relative">
+                  {/* Frosted top studio controls overlaid cleanly without eating extra vertical height */}
+                  <div className="absolute top-3 inset-x-3 z-10 flex items-center justify-between gap-2 pointer-events-none">
+                    <div className="pointer-events-auto inline-flex items-center p-0.5 rounded-full bg-black/50 backdrop-blur-md border border-white/15">
+                      {(
+                        [
+                          ["corrected", "Đã cân bằng"],
+                          ["original", "Ảnh gốc"],
+                        ] as const
+                      ).map(([id, label]) => {
+                        const isActive =
+                          viewportMode === id ||
+                          (id === "corrected" &&
+                            viewportMode !== "original" &&
+                            viewportMode !== "corrected");
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => setViewportMode(id)}
+                            className={`min-h-[36px] md:min-h-[30px] px-3 md:px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-colors cursor-pointer ${
+                              isActive
+                                ? "bg-white text-zinc-900 shadow-xs"
+                                : "text-white/85 hover:text-white"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      aria-pressed={showOverlay}
+                      onClick={() => setShowOverlay((v) => !v)}
+                      className={`pointer-events-auto min-h-[36px] md:min-h-[30px] px-3 md:px-2.5 py-1 text-xs font-medium rounded-full backdrop-blur-md border whitespace-nowrap transition-colors cursor-pointer ${
+                        showOverlay
+                          ? "bg-white/95 border-white text-zinc-900"
+                          : "bg-black/45 border-white/20 text-white/85 hover:text-white"
+                      }`}
+                    >
+                      {showOverlay ? "Điểm sáng: Bật" : "Điểm sáng: Tắt"}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    aria-pressed={showOverlay}
-                    onClick={() => setShowOverlay((v) => !v)}
-                    className={`px-2 py-1 text-[11px] font-medium rounded border whitespace-nowrap transition-colors cursor-pointer ${
-                      showOverlay
-                        ? "border-zinc-900 text-zinc-900 bg-white"
-                        : "border-zinc-300 text-zinc-500 bg-zinc-100"
-                    }`}
-                  >
-                    {showOverlay ? "Viền mặt: Bật" : "Viền mặt: Tắt"}
-                  </button>
+
+                  {isProcessingPortrait ? (
+                    <PortraitSkeleton
+                      variant="studio"
+                      className="max-h-[340px] sm:max-h-[420px]"
+                    />
+                  ) : (
+                    <PortraitCanvas
+                      report={report}
+                      mode={viewportMode}
+                      showOverlay={showOverlay}
+                      box={faceBox}
+                      containerClassName="bg-[#161514]"
+                      className="max-h-[340px] sm:max-h-[420px]"
+                    />
+                  )}
+
+                  {/* Mobile Hero Scrim: Immediate above-the-fold Personal Color verdict */}
+                  <div className="lg:hidden absolute inset-x-0 bottom-0 pt-16 pb-3.5 px-4 bg-gradient-to-t from-black/90 via-black/55 to-transparent pointer-events-none">
+                    {isProcessingPortrait || !report ? (
+                      <div className="space-y-1.5">
+                        <div className="h-2.5 w-28 rounded-full bg-white/20 animate-pulse" />
+                        <div className="h-5 w-48 rounded-md bg-white/25 animate-pulse" />
+                        <div className="h-3 w-40 rounded-full bg-white/15 animate-pulse" />
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-200/90">
+                          Personal Color · {describeCctVi(report.whiteBalance.estimatedCctK)}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span
+                            className="w-3.5 h-3.5 rounded-full ring-1 ring-white/50 shrink-0"
+                            style={{ backgroundColor: skinSwatchHex }}
+                          />
+                          <div className="text-lg font-bold text-white tracking-tight truncate">
+                            {SEASON_VI_LABELS[report.season.season].title}
+                          </div>
+                        </div>
+                        <div className="text-xs text-white/85 mt-0.5 truncate">
+                          {translateItaCategory(report.skinMetrics.ITA_category)} ·{" "}
+                          {UNDERTONE_VI_LABELS[report.season.undertone]} ·{" "}
+                          {SHAPE_VI_LABELS[report.faceShape.primary]}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <PortraitCanvas
-                  report={report}
-                  mode={viewportMode}
-                  showOverlay={showOverlay}
-                  box={faceBox}
-                  className="max-h-[460px]"
-                />
+                {/* Attached Mobile 3-Shade Signature Dock (visible immediately above fold) */}
+                <div className="lg:hidden bg-white px-3.5 py-3 border-t border-zinc-100 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 text-[11px]">
+                    <span className="font-medium text-zinc-700">
+                      3 gam màu hợp sắc da nhất
+                    </span>
+                    {isProcessingPortrait ? (
+                      <span className="h-2.5 w-24 rounded-full skeleton-shimmer" aria-hidden="true" />
+                    ) : (
+                      <span className="text-zinc-500 truncate">
+                        {landmarkStatus === "neural"
+                          ? `${report?.landmarkCount ?? 478} điểm · Lọc nhiễu${
+                              enhancementStats?.lowLightBoosted ? " · Tăng sáng" : ""
+                            }`
+                          : "Chỉnh khung bên dưới"}
+                      </span>
+                    )}
+                  </div>
 
-                <div className="px-4 py-2.5 border-t border-zinc-200 bg-zinc-50 flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-600">
-                  <span className="truncate font-medium text-zinc-800">
-                    {landmarkStatus === "loading"
-                      ? "Đang lọc nhiễu, làm nét & nhận diện khuôn mặt..."
-                      : landmarkStatus === "neural"
-                        ? `AI đã nhận diện ${report?.landmarkCount ?? 478} điểm · Đã lọc nhiễu & làm nét${
-                            enhancementStats?.lowLightBoosted
-                              ? ` · Tăng sáng (γ=${enhancementStats.gammaApplied})`
-                              : ""
+                  {isProcessingPortrait || !report ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {[0, 1, 2].map((idx) => (
+                        <div
+                          key={idx}
+                          className="border border-zinc-200 rounded-xl overflow-hidden"
+                        >
+                          <div className="h-9 w-full skeleton-shimmer" />
+                          <div className="px-2 py-1.5 bg-white">
+                            <div className="h-2.5 w-12 rounded-full skeleton-shimmer" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2">
+                      {(
+                        [
+                          ["Màu Son", report.blendedTargets.lip],
+                          ["Má Hồng", report.blendedTargets.blush],
+                          ["Phấn Mắt", report.blendedTargets.eyeshadow],
+                        ] as const
+                      ).map(([label, hex]) => (
+                        <div
+                          key={`dock-${label}`}
+                          className="border border-zinc-200 rounded-xl overflow-hidden bg-white"
+                        >
+                          <div className="h-9 w-full" style={{ backgroundColor: hex }} />
+                          <div className="px-2.5 py-1.5 flex flex-col gap-0.5">
+                            <span className="text-xs font-semibold text-zinc-800 leading-tight">
+                              {label}
+                            </span>
+                            <span className="font-mono text-[10px] text-zinc-500 leading-tight">
+                              {hex}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Desktop Portrait Status Footer */}
+                <div className="hidden lg:flex px-4 py-2.5 border-t border-zinc-200 bg-zinc-50 items-center justify-between gap-2 text-xs text-zinc-600">
+                  {isProcessingPortrait ? (
+                    <div className="h-3 w-48 rounded-full skeleton-shimmer" aria-hidden="true" />
+                  ) : (
+                    <span className="truncate">
+                      {landmarkStatus === "neural"
+                        ? `Đã nhận diện ${report?.landmarkCount ?? 478} điểm · Lọc nhiễu & làm nét${
+                            enhancementStats?.lowLightBoosted ? " · Đã tăng sáng" : ""
                           }`
-                        : "Không thấy rõ mặt chính diện — đang dùng khung ước lượng"}
-                  </span>
-                  <span className="font-mono shrink-0 text-zinc-500">
-                    {report ? `${report.skinMetrics.sampleCount.toLocaleString()} px da` : "—"}
-                  </span>
+                        : "Không thấy rõ mặt chính diện — chạm chỉnh khung bên dưới"}
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Simple User Preferences */}
-              <div className="bg-white border border-zinc-200 rounded-lg p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+              {/* Everyday Preferences */}
+              <div className="bg-white border border-zinc-200 rounded-2xl md:rounded-xl p-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="occasion-select" className="block text-[11px] font-medium text-zinc-600 mb-1">
+                    <label htmlFor="occasion-select" className="block text-xs font-medium text-zinc-700 mb-1.5">
                       Dịp trang điểm
                     </label>
                     <select
                       id="occasion-select"
                       value={occasion}
                       onChange={(e) => setOccasion(e.target.value as OccasionType)}
-                      className="w-full text-xs bg-white border border-zinc-300 rounded px-2.5 py-1.5 text-zinc-900"
+                      className="w-full min-h-[44px] md:min-h-[38px] text-sm md:text-xs bg-white border border-zinc-300 rounded-xl md:rounded-md px-3 py-2 text-zinc-900"
                     >
                       <option value="daily">Đi học / Hàng ngày (Nhẹ nhàng)</option>
                       <option value="office">Đi làm / Công sở (Thanh lịch)</option>
-                      <option value="glam">Đi tiệc / Chụp ảnh (Nổi bật)</option>
+                      <option value="glam">Đi tiệc / Buổi tối (Nổi bật)</option>
                     </select>
                   </div>
 
                   <div>
-                    <label htmlFor="texture-select" className="block text-[11px] font-medium text-zinc-600 mb-1">
+                    <label htmlFor="texture-select" className="block text-xs font-medium text-zinc-700 mb-1.5">
                       Loại da của bạn
                     </label>
                     <select
                       id="texture-select"
                       value={texture}
                       onChange={(e) => setTexture(e.target.value as SkinTextureType)}
-                      className="w-full text-xs bg-white border border-zinc-300 rounded px-2.5 py-1.5 text-zinc-900"
+                      className="w-full min-h-[44px] md:min-h-[38px] text-sm md:text-xs bg-white border border-zinc-300 rounded-xl md:rounded-md px-3 py-2 text-zinc-900"
                     >
                       <option value="combination">Da hỗn hợp (Dầu chữ T)</option>
                       <option value="oily">Da dầu</option>
                       <option value="dry">Da khô / Thiếu ẩm</option>
                     </select>
                   </div>
-
-                  <div>
-                    <label htmlFor="wb-method" className="block text-[11px] font-medium text-zinc-600 mb-1">
-                      Chế độ khử ánh đèn
-                    </label>
-                    <select
-                      id="wb-method"
-                      value={wbMethod}
-                      onChange={(e) => setWbMethod(e.target.value as WhiteBalanceMethod)}
-                      className="w-full text-xs bg-white border border-zinc-300 rounded px-2.5 py-1.5 text-zinc-900"
-                    >
-                      <option value="planckian_grey_edge">Tự động chuẩn (Grey-Edge)</option>
-                      <option value="planckian_sog">Tự động nhanh (Shades-of-Gray)</option>
-                      <option value="none">Giữ nguyên ảnh gốc</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="catalog-ill" className="block text-[11px] font-medium text-zinc-600 mb-1">
-                      Chuẩn màu bảng son
-                    </label>
-                    <select
-                      id="catalog-ill"
-                      value={catalogIlluminant}
-                      onChange={(e) => setCatalogIlluminant(e.target.value as IlluminantName)}
-                      className="w-full text-xs bg-white border border-zinc-300 rounded px-2.5 py-1.5 text-zinc-900"
-                    >
-                      <option value="D65">Ảnh web chuẩn (D65)</option>
-                      <option value="D50">Ảnh đo phòng lab (D50 → D65)</option>
-                    </select>
-                  </div>
                 </div>
 
-                {landmarkStatus === "fallback" && (
+                {!isProcessingPortrait && landmarkStatus === "fallback" && (
                   <div className="border-t border-zinc-200 pt-3">
                     <button
                       type="button"
                       onClick={() => setShowRoiTuning((v) => !v)}
-                      className="w-full flex items-center justify-between text-xs font-medium text-zinc-700 hover:text-zinc-900 cursor-pointer"
+                      className="w-full min-h-[44px] md:min-h-[36px] flex items-center justify-between text-xs font-medium text-zinc-700 hover:text-zinc-900 cursor-pointer"
                     >
                       <span className="inline-flex items-center gap-1.5">
                         <SlidersHorizontal className="w-3.5 h-3.5" />
-                        Chỉnh khung mặt thủ công (khi AI không thấy rõ mặt)
+                        Chỉnh vị trí khuôn mặt thủ công
                       </span>
                       <span className="text-zinc-500">{showRoiTuning ? "Ẩn" : "Mở"}</span>
                     </button>
 
                     {showRoiTuning && (
-                      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[11px]">
+                      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
                         <label className="block">
                           <span className="flex justify-between text-zinc-600">
-                            <span>Vị trí ngang</span>
+                            <span>Ngang</span>
                             <span className="font-mono">{faceBox.centerX.toFixed(2)}</span>
                           </span>
-                          <input
-                            type="range"
-                            min={0.2}
-                            max={0.8}
-                            step={0.01}
-                            value={faceBox.centerX}
-                            onChange={(e) =>
-                              setFaceBox((b) => ({ ...b, centerX: Number(e.target.value) }))
-                            }
-                            className="w-full accent-zinc-900"
-                          />
+                          <div className="py-1.5">
+                            <input
+                              type="range"
+                              min={0.2}
+                              max={0.8}
+                              step={0.01}
+                              value={faceBox.centerX}
+                              onChange={(e) =>
+                                setFaceBox((b) => ({ ...b, centerX: Number(e.target.value) }))
+                              }
+                              className="w-full h-2 accent-zinc-900"
+                            />
+                          </div>
                         </label>
                         <label className="block">
                           <span className="flex justify-between text-zinc-600">
-                            <span>Vị trí dọc</span>
+                            <span>Dọc</span>
                             <span className="font-mono">{faceBox.centerY.toFixed(2)}</span>
                           </span>
-                          <input
-                            type="range"
-                            min={0.2}
-                            max={0.75}
-                            step={0.01}
-                            value={faceBox.centerY}
-                            onChange={(e) =>
-                              setFaceBox((b) => ({ ...b, centerY: Number(e.target.value) }))
-                            }
-                            className="w-full accent-zinc-900"
-                          />
+                          <div className="py-1.5">
+                            <input
+                              type="range"
+                              min={0.2}
+                              max={0.75}
+                              step={0.01}
+                              value={faceBox.centerY}
+                              onChange={(e) =>
+                                setFaceBox((b) => ({ ...b, centerY: Number(e.target.value) }))
+                              }
+                              className="w-full h-2 accent-zinc-900"
+                            />
+                          </div>
                         </label>
                       </div>
                     )}
@@ -578,105 +670,355 @@ export default function App() {
               </div>
             </div>
 
-            {/* Right Diagnostic Readout */}
-            <div className="lg:col-span-7 space-y-6">
-              {/* 4 Plain-Language Summary Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-                <div className="bg-white border border-zinc-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-                      Độ sáng &amp; Sắc da
-                    </span>
-                    <span
-                      className="w-4 h-4 rounded-sm border border-zinc-300"
-                      style={{ backgroundColor: skinSwatchHex }}
-                      title={`Màu da đo được ${skinSwatchHex}`}
-                    />
-                  </div>
-                  <div className="mt-2 text-base font-semibold text-zinc-900 leading-snug">
-                    {report ? translateItaCategory(report.skinMetrics.ITA_category) : "—"}
-                  </div>
-                  <div className="mt-1 font-mono text-[11px] text-zinc-500">
-                    {report
-                      ? `L* ${report.skinMetrics.L_star.toFixed(0)} · a* ${report.skinMetrics.a_star.toFixed(1)} · b* ${report.skinMetrics.b_star.toFixed(1)}`
-                      : "—"}
-                  </div>
-                </div>
+            {/* Right: Scientific Colorimetry Diagnosis, Metrics Strip & Face Geometry Protocol */}
+            <div className="lg:col-span-7 space-y-4 sm:space-y-5">
+              {isProcessingPortrait ? (
+                <ResultsSkeleton />
+              ) : (
+                <>
+                  {/* Primary Scientific Diagnosis Card */}
+                  <div className="bg-white border border-zinc-200 rounded-2xl md:rounded-xl p-5 sm:p-6 space-y-5">
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-zinc-500">
+                        Kết quả phân loại 12 mùa sắc (Soft CIELAB)
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span
+                          className="w-6 h-6 rounded-md border border-zinc-300 shrink-0"
+                          style={{ backgroundColor: skinSwatchHex }}
+                          title={`Sắc da đo được: ${skinSwatchHex}`}
+                        />
+                        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900">
+                          {SEASON_VI_LABELS[report.season.season].title}
+                        </h2>
+                      </div>
 
-                <div className="bg-white border border-zinc-200 rounded-lg p-4">
-                  <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-                    Mùa sắc cá nhân
-                  </div>
-                  <div className="mt-2 text-base font-semibold text-zinc-900 leading-snug">
-                    {report ? SEASON_VI_LABELS[report.season.season].title : "—"}
-                  </div>
-                  <div className="mt-1 text-xs text-zinc-600">
-                    {report ? UNDERTONE_VI_LABELS[report.season.undertone] : "—"}
-                  </div>
-                </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-600">
+                        <span>{translateItaCategory(report.skinMetrics.ITA_category)}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{UNDERTONE_VI_LABELS[report.season.undertone]}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{SHAPE_VI_LABELS[report.faceShape.primary]}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{describeCctVi(report.whiteBalance.estimatedCctK)}</span>
+                      </div>
 
-                <div className="bg-white border border-zinc-200 rounded-lg p-4">
-                  <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-                    Dáng khuôn mặt
-                  </div>
-                  <div className="mt-2 text-base font-semibold text-zinc-900 leading-snug">
-                    {report ? SHAPE_VI_LABELS[report.faceShape.primary] : "—"}
-                  </div>
-                  <div className="mt-1 text-xs text-zinc-600">
-                    {report
-                      ? `Gần với ${SHAPE_VI_LABELS[sortedShapes[1]?.name ?? "Oval"]}`
-                      : "—"}
-                  </div>
-                </div>
-
-                <div className="bg-white border border-zinc-200 rounded-lg p-4">
-                  <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-                    Ánh sáng trong ảnh
-                  </div>
-                  <div className="mt-2 text-base font-semibold text-zinc-900 leading-snug">
-                    {report?.whiteBalance.estimatedCctK
-                      ? `${report.whiteBalance.estimatedCctK.toFixed(0)}K`
-                      : "Ảnh gốc"}
-                  </div>
-                  <div className="mt-1 text-xs text-zinc-600 truncate">
-                    {report ? describeCctVi(report.whiteBalance.estimatedCctK) : "—"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Season Explanation & Blended Targets */}
-              {report && (
-                <div className="bg-white border border-zinc-200 rounded-lg p-5 space-y-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200 pb-3">
-                    <div>
-                      <h2 className="text-base font-semibold text-zinc-900">
-                        Bảng màu hợp nhất với bạn: {SEASON_VI_LABELS[report.season.season].title}
-                      </h2>
-                      <p className="text-xs text-zinc-600 mt-0.5">
+                      <p className="text-sm text-zinc-700 pt-1 leading-relaxed">
                         {SEASON_VI_LABELS[report.season.season].summary}
                         {report.season.isBorderline
-                          ? ` (Có nét giao thoa nhẹ với ${SEASON_VI_LABELS[report.season.secondarySeason].title})`
+                          ? ` Vùng chuyển tiếp gần ${SEASON_VI_LABELS[report.season.secondarySeason].title}.`
                           : ""}
                       </p>
                     </div>
-                    <div className="font-mono text-xs text-zinc-700 shrink-0">
-                      Độ ấm da: {(report.season.warmProbability * 100).toFixed(0)}%
+
+                    {/* Tabular Scientific Colorimetry Telemetry Strip */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-3.5 border-y border-zinc-200">
+                      <div>
+                        <div className="text-[11px] font-medium text-zinc-500">CIELAB (L* / a* / b*)</div>
+                        <div className="font-mono tabular-nums text-sm font-semibold text-zinc-900 mt-0.5">
+                          {report.skinMetrics.L_star.toFixed(1)} / {report.skinMetrics.a_star.toFixed(1)} /{" "}
+                          {report.skinMetrics.b_star.toFixed(1)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-medium text-zinc-500">Góc ITA°</div>
+                        <div className="font-mono tabular-nums text-sm font-semibold text-zinc-900 mt-0.5">
+                          {report.skinMetrics.ITA_deg.toFixed(1)}°
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-medium text-zinc-500">Ước lượng CCT</div>
+                        <div className="font-mono tabular-nums text-sm font-semibold text-zinc-900 mt-0.5">
+                          {report.whiteBalance.estimatedCctK !== null
+                            ? `${Math.round(report.whiteBalance.estimatedCctK)}K`
+                            : "—"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-medium text-zinc-500">Xác suất Tông Ấm</div>
+                        <div className="font-mono tabular-nums text-sm font-semibold text-zinc-900 mt-0.5">
+                          {(report.season.warmProbability * 100).toFixed(0)}%
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Top 3 Season Posterior Probabilities */}
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-zinc-700">
+                        Phân bố xác suất các nhóm mùa gần nhất
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2">
+                        {sortedSeasons.slice(0, 3).map((item, idx) => (
+                          <div key={item.name} className="space-y-1">
+                            <div className="flex justify-between text-xs gap-2">
+                              <span
+                                className={`truncate ${
+                                  idx === 0 ? "font-semibold text-zinc-900" : "text-zinc-600"
+                                }`}
+                              >
+                                {SEASON_VI_LABELS[item.name].title}
+                              </span>
+                              <span className="font-mono tabular-nums text-zinc-700 shrink-0">
+                                {(item.prob * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${
+                                  idx === 0 ? "bg-zinc-900" : "bg-zinc-400"
+                                }`}
+                                style={{ width: `${Math.max(4, item.prob * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="hidden lg:block pt-3 border-t border-zinc-200 space-y-2.5">
+                      <div className="text-xs font-medium text-zinc-700">
+                        Tọa độ sắc mục tiêu sau pha trộn xác suất (Target Lab Blend)
+                      </div>
+                      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+                        {(
+                          [
+                            ["Màu Son", report.blendedTargets.lip],
+                            ["Má Hồng", report.blendedTargets.blush],
+                            ["Phấn Mắt", report.blendedTargets.eyeshadow],
+                          ] as const
+                        ).map(([label, hex]) => (
+                          <div
+                            key={label}
+                            className="border border-zinc-200 rounded-xl md:rounded-md overflow-hidden"
+                          >
+                            <div className="h-12 w-full" style={{ backgroundColor: hex }} />
+                            <div className="px-2.5 sm:px-3 py-1.5 bg-white flex items-center justify-between gap-2">
+                              <span className="text-xs font-medium text-zinc-800 truncate">
+                                {label}
+                              </span>
+                              <span className="font-mono tabular-nums text-[11px] text-zinc-500">
+                                {hex}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium text-zinc-700 mb-1">
-                        Xác suất các nhóm màu gần bạn nhất
+                  {/* Facial Geometry Advice Card */}
+                  <div className="bg-white border border-zinc-200 rounded-2xl md:rounded-xl p-5 sm:p-6 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 pb-3">
+                      <h3 className="text-base font-semibold text-zinc-900">
+                        Khuyến nghị hình học cho {SHAPE_VI_LABELS[report.faceShape.primary]}
+                      </h3>
+                      <span className="text-xs text-zinc-500">
+                        {report.advice.executionParameters.intensity.replace(/\s*\([^)]*\)/, "")}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 text-xs leading-relaxed">
+                      <div>
+                        <span className="font-semibold text-zinc-900">Tạo khối: </span>
+                        <span className="text-zinc-700">{report.advice.contour}</span>
                       </div>
+                      <div>
+                        <span className="font-semibold text-zinc-900">Đánh má: </span>
+                        <span className="text-zinc-700">{report.advice.blush}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-zinc-900">Mắt: </span>
+                        <span className="text-zinc-700">{report.advice.eyes}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-zinc-900">Môi: </span>
+                        <span className="text-zinc-700">{report.advice.lip}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-zinc-100 text-xs text-zinc-600 space-y-1 leading-relaxed">
+                      <div>
+                        <span className="font-semibold text-zinc-900">Chuẩn bị &amp; Chất liệu: </span>
+                        {report.advice.executionParameters.prep} ·{" "}
+                        {report.advice.executionParameters.textureStyle} ·{" "}
+                        {report.advice.executionParameters.setting}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-zinc-900">Cần tránh: </span>
+                        {report.advice.avoid.join(" · ")}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Section 2A: Optical & Chromophore Research Lab (Planckian Relighting + Beer-Lambert Maps) */}
+        {!isProcessingPortrait && report && (
+          <section
+            id="studio-lab"
+            className="scroll-mt-20 border-t border-zinc-200 pt-8 md:pt-10 space-y-5 md:space-y-6"
+          >
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-medium text-zinc-500 mb-1">
+                  02A. Thực nghiệm Quang học &amp; Sắc tố da
+                </p>
+                <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900">
+                  Ổn định màu sắc dưới biến thiên ánh sáng &amp; bản đồ sắc tố Beer-Lambert
+                </h2>
+              </div>
+
+              <div className="flex items-center gap-1.5 p-1.5 bg-zinc-100 border border-zinc-200 rounded-xl overflow-x-auto shrink-0">
+                {(
+                  [
+                    ["lighting", "Thử nghiệm ánh sáng"],
+                    ["chromophores", "Sắc tố Beer-Lambert"],
+                    ["advanced", "Thông số & JSON"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setStudioTab(id)}
+                    className={`min-h-[40px] md:min-h-[34px] px-3.5 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                      studioTab === id
+                        ? "bg-white text-zinc-900 shadow-xs"
+                        : "text-zinc-600 hover:text-zinc-900"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {studioTab === "lighting" && <RelightingLab report={report} />}
+
+            {studioTab === "chromophores" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
+                <div className="bg-white border border-zinc-200 rounded-2xl md:rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 border-b border-zinc-200 flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-zinc-900">
+                        Bản đồ Melanin (Phân bố sắc tố nâu)
+                      </h3>
+                      <p className="text-xs text-zinc-500">
+                        Phân tách quang học theo không gian hấp thụ tuyến tính
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 shrink-0">
+                      <span>Ít</span>
+                      <span className="w-12 sm:w-14 h-2 rounded-xs bg-gradient-to-r from-[#2d5091] via-[#c7995b] to-[#fa961e]" />
+                      <span>Nhiều</span>
+                    </div>
+                  </div>
+                  <PortraitCanvas
+                    report={report}
+                    mode="melanin"
+                    showOverlay={false}
+                    box={faceBox}
+                    className="max-h-[320px] sm:max-h-[340px]"
+                  />
+                </div>
+
+                <div className="bg-white border border-zinc-200 rounded-2xl md:rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 border-b border-zinc-200 flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-zinc-900">
+                        Bản đồ Hồng ban (Hemoglobin / Mạch máu)
+                      </h3>
+                      <p className="text-xs text-zinc-500">
+                        Đo phân bố độ đỏ dưới biểu bì để đánh giá sắc da thực
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 shrink-0">
+                      <span>Ít</span>
+                      <span className="w-12 sm:w-14 h-2 rounded-xs bg-gradient-to-r from-[#2896c8] via-[#a35a9c] to-[#fa2c37]" />
+                      <span>Nhiều</span>
+                    </div>
+                  </div>
+                  <PortraitCanvas
+                    report={report}
+                    mode="hemoglobin"
+                    showOverlay={false}
+                    box={faceBox}
+                    className="max-h-[320px] sm:max-h-[340px]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {studioTab === "advanced" && (
+              <div className="bg-white border border-zinc-200 rounded-2xl md:rounded-xl p-5 sm:p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-zinc-900">
+                      Tham số cân bằng trắng &amp; chuẩn chiếu sáng bảng màu
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="wb-method" className="block text-xs font-medium text-zinc-600 mb-1.5">
+                          Thuật toán cân bằng trắng
+                        </label>
+                        <select
+                          id="wb-method"
+                          value={wbMethod}
+                          onChange={(e) => setWbMethod(e.target.value as WhiteBalanceMethod)}
+                          className="w-full min-h-[44px] md:min-h-[38px] text-sm md:text-xs bg-white border border-zinc-300 rounded-xl md:rounded-md px-3 py-2 text-zinc-900"
+                        >
+                          <option value="planckian_grey_edge">Planckian Grey-Edge (Mặc định)</option>
+                          <option value="planckian_sog">Shades-of-Gray</option>
+                          <option value="none">Không cân bằng (Ảnh gốc)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="catalog-ill" className="block text-xs font-medium text-zinc-600 mb-1.5">
+                          Chuẩn chuyển đổi Bradford CAT
+                        </label>
+                        <select
+                          id="catalog-ill"
+                          value={catalogIlluminant}
+                          onChange={(e) => setCatalogIlluminant(e.target.value as IlluminantName)}
+                          className="w-full min-h-[44px] md:min-h-[38px] text-sm md:text-xs bg-white border border-zinc-300 rounded-xl md:rounded-md px-3 py-2 text-zinc-900"
+                        >
+                          <option value="D65">Chuẩn sRGB / Web (D65)</option>
+                          <option value="D50">Chuẩn đo lab ICC (D50 → D65)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-zinc-600 space-y-1 font-mono tabular-nums pt-1">
+                      <div>
+                        ROI hợp lệ: {report.skinMetrics.sampleCount.toLocaleString()} px ·
+                        Melanin σ={report.chromophores.melaninSpatialStd.toFixed(3)} · Hemoglobin
+                        σ={report.chromophores.hemoglobinSpatialStd.toFixed(3)}
+                      </div>
+                      <div>
+                        Góc off-locus Planckian:{" "}
+                        {report.whiteBalance.offLocusDeg !== null
+                          ? `${report.whiteBalance.offLocusDeg.toFixed(2)}°`
+                          : "—"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-zinc-900">
+                      Toàn bộ phân bố 4 mùa sắc hàng đầu
+                    </h3>
+                    <div className="space-y-2">
                       {sortedSeasons.slice(0, 4).map((item, idx) => (
                         <div key={item.name} className="space-y-1">
                           <div className="flex justify-between text-xs">
                             <span className={idx === 0 ? "font-semibold text-zinc-900" : "text-zinc-600"}>
                               {SEASON_VI_LABELS[item.name].title}
                             </span>
-                            <span className="font-mono text-zinc-700">
-                              {(item.prob * 100).toFixed(0)}%
+                            <span className="font-mono tabular-nums text-zinc-700">
+                              {(item.prob * 100).toFixed(1)}%
                             </span>
                           </div>
                           <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
@@ -690,225 +1032,30 @@ export default function App() {
                         </div>
                       ))}
                     </div>
-
-                    <div className="space-y-3">
-                      <div className="text-xs font-medium text-zinc-700">
-                        3 tông màu chuẩn được pha theo sắc da của bạn
-                      </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        {(
-                          [
-                            ["Màu Son", report.blendedTargets.lip],
-                            ["Má Hồng", report.blendedTargets.blush],
-                            ["Phấn Mắt", report.blendedTargets.eyeshadow],
-                          ] as const
-                        ).map(([label, hex]) => (
-                          <div key={label} className="border border-zinc-200 rounded overflow-hidden">
-                            <div className="h-14 w-full" style={{ backgroundColor: hex }} />
-                            <div className="p-2 bg-white">
-                              <div className="text-[11px] text-zinc-500">{label}</div>
-                              <div className="font-mono text-xs font-semibold text-zinc-900 mt-0.5">
-                                {hex}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 </div>
-              )}
 
-              {/* Step-by-Step Advice */}
-              {report && (
-                <div className="bg-white border border-zinc-200 rounded-lg p-5 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 pb-3">
-                    <div>
-                      <h2 className="text-base font-semibold text-zinc-900">
-                        Hướng dẫn trang điểm cho {SHAPE_VI_LABELS[report.faceShape.primary]} ×{" "}
-                        {SEASON_VI_LABELS[report.season.season].title}
-                      </h2>
-                      <p className="text-xs text-zinc-500 mt-0.5">
-                        Độ đậm khuyến nghị: {report.advice.executionParameters.intensity}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                    <div className="space-y-2.5">
-                      <div>
-                        <span className="font-semibold text-zinc-900">Tạo khối: </span>
-                        <span className="text-zinc-700">{report.advice.contour}</span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-zinc-900">Đánh má: </span>
-                        <span className="text-zinc-700">{report.advice.blush}</span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-zinc-900">Trang điểm mắt: </span>
-                        <span className="text-zinc-700">{report.advice.eyes}</span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-zinc-900">Thoa son: </span>
-                        <span className="text-zinc-700">{report.advice.lip}</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2.5 bg-zinc-50 border border-zinc-200 rounded-md p-3.5">
-                      <div>
-                        <span className="font-semibold text-zinc-900">Kem lót &amp; Chất son: </span>
-                        <span className="text-zinc-700">
-                          {report.advice.executionParameters.prep} ·{" "}
-                          {report.advice.executionParameters.textureStyle}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-zinc-900">Khóa lớp nền: </span>
-                        <span className="text-zinc-700">
-                          {report.advice.executionParameters.setting}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-zinc-900">Nên tránh: </span>
-                        <span className="text-zinc-600">{report.advice.avoid.join(" · ")}</span>
-                      </div>
-                    </div>
-                  </div>
+                <div className="pt-4 border-t border-zinc-200 flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-xs text-zinc-500">
+                    Xuất toàn bộ vector CIELAB, tham số sắc tố, cân bằng trắng và bảng đối chiếu
+                    định dạng JSON.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleExportJson}
+                    className="w-full sm:w-auto min-h-[44px] md:min-h-[38px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-medium text-zinc-900 bg-zinc-100 border border-zinc-300 rounded-xl md:rounded-md hover:bg-zinc-200 transition-colors cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Tải báo cáo JSON
+                  </button>
                 </div>
-              )}
-
-              {/* Quick Top Picks */}
-              {topMatches.lipsticks.length > 0 && (
-                <div className="bg-white border border-zinc-200 rounded-lg p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-semibold text-zinc-900">
-                      Gợi ý mua nhanh hợp nhất với bạn
-                    </h2>
-                    <a
-                      href="#catalog"
-                      className="text-xs font-medium text-cyan-800 hover:underline"
-                    >
-                      Xem toàn bộ {products.length} sản phẩm
-                    </a>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                    {[
-                      { title: "Son môi hợp nhất", items: topMatches.lipsticks.slice(0, 3) },
-                      { title: "Má hồng hợp nhất", items: topMatches.blushes.slice(0, 2) },
-                      { title: "Phấn mắt hợp nhất", items: topMatches.eyeshadows.slice(0, 2) },
-                    ].map((group) => (
-                      <div key={group.title} className="border border-zinc-200 rounded p-3 space-y-2">
-                        <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-                          {group.title}
-                        </div>
-                        {group.items.map((prod) => (
-                          <div key={prod.id} className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span
-                                className="w-4 h-4 rounded-sm border border-zinc-300 shrink-0"
-                                style={{ backgroundColor: prod.renderedHex ?? prod.hex }}
-                              />
-                              <div className="truncate">
-                                <span className="font-medium text-zinc-900">{prod.brand}</span>{" "}
-                                <span className="text-zinc-600">{prod.shade}</span>
-                              </div>
-                            </div>
-                            <span className="font-mono text-[11px] text-zinc-500 shrink-0">
-                              ΔE {prod.deltaE.toFixed(1)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* Section 2: Interactive Relighting & Chromophore Stability Lab (exp01-exp05) */}
-        {report && <RelightingLab report={report} />}
-
-        {/* Section 3: Skin Chromophore Maps */}
-        {report && (
-          <section id="chromophores" className="border-t border-zinc-200 pt-10 space-y-6">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-1">
-                  03. Phân tích sắc tố dưới bề mặt da
-                </p>
-                <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">
-                  Bản đồ hắc sắc tố (Melanin) &amp; Vùng ửng đỏ (Hemoglobin)
-                </h2>
-                <p className="text-sm text-zinc-600 mt-1 max-w-2xl">
-                  Tách riêng sắc tố melanin (vùng sạm/tàn nhang) và hemoglobin (vùng má ửng hồng hoặc
-                  mẩn đỏ) khỏi bóng tối trên khuôn mặt — hữu ích để chọn che khuyết điểm và độ che
-                  phủ kem nền.
-                </p>
               </div>
-              <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-zinc-600">
-                <span>Điểm da hợp lệ: {report.chromophores.validPixels.toLocaleString()}</span>
-                <span>Độ đồng đều Melanin: {report.chromophores.melaninSpatialStd.toFixed(4)}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
-                <div className="px-4 py-3 border-b border-zinc-200 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-zinc-900">
-                      Bản đồ Melanin (Đốm nâu / Sạm nhẹ)
-                    </h3>
-                    <p className="text-xs text-zinc-500">
-                      Chỉ số Melanin trung bình: {report.skinMetrics.Melanin_index.toFixed(1)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                    <span>Ít</span>
-                    <span className="w-16 h-2 rounded-xs bg-gradient-to-r from-[#2d5091] via-[#c7995b] to-[#fa961e]" />
-                    <span>Nhiều</span>
-                  </div>
-                </div>
-                <PortraitCanvas
-                  report={report}
-                  mode="melanin"
-                  showOverlay={false}
-                  box={faceBox}
-                  className="max-h-[340px]"
-                />
-              </div>
-
-              <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
-                <div className="px-4 py-3 border-b border-zinc-200 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-zinc-900">
-                      Bản đồ Hồng ban (Mạch máu / Ửng đỏ)
-                    </h3>
-                    <p className="text-xs text-zinc-500">
-                      Chỉ số Hemoglobin trung bình: {report.skinMetrics.Hemoglobin_index.toFixed(1)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                    <span>Ít</span>
-                    <span className="w-16 h-2 rounded-xs bg-gradient-to-r from-[#2896c8] via-[#a35a9c] to-[#fa2c37]" />
-                    <span>Nhiều</span>
-                  </div>
-                </div>
-                <PortraitCanvas
-                  report={report}
-                  mode="hemoglobin"
-                  showOverlay={false}
-                  box={faceBox}
-                  className="max-h-[340px]"
-                />
-              </div>
-            </div>
+            )}
           </section>
         )}
 
-        {/* Section 4: Kubelka-Munk Lip Simulator */}
-        {report && (
+        {/* Section 2B: Kubelka-Munk Lip Substrate Mixing Simulation */}
+        {!isProcessingPortrait && report && (
           <KubelkaMunkLab
             lipMetrics={report.lipMetrics}
             targetLipHex={report.blendedTargets.lip}
@@ -918,28 +1065,56 @@ export default function App() {
           />
         )}
 
-        {/* Section 5: Catalog Matcher */}
-        {report && (
+        {/* Section 3: Product Second — Catalog Matching with Highlighted Popular Picks */}
+        {!isProcessingPortrait && report && (
           <CatalogMatcher
             products={products}
             blendedTargets={report.blendedTargets}
             lipBaseLab={report.lipMetrics.lipBaseLab}
             skinMetrics={report.skinMetrics}
+            userSeason={report.season.season}
             catalogIlluminant={catalogIlluminant}
             onInspectLipstick={setInspectedLipstick}
           />
         )}
       </main>
 
-      <footer className="border-t border-zinc-200 bg-white mt-16">
-        <div className="max-w-[1400px] mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
+      <footer className="border-t border-zinc-200 bg-white pb-16 md:pb-0 mt-8 md:mt-14">
+        <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-500 text-center sm:text-left">
           <div>
-            Beauty AI Consultant · Công cụ tham khảo chọn màu mỹ phẩm cá nhân (không thay thế chẩn đoán
-            da liễu y khoa).
+            Beauty AI Consultant · Nghiên cứu trắc quang cá nhân &amp; mô hình hóa sắc mỹ phẩm.
           </div>
-          <div>MIT License · {products.length} sản phẩm Việt Nam &amp; Quốc tế</div>
+          <div>{products.length} sản phẩm tham chiếu trong cơ sở dữ liệu</div>
         </div>
       </footer>
+
+      {/* Mobile Bottom Thumb-Zone Navigation Bar (56px, keeping total sticky chrome <= 13.3% of 844px) */}
+      <nav
+        aria-label="Điều hướng nhanh trên di động"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-14 pb-safe bg-white/95 backdrop-blur-md border-t border-zinc-200 grid grid-cols-4 items-center"
+      >
+        {[
+          { id: "results" as const, href: "#results", label: "Phân tích", icon: ScanFace },
+          { id: "studio-lab" as const, href: "#studio-lab", label: "Quang học", icon: Sun },
+          { id: "lip-tryon" as const, href: "#lip-tryon", label: "Hòa sắc", icon: Droplets },
+          { id: "catalog" as const, href: "#catalog", label: "Sản phẩm", icon: ShoppingBag },
+        ].map(({ id, href, label, icon: Icon }) => {
+          const isActive = activeNav === id;
+          return (
+            <a
+              key={id}
+              href={href}
+              onClick={() => setActiveNav(id)}
+              className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium whitespace-nowrap transition-colors ${
+                isActive ? "text-zinc-900 font-semibold" : "text-zinc-500 hover:text-zinc-800"
+              }`}
+            >
+              <Icon className="w-[18px] h-[18px]" strokeWidth={isActive ? 2.2 : 1.75} />
+              <span>{label}</span>
+            </a>
+          );
+        })}
+      </nav>
     </div>
   );
 }
