@@ -13,20 +13,24 @@ interface PhotoPickerSheetProps {
   open: boolean;
   demoPresets: DemoPortraitPreset[];
   activeDemoId: string | null;
+  hasPortrait?: boolean;
   onClose: () => void;
   onPickCamera: () => void;
   onPickGallery: () => void;
   onSelectDemo: (preset: DemoPortraitPreset) => void;
+  onClearPortrait?: () => void;
 }
 
 export const PhotoPickerSheet: React.FC<PhotoPickerSheetProps> = ({
   open,
   demoPresets,
   activeDemoId,
+  hasPortrait = false,
   onClose,
   onPickCamera,
   onPickGallery,
   onSelectDemo,
+  onClearPortrait,
 }) => {
   useEffect(() => {
     if (!open) return;
@@ -158,6 +162,21 @@ export const PhotoPickerSheet: React.FC<PhotoPickerSheetProps> = ({
           Mẹo: Chụp chính diện nơi đủ sáng, vén gọn tóc mái và hạn chế dùng filter chỉnh màu để
           kết quả chọn màu son chuẩn nhất.
         </p>
+
+        {hasPortrait && onClearPortrait && (
+          <div className="pt-2 border-t border-zinc-100 flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onClearPortrait();
+              }}
+              className="min-h-[38px] px-3 py-1.5 text-xs font-medium text-zinc-500 hover:text-rose-700 transition-colors cursor-pointer"
+            >
+              Xóa ảnh hiện tại
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

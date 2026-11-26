@@ -36,22 +36,44 @@ function ensureTfliteInfoConsoleFilter(): void {
   };
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    promise.then(
+      (val) => {
+        window.clearTimeout(timer);
+        resolve(val);
+      },
+      (err) => {
+        window.clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 async function getFaceLandmarker(): Promise<FaceLandmarker> {
   if (!landmarkerPromise) {
     ensureTfliteInfoConsoleFilter();
-    landmarkerPromise = (async () => {
-      const vision = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
-      return FaceLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: "/mediapipe/face_landmarker.task",
-          delegate: "CPU",
-        },
-        runningMode: "IMAGE",
-        numFaces: 1,
-        minFaceDetectionConfidence: 0.45,
-        minFacePresenceConfidence: 0.45,
-      });
-    })().catch((err) => {
+    landmarkerPromise = withTimeout(
+      (async () => {
+        const vision = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
+        return FaceLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: "/mediapipe/face_landmarker.task",
+            delegate: "CPU",
+          },
+          runningMode: "IMAGE",
+          numFaces: 1,
+          minFaceDetectionConfidence: 0.45,
+          minFacePresenceConfidence: 0.45,
+        });
+      })(),
+      12000,
+      "MediaPipe FaceLandmarker init"
+    ).catch((err) => {
       landmarkerPromise = null;
       throw err;
     });
@@ -75,7 +97,7 @@ export async function detectNeuralFaceLandmarks(
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) return { landmarks: null, enhancement: stats };
 
   const imgData = new ImageData(new Uint8ClampedArray(enhancedRgba), width, height);

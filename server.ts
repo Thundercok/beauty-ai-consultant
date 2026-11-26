@@ -128,6 +128,17 @@ async function startServer() {
     });
   }
 
+  const mediapipeTaskPath = path.join(rootDir, "public", "mediapipe", "face_landmarker.task");
+  app.get("/mediapipe/face_landmarker.task", (_req, res) => {
+    if (!fs.existsSync(mediapipeTaskPath)) {
+      res.status(404).json({ error: "MediaPipe task model not found." });
+      return;
+    }
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.sendFile(mediapipeTaskPath);
+  });
+
   const httpServer = http.createServer(app);
   const distDir = path.join(rootDir, "dist");
   const isProd = process.env.NODE_ENV === "production" && fs.existsSync(distDir);
@@ -138,10 +149,11 @@ async function startServer() {
       res.sendFile(path.join(distDir, "index.html"));
     });
   } else {
+    const disableHmr = process.env.DISABLE_HMR === "true";
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: { server: httpServer },
+        hmr: disableHmr ? false : { server: httpServer },
       },
       appType: "spa",
     });

@@ -3,8 +3,8 @@ import { Camera, Droplets, ScanFace, ShoppingBag, SlidersHorizontal } from "luci
 import demoBrightUrl from "./assets/images/demo_beauty_bright_1795711946366.jpg";
 import demoSunlitUrl from "./assets/images/demo_beauty_sunlit_1795711975051.jpg";
 import demoWarmUrl from "./assets/images/demo_beauty_warm_1795711945979.jpg";
-import { ResultsSkeleton } from "./components/AnalysisSkeleton";
 import { CatalogMatcher, type CatalogFilterId } from "./components/CatalogMatcher";
+import { GettingStartedEmptyState } from "./components/GettingStartedEmptyState";
 import { LipTryOnView } from "./components/LipTryOnView";
 import { PhotoPickerSheet, type DemoPortraitPreset } from "./components/PhotoPickerSheet";
 import { type ViewportMode } from "./components/PortraitCanvas";
@@ -101,7 +101,7 @@ function imageElementToBuffer(
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) {
     throw new Error("Không thể khởi tạo khung vẽ 2D.");
   }
@@ -125,6 +125,7 @@ export default function App() {
   const [catalogError, setCatalogError] = useState<string | null>(null);
 
   const [imageBuffer, setImageBuffer] = useState<LoadedImageBuffer | null>(null);
+  const [isDecodingImage, setIsDecodingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const [activeDemoId, setActiveDemoId] = useState<string | null>(DEMO_PORTRAIT_PRESETS[0].id);
   const [neuralLandmarks, setNeuralLandmarks] = useState<Array<[number, number, number]> | null>(
@@ -216,18 +217,20 @@ export default function App() {
     async (buf: LoadedImageBuffer) => {
       const token = ++processTokenRef.current;
       const autoBox = detectInitialFaceBox(buf.rgba, buf.width, buf.height);
+      // Publish buffer immediately so full optical analysis renders in <20ms without waiting for WASM
       setImageBuffer(buf);
+      setIsDecodingImage(false);
       setFaceBox(autoBox);
       setNeuralLandmarks(null);
       setLandmarkStatus("loading");
-      setProgressValue((p) => Math.max(p, 0.42));
-      setProcessingLabel("Đang nhận diện khuôn mặt…");
+      setProgressValue((p) => Math.max(p, 0.45));
+      setProcessingLabel("Đang tinh chỉnh 478 điểm khuôn mặt…");
 
       try {
         const { landmarks } = await detectNeuralFaceLandmarks(buf.rgba, buf.width, buf.height);
         if (token !== processTokenRef.current) return;
-        setProcessingLabel("Đang phân tích tông da…");
-        setProgressValue(0.88);
+        setProcessingLabel("Hoàn tất nhận diện khuôn mặt");
+        setProgressValue(0.92);
         if (landmarks && landmarks.length >= 468) {
           setNeuralLandmarks(landmarks);
           setLandmarkStatus("neural");
@@ -248,10 +251,25 @@ export default function App() {
     [finishProgress]
   );
 
+  const handleClearPortrait = useCallback(() => {
+    processTokenRef.current += 1;
+    setImageBuffer(null);
+    setIsDecodingImage(false);
+    setImageError(null);
+    setActiveDemoId(null);
+    setNeuralLandmarks(null);
+    setLandmarkStatus("fallback");
+    setInspectedLipstick(null);
+    setTryOnBlushEnabled(false);
+    setTryOnBlushId(null);
+    finishProgress();
+  }, [finishProgress]);
+
   const loadDemoPreset = useCallback(
     (preset: DemoPortraitPreset) => {
       setImageError(null);
       setActiveDemoId(preset.id);
+      setIsDecodingImage(true);
       setLandmarkStatus("loading");
       beginProgress("Đang tải ảnh mẫu…");
 
@@ -275,6 +293,7 @@ export default function App() {
             void processLoadedBuffer(buf);
           } catch (err) {
             setImageError(err instanceof Error ? err.message : "Không đọc được ảnh mẫu.");
+            setIsDecodingImage(false);
             setLandmarkStatus("fallback");
             finishProgress();
           }
@@ -284,6 +303,7 @@ export default function App() {
             loadFromUrl(fallbackUrl, "Ảnh mẫu dự phòng");
           } else {
             setImageError("Không tải được ảnh mẫu.");
+            setIsDecodingImage(false);
             setLandmarkStatus("fallback");
             finishProgress();
           }
@@ -323,42 +343,37 @@ export default function App() {
     if (!file) return;
     setImageError(null);
     setActiveDemoId(null);
+    setIsDecodingImage(true);
     setLandmarkStatus("loading");
     beginProgress("Đang đọc ảnh từ thiết bị…");
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = typeof reader.result === "string" ? reader.result : "";
-      if (!dataUrl) {
-        finishProgress();
-        return;
-      }
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const buf = imageElementToBuffer(img, file.name);
-          setInspectedLipstick(null);
-          void processLoadedBuffer(buf);
-          setActiveTab("tone");
-        } catch (err) {
-          setImageError(err instanceof Error ? err.message : "Không xử lý được ảnh tải lên.");
-          setLandmarkStatus("fallback");
-          finishProgress();
-        }
-      };
-      img.onerror = () => {
-        setImageError("Tệp ảnh không hợp lệ hoặc bị hỏng.");
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      try {
+        const buf = imageElementToBuffer(img, file.name);
+        setInspectedLipstick(null);
+        setTryOnBlushEnabled(false);
+        setTryOnBlushId(null);
+        setViewportMode("corrected");
+        void processLoadedBuffer(buf);
+        setActiveTab("tone");
+      } catch (err) {
+        setImageError(err instanceof Error ? err.message : "Không xử lý được ảnh tải lên.");
+        setIsDecodingImage(false);
         setLandmarkStatus("fallback");
         finishProgress();
-      };
-      img.src = dataUrl;
+      }
     };
-    reader.onerror = () => {
-      setImageError("Không đọc được tệp ảnh đã chọn.");
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      setImageError("Tệp ảnh không hợp lệ hoặc định dạng không hỗ trợ (hãy dùng JPG, PNG, WebP).");
+      setIsDecodingImage(false);
       setLandmarkStatus("fallback");
       finishProgress();
     };
-    reader.readAsDataURL(file);
+    img.src = objectUrl;
     event.target.value = "";
   };
 
@@ -373,7 +388,8 @@ export default function App() {
     );
   }, [imageBuffer, faceBox, wbMethod, occasion, texture, neuralLandmarks]);
 
-  const isProcessingPortrait = !report || landmarkStatus === "loading";
+  // Never block the rendered analysis on slow MediaPipe WASM downloads; only show decoding state while reading a new file
+  const isProcessingPortrait = isDecodingImage && !report;
 
   const topMatches = useMemo(() => {
     if (!report || products.length === 0) {
@@ -558,7 +574,7 @@ export default function App() {
               className="inline-flex items-center justify-center gap-1.5 min-h-[40px] md:min-h-[38px] px-3.5 sm:px-4 py-1.5 text-xs font-medium text-white bg-zinc-900 hover:bg-zinc-800 rounded-full md:rounded-xl transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Camera className="w-3.5 h-3.5" />
-              <span>Đổi ảnh</span>
+              <span>Phân tích ảnh</span>
             </button>
           </div>
         </div>
@@ -575,36 +591,55 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === "tone" && (
-          <ToneHomeView
-            report={report}
-            isProcessing={isProcessingPortrait}
-            processingLabel={processingLabel}
-            skinSwatchHex={skinSwatchHex}
-            faceBox={faceBox}
-            viewportMode={viewportMode}
-            onViewportModeChange={setViewportMode}
-            occasion={occasion}
-            onOccasionChange={setOccasion}
-            texture={texture}
-            onTextureChange={setTexture}
-            topLipstick={topMatches.lipsticks[0] ?? null}
-            topBlush={topMatches.blushes[0] ?? null}
-            topEyeshadow={topMatches.eyeshadows[0] ?? null}
-            savedIds={savedIds}
-            onToggleSave={handleToggleSave}
-            onInspectProduct={setDetailProduct}
-            onCycleDemoPortrait={handleCycleDemoPortrait}
-            onTryLipstick={handleTryLipstick}
-            onApplyHarmonyPalette={handleApplyHarmonyPalette}
-            onOpenShopCategory={handleOpenShopCategory}
-            onOpenInsights={() => switchTab("insights")}
-          />
-        )}
+        {activeTab === "tone" &&
+          (!report && !isProcessingPortrait ? (
+            <GettingStartedEmptyState
+              tab="tone"
+              demoPresets={DEMO_PORTRAIT_PRESETS}
+              onPickGallery={() => galleryInputRef.current?.click()}
+              onPickCamera={() => cameraInputRef.current?.click()}
+              onSelectDemo={loadDemoPreset}
+            />
+          ) : (
+            <ToneHomeView
+              report={report}
+              isProcessing={isProcessingPortrait}
+              processingLabel={processingLabel}
+              isDemoPortrait={activeDemoId !== null}
+              skinSwatchHex={skinSwatchHex}
+              faceBox={faceBox}
+              viewportMode={viewportMode}
+              onViewportModeChange={setViewportMode}
+              occasion={occasion}
+              onOccasionChange={setOccasion}
+              texture={texture}
+              onTextureChange={setTexture}
+              topLipstick={topMatches.lipsticks[0] ?? null}
+              topBlush={topMatches.blushes[0] ?? null}
+              topEyeshadow={topMatches.eyeshadows[0] ?? null}
+              savedIds={savedIds}
+              onToggleSave={handleToggleSave}
+              onInspectProduct={setDetailProduct}
+              onCycleDemoPortrait={handleCycleDemoPortrait}
+              onPickGallery={() => galleryInputRef.current?.click()}
+              onPickCamera={() => cameraInputRef.current?.click()}
+              onClearPortrait={handleClearPortrait}
+              onTryLipstick={handleTryLipstick}
+              onApplyHarmonyPalette={handleApplyHarmonyPalette}
+              onOpenShopCategory={handleOpenShopCategory}
+              onOpenInsights={() => switchTab("insights")}
+            />
+          ))}
 
         {activeTab === "tryon" &&
-          (isProcessingPortrait || !report ? (
-            <ResultsSkeleton />
+          (!report ? (
+            <GettingStartedEmptyState
+              tab="tryon"
+              demoPresets={DEMO_PORTRAIT_PRESETS}
+              onPickGallery={() => galleryInputRef.current?.click()}
+              onPickCamera={() => cameraInputRef.current?.click()}
+              onSelectDemo={loadDemoPreset}
+            />
           ) : (
             <LipTryOnView
               report={report}
@@ -623,8 +658,14 @@ export default function App() {
           ))}
 
         {activeTab === "shop" &&
-          (isProcessingPortrait || !report ? (
-            <ResultsSkeleton />
+          (!report ? (
+            <GettingStartedEmptyState
+              tab="shop"
+              demoPresets={DEMO_PORTRAIT_PRESETS}
+              onPickGallery={() => galleryInputRef.current?.click()}
+              onPickCamera={() => cameraInputRef.current?.click()}
+              onSelectDemo={loadDemoPreset}
+            />
           ) : (
             <CatalogMatcher
               products={products}
@@ -642,8 +683,14 @@ export default function App() {
           ))}
 
         {activeTab === "insights" &&
-          (isProcessingPortrait || !report ? (
-            <ResultsSkeleton />
+          (!report ? (
+            <GettingStartedEmptyState
+              tab="insights"
+              demoPresets={DEMO_PORTRAIT_PRESETS}
+              onPickGallery={() => galleryInputRef.current?.click()}
+              onPickCamera={() => cameraInputRef.current?.click()}
+              onSelectDemo={loadDemoPreset}
+            />
           ) : (
             <ProInsightsView
               report={report}
@@ -703,10 +750,12 @@ export default function App() {
         open={photoSheetOpen}
         demoPresets={DEMO_PORTRAIT_PRESETS}
         activeDemoId={activeDemoId}
+        hasPortrait={Boolean(report)}
         onClose={() => setPhotoSheetOpen(false)}
         onPickCamera={() => cameraInputRef.current?.click()}
         onPickGallery={() => galleryInputRef.current?.click()}
         onSelectDemo={loadDemoPreset}
+        onClearPortrait={handleClearPortrait}
       />
 
       {/* Product Detail Bottom Sheet */}

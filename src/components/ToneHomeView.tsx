@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { ChevronRight, Heart, RefreshCw, Sparkles } from "lucide-react";
+import { Camera, ChevronRight, Heart, ImagePlus, RefreshCw, Sparkles } from "lucide-react";
 import { PortraitSkeleton, ResultsSkeleton } from "./AnalysisSkeleton";
 import { PortraitCanvas, type ViewportMode } from "./PortraitCanvas";
 import {
@@ -26,6 +26,7 @@ interface ToneHomeViewProps {
   report: ConsultationReport | null;
   isProcessing: boolean;
   processingLabel: string;
+  isDemoPortrait: boolean;
   skinSwatchHex: string;
   faceBox: FaceLandmarksBox;
   viewportMode: ViewportMode;
@@ -41,6 +42,9 @@ interface ToneHomeViewProps {
   onToggleSave: (id: number) => void;
   onInspectProduct: (product: MatchedProduct) => void;
   onCycleDemoPortrait: () => void;
+  onPickGallery: () => void;
+  onPickCamera: () => void;
+  onClearPortrait: () => void;
   onTryLipstick: (product: MatchedProduct | null) => void;
   onApplyHarmonyPalette: (palette: ColorHarmonyPalette) => void;
   onOpenShopCategory: (category: "lipstick" | "blush" | "eyeshadow" | "all") => void;
@@ -85,6 +89,7 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
   report,
   isProcessing,
   processingLabel,
+  isDemoPortrait,
   skinSwatchHex,
   faceBox,
   viewportMode,
@@ -100,6 +105,9 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
   onToggleSave,
   onInspectProduct,
   onCycleDemoPortrait,
+  onPickGallery,
+  onPickCamera,
+  onClearPortrait,
   onTryLipstick,
   onApplyHarmonyPalette,
   onOpenShopCategory,
@@ -122,6 +130,7 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
   }, [harmonyBundle, occasion]);
 
   const isOriginalView = viewportMode === "original";
+  const isRoiView = viewportMode === "roi";
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 items-start">
@@ -135,21 +144,23 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
           >
             {/* Top floating minimal translucent controls */}
             <div className="absolute top-3 inset-x-3 z-10 flex items-center justify-between gap-2 pointer-events-none">
-              <div className="pointer-events-auto inline-flex items-center p-0.5 rounded-full bg-black/45 backdrop-blur-md border border-white/15">
+              <div className="pointer-events-auto inline-flex items-center p-0.5 rounded-full bg-black/50 backdrop-blur-md border border-white/15">
                 {(
                   [
                     ["corrected", "Ánh sáng chuẩn"],
                     ["original", "Gốc"],
+                    ["roi", "Vùng đo"],
                   ] as const
                 ).map(([id, label]) => {
                   const active =
-                    viewportMode === id || (id === "corrected" && viewportMode !== "original");
+                    viewportMode === id ||
+                    (id === "corrected" && viewportMode !== "original" && viewportMode !== "roi");
                   return (
                     <button
                       key={id}
                       type="button"
                       onClick={() => onViewportModeChange(id)}
-                      className={`min-h-[32px] px-3 py-1 text-[11px] font-semibold rounded-full whitespace-nowrap transition-colors cursor-pointer ${
+                      className={`min-h-[32px] px-2.5 sm:px-3 py-1 text-[11px] font-semibold rounded-full whitespace-nowrap transition-colors cursor-pointer ${
                         active ? "bg-white text-zinc-900 shadow-2xs" : "text-white/85 hover:text-white"
                       }`}
                     >
@@ -162,7 +173,7 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
               <button
                 type="button"
                 onClick={onCycleDemoPortrait}
-                className="pointer-events-auto min-h-[34px] px-3 py-1 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-md border border-white/15 text-white text-[11px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
+                className="pointer-events-auto min-h-[34px] px-2.5 sm:px-3 py-1 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-md border border-white/15 text-white text-[11px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Mẫu khác</span>
@@ -178,8 +189,8 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
             ) : (
               <PortraitCanvas
                 report={report}
-                mode={isOriginalView ? "original" : "corrected"}
-                showOverlay={false}
+                mode={isOriginalView ? "original" : isRoiView ? "roi" : "corrected"}
+                showOverlay={isRoiView}
                 box={faceBox}
                 fit="cover"
                 containerClassName="h-full w-full bg-zinc-950"
@@ -306,6 +317,44 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                     )}.`
                   : ""}
               </p>
+            )}
+
+            {/* Direct 1-tap User Photo Analysis Action Row */}
+            {!isProcessing && report && (
+              <div className="pt-3 border-t border-zinc-100 space-y-2">
+                <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-500">
+                  <span>
+                    {isDemoPortrait
+                      ? "Đang xem ảnh mẫu · Tải ảnh của bạn để đo chuẩn"
+                      : "Đang phân tích ảnh chân dung của bạn"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onClearPortrait}
+                    className="font-medium text-zinc-500 hover:text-rose-700 whitespace-nowrap cursor-pointer"
+                  >
+                    Xóa ảnh
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={onPickGallery}
+                    className="min-h-[40px] px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
+                  >
+                    <ImagePlus className="w-3.5 h-3.5" />
+                    <span>Tải ảnh của bạn</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onPickCamera}
+                    className="min-h-[40px] px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Chụp selfie</span>
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
