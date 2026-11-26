@@ -102,6 +102,32 @@ async function startServer() {
     res.sendFile(sampleFacePath);
   });
 
+  const mediapipeWasmDir = path.join(
+    rootDir,
+    "node_modules",
+    "@mediapipe",
+    "tasks-vision",
+    "wasm"
+  );
+  if (fs.existsSync(mediapipeWasmDir)) {
+    app.use(
+      "/mediapipe/wasm",
+      express.static(mediapipeWasmDir, {
+        maxAge: "1d",
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith(".wasm")) {
+            res.setHeader("Content-Type", "application/wasm");
+          } else if (filePath.endsWith(".js")) {
+            res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+          }
+        },
+      })
+    );
+    app.use("/mediapipe/wasm", (_req, res) => {
+      res.status(404).json({ error: "MediaPipe WASM asset not found." });
+    });
+  }
+
   const httpServer = http.createServer(app);
   const distDir = path.join(rootDir, "dist");
   const isProd = process.env.NODE_ENV === "production" && fs.existsSync(distDir);
