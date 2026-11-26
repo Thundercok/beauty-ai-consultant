@@ -1,16 +1,13 @@
-import React, { useMemo, useState } from "react";
-import { Flame, Search } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Heart, Search } from "lucide-react";
 import { labToRgb, rgbToHex } from "../lib/beauty/bradfordCat";
 import {
   matchProducts,
   scoreMatchedProductsPopularity,
   type TrendingProductItem,
 } from "../lib/beauty/productMatcher";
-import {
-  PRODUCT_TYPE_VI_LABELS,
-  TEXTURE_VI_LABELS,
-  translateMatchTier,
-} from "../lib/beauty/viLabels";
+import { deltaEToMatchPercent } from "../lib/beauty/virtualMakeup";
+import { PRODUCT_TYPE_VI_LABELS, TEXTURE_VI_LABELS } from "../lib/beauty/viLabels";
 import type {
   CatalogProduct,
   IlluminantName,
@@ -19,6 +16,19 @@ import type {
   SkinMetrics,
 } from "../lib/beauty/types";
 
+export type CatalogFilterId =
+  | "vn_popular"
+  | "popular_only"
+  | "saved"
+  | "lipstick"
+  | "blush"
+  | "eyeshadow"
+  | "foundation"
+  | "contour"
+  | "concealer"
+  | "glasses"
+  | "all";
+
 interface CatalogMatcherProps {
   products: CatalogProduct[];
   blendedTargets: { lip: string; blush: string; eyeshadow: string };
@@ -26,7 +36,11 @@ interface CatalogMatcherProps {
   skinMetrics: SkinMetrics;
   userSeason: SeasonName;
   catalogIlluminant: IlluminantName;
-  onInspectLipstick: (product: MatchedProduct) => void;
+  initialCategory?: CatalogFilterId;
+  savedIds: Set<number>;
+  onToggleSave: (id: number) => void;
+  onInspectProduct: (product: MatchedProduct) => void;
+  onTryLipstick: (product: MatchedProduct) => void;
 }
 
 const VN_POPULAR_BRANDS = new Set([
@@ -42,18 +56,19 @@ const VN_POPULAR_BRANDS = new Set([
   "L'Oreal",
 ]);
 
-const CATEGORY_TABS = [
+const CATEGORY_TABS: Array<{ id: CatalogFilterId; label: string }> = [
   { id: "vn_popular", label: "Hãng Việt & Phổ biến" },
-  { id: "popular_only", label: "Phổ biến nhất" },
   { id: "lipstick", label: "Son môi" },
   { id: "blush", label: "Má hồng" },
   { id: "eyeshadow", label: "Phấn mắt" },
   { id: "foundation", label: "Kem nền" },
+  { id: "saved", label: "Đã lưu" },
+  { id: "popular_only", label: "Bán chạy" },
   { id: "contour", label: "Tạo khối" },
   { id: "concealer", label: "Che khuyết điểm" },
   { id: "glasses", label: "Gọng kính" },
   { id: "all", label: "Tất cả" },
-] as const;
+];
 
 export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
   products,
@@ -62,11 +77,20 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
   skinMetrics,
   userSeason,
   catalogIlluminant,
-  onInspectLipstick,
+  initialCategory = "vn_popular",
+  savedIds,
+  onToggleSave,
+  onInspectProduct,
+  onTryLipstick,
 }) => {
-  const [activeType, setActiveType] = useState<(typeof CATEGORY_TABS)[number]["id"]>("vn_popular");
+  const [activeType, setActiveType] = useState<CatalogFilterId>(initialCategory);
   const [query, setQuery] = useState("");
-  const [visibleCount, setVisibleCount] = useState(6);
+  const [visibleCount, setVisibleCount] = useState(12);
+
+  useEffect(() => {
+    setActiveType(initialCategory);
+    setVisibleCount(12);
+  }, [initialCategory]);
 
   const skinHex = useMemo(
     () => rgbToHex(labToRgb([skinMetrics.L_star, skinMetrics.a_star, skinMetrics.b_star])),
@@ -84,10 +108,17 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
     const sourceList =
       activeType === "vn_popular"
         ? products.filter((p) => VN_POPULAR_BRANDS.has(p.brand))
-        : products;
+        : activeType === "saved"
+          ? products.filter((p) => savedIds.has(p.id))
+          : products;
 
     let baseMatched: MatchedProduct[] = [];
-    if (activeType === "all" || activeType === "vn_popular" || activeType === "popular_only") {
+    if (
+      activeType === "all" ||
+      activeType === "vn_popular" ||
+      activeType === "popular_only" ||
+      activeType === "saved"
+    ) {
       const types = Array.from(new Set(sourceList.map((p) => p.product_type)));
       for (const t of types) {
         baseMatched.push(
@@ -115,10 +146,18 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
         .sort((a, b) => b.popularityScore - a.popularityScore);
     }
 
-    // Keep scientific ΔE2000 accuracy primary, slightly preferring popular items within equal ΔE bands
     scored.sort((a, b) => a.deltaE - b.deltaE);
     return scored;
-  }, [activeType, products, blendedTargets, lipBaseLab, skinHex, userSeason, catalogIlluminant]);
+  }, [
+    activeType,
+    products,
+    blendedTargets,
+    lipBaseLab,
+    skinHex,
+    userSeason,
+    catalogIlluminant,
+    savedIds,
+  ]);
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -127,29 +166,22 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
       (item) =>
         item.brand.toLowerCase().includes(q) ||
         item.name.toLowerCase().includes(q) ||
-        item.shade.toLowerCase().includes(q) ||
-        item.bestSeasons.toLowerCase().includes(q)
+        item.shade.toLowerCase().includes(q)
     );
   }, [rankedItems, query]);
 
   const displayedItems = filteredItems.slice(0, visibleCount);
 
   return (
-    <section
-      id="catalog"
-      className="scroll-mt-20 border-t border-zinc-200 pt-8 md:pt-10 space-y-5"
-    >
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="space-y-4 sm:space-y-5">
+      {/* Header + Search */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-3.5">
         <div>
-          <p className="text-xs font-medium text-zinc-500 mb-1">
-            03. Ứng dụng: Đối chiếu bảng màu mỹ phẩm ({products.length} mã SKU)
-          </p>
-          <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900">
-            Sản phẩm tương thích theo khoảng cách màu ΔE2000
-          </h2>
-          <p className="text-sm text-zinc-600 mt-1 max-w-2xl">
-            Xếp hạng theo độ gần với mục tiêu sắc độ đo được từ ảnh; các mã có viền nổi bật là
-            sản phẩm phổ biến &amp; hợp mùa sắc cao.
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900">
+            Mỹ phẩm hợp tông da bạn
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
+            Chạm vào từng sản phẩm để xem chi tiết màu và chép tên tìm mua
           </p>
         </div>
 
@@ -160,135 +192,150 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              setVisibleCount(6);
+              setVisibleCount(12);
             }}
             placeholder="Tìm tên son, hãng, mã màu..."
             aria-label="Tìm tên son, hãng hoặc mã màu"
-            className="w-full min-h-[44px] md:min-h-[38px] pl-10 pr-3 py-2 text-sm md:text-xs bg-white border border-zinc-300 rounded-xl md:rounded-md text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+            className="w-full min-h-[44px] md:min-h-[40px] pl-10 pr-3 py-2 text-sm md:text-xs bg-white border border-zinc-200 rounded-2xl md:rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 p-1.5 bg-zinc-100 border border-zinc-200 rounded-xl overflow-x-auto snap-x">
-        {CATEGORY_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => {
-              setActiveType(tab.id);
-              setVisibleCount(6);
-            }}
-            className={`min-h-[40px] md:min-h-[34px] px-3.5 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap shrink-0 snap-start transition-colors cursor-pointer ${
-              activeType === tab.id
-                ? "bg-white text-zinc-900 shadow-xs"
-                : "text-zinc-600 hover:text-zinc-900"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Interactive Category Filter Bar */}
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
+        {CATEGORY_TABS.map((tab) => {
+          const isActive = activeType === tab.id;
+          const label =
+            tab.id === "saved" && savedIds.size > 0
+              ? `${tab.label} (${savedIds.size})`
+              : tab.label;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setActiveType(tab.id);
+                setVisibleCount(12);
+              }}
+              className={`min-h-[40px] sm:min-h-[36px] px-3.5 py-1.5 text-xs font-medium rounded-xl whitespace-nowrap shrink-0 snap-start border transition-colors cursor-pointer ${
+                isActive
+                  ? "bg-zinc-900 text-white border-zinc-900"
+                  : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
+      {/* 2-Column Mobile Grid / 3–4 Column Desktop Grid */}
       {displayedItems.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {displayedItems.map((item) => {
             const typeLabel = PRODUCT_TYPE_VI_LABELS[item.productType] ?? item.productType;
             const textureLabel = TEXTURE_VI_LABELS[item.texture] ?? item.texture;
-            const tierLabel = translateMatchTier(item.matchTier);
+            const matchPct = deltaEToMatchPercent(item.deltaE);
+            const isSaved = savedIds.has(item.id);
+            const isLip = item.productType === "lipstick";
 
             return (
               <article
                 key={item.id}
                 data-popular={item.isPopular ? "true" : "false"}
-                className={`bg-white rounded-2xl md:rounded-xl overflow-hidden flex flex-col justify-between transition-shadow hover:shadow-sm ${
-                  item.isPopular
-                    ? "border border-amber-400/90 ring-1 ring-amber-200/70"
-                    : "border border-zinc-200"
-                }`}
+                className="bg-white rounded-2xl border border-zinc-200/90 overflow-hidden flex flex-col justify-between transition-shadow hover:shadow-xs"
               >
                 <div>
-                  {item.renderedHex ? (
-                    <div>
-                      <div className="grid grid-cols-2 h-16">
-                        <div style={{ backgroundColor: item.hex }} title={`Màu thỏi: ${item.hex}`} />
-                        <div
-                          style={{ backgroundColor: item.renderedHex }}
-                          title={`Khi lên môi bạn: ${item.renderedHex}`}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 px-4 py-1.5 bg-zinc-50 border-b border-zinc-100 text-[11px] text-zinc-500">
-                        <span>Màu thỏi son</span>
-                        <span className="text-right font-medium text-zinc-800">
-                          Lên môi thật
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div
-                        className="h-16"
-                        style={{ backgroundColor: item.hex }}
-                        title={`Màu sản phẩm: ${item.hex}`}
-                      />
-                      <div className="flex items-center justify-between px-4 py-1.5 bg-zinc-50 border-b border-zinc-100 text-[11px] text-zinc-500">
-                        <span>Màu sản phẩm</span>
-                        <span className="font-mono tabular-nums text-zinc-600">{item.hex}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="p-4 space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs text-zinc-500 truncate">
-                        {item.brand} · {typeLabel}
-                      </div>
-                      {item.isPopular && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/90 text-[11px] font-medium text-amber-800 shrink-0">
-                          <Flame className="w-3 h-3 text-amber-600" aria-hidden="true" />
-                          Phổ biến
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-sm font-semibold text-zinc-900 leading-snug">
-                      {item.name}
-                    </h3>
-                    <div className="text-xs text-zinc-700">{item.shade}</div>
-                    <div className="text-xs text-zinc-500 pt-0.5">
-                      <span
-                        className={
-                          item.matchTier === "Exact Match"
-                            ? "font-medium text-emerald-700"
-                            : item.matchTier === "Great Match"
-                              ? "font-medium text-zinc-800"
-                              : "text-zinc-500"
-                        }
-                      >
-                        {tierLabel}
-                      </span>{" "}
-                      · {textureLabel}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="px-4 py-2.5 border-t border-zinc-100 flex items-center justify-between gap-2 bg-zinc-50/50">
-                  <span className="font-mono tabular-nums text-[11px] text-zinc-500">
-                    ΔE {item.deltaE.toFixed(1)} · {item.renderedHex ?? item.hex}
-                  </span>
-                  {item.productType === "lipstick" ? (
+                  {/* Swatch Visual Header */}
+                  <div className="relative">
                     <button
                       type="button"
-                      onClick={() => {
-                        onInspectLipstick(item);
-                        document
-                          .getElementById("lip-tryon")
-                          ?.scrollIntoView({ behavior: "smooth" });
-                      }}
-                      className="min-h-[40px] md:min-h-[32px] px-3.5 md:px-3 py-1.5 text-xs font-medium text-white bg-zinc-900 hover:bg-zinc-800 rounded-xl md:rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                      onClick={() => onInspectProduct(item)}
+                      aria-label={`Xem chi tiết ${item.brand} ${item.name} ${item.shade}`}
+                      className="block w-full text-left cursor-pointer"
                     >
-                      Thử mô hình môi
+                      {isLip && item.renderedHex ? (
+                        <>
+                          <div className="grid grid-cols-2 h-20 sm:h-24">
+                            <div style={{ backgroundColor: item.hex }} />
+                            <div style={{ backgroundColor: item.renderedHex }} />
+                          </div>
+                          <div className="grid grid-cols-2 px-2.5 py-1 bg-zinc-50 border-b border-zinc-100 text-[10px] text-zinc-500">
+                            <span className="truncate">Màu thỏi</span>
+                            <span className="text-right font-medium text-zinc-800 truncate">
+                              Lên môi bạn
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div
+                          className="h-20 sm:h-24 border-b border-zinc-100"
+                          style={{ backgroundColor: item.hex }}
+                        />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onToggleSave(item.id)}
+                      aria-label={isSaved ? `Bỏ lưu ${item.name}` : `Lưu ${item.name}`}
+                      className="absolute top-1.5 right-1.5 w-9 h-9 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Heart
+                        className={`w-4 h-4 ${
+                          isSaved ? "fill-rose-600 text-rose-600" : "text-zinc-600"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Clean Unboxed Typography */}
+                  <button
+                    type="button"
+                    onClick={() => onInspectProduct(item)}
+                    className="w-full text-left p-3 space-y-1 cursor-pointer"
+                  >
+                    <div className="text-[11px] text-zinc-500 truncate">
+                      {item.brand} · {typeLabel}
+                    </div>
+                    <h3 className="text-xs sm:text-sm font-semibold text-zinc-900 leading-snug line-clamp-2">
+                      {item.name}
+                    </h3>
+                    <div className="text-xs text-zinc-600 truncate">{item.shade}</div>
+                    <div className="pt-1 flex items-center gap-1.5 text-[11px] truncate">
+                      <span
+                        className={`font-semibold tabular-nums ${
+                          matchPct >= 90 ? "text-emerald-700" : "text-zinc-800"
+                        }`}
+                      >
+                        {matchPct}% hợp da
+                      </span>
+                      <span className="text-zinc-300" aria-hidden="true">
+                        ·
+                      </span>
+                      <span className="text-zinc-500 truncate">{textureLabel}</span>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Card Action */}
+                <div className="px-3 pb-3 pt-1">
+                  {isLip ? (
+                    <button
+                      type="button"
+                      onClick={() => onTryLipstick(item)}
+                      className="w-full min-h-[40px] sm:min-h-[36px] px-3 py-1.5 text-xs font-medium text-white bg-zinc-900 hover:bg-zinc-800 rounded-xl transition-colors whitespace-nowrap cursor-pointer"
+                    >
+                      Thử lên môi
                     </button>
                   ) : (
-                    <span className="text-xs text-zinc-500 py-1">{item.undertone}</span>
+                    <button
+                      type="button"
+                      onClick={() => onInspectProduct(item)}
+                      className="w-full min-h-[40px] sm:min-h-[36px] px-3 py-1.5 text-xs font-medium rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-800 transition-colors whitespace-nowrap cursor-pointer"
+                    >
+                      Xem chi tiết
+                    </button>
                   )}
                 </div>
               </article>
@@ -296,22 +343,31 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
           })}
         </div>
       ) : (
-        <div className="bg-white border border-zinc-200 rounded-2xl md:rounded-xl py-10 text-center text-sm text-zinc-500">
-          Không tìm thấy sản phẩm phù hợp với điều kiện lọc hiện tại.
+        <div className="bg-white border border-zinc-200 rounded-2xl py-12 px-4 text-center space-y-2">
+          <div className="text-sm font-semibold text-zinc-800">
+            {activeType === "saved"
+              ? "Bạn chưa lưu sản phẩm nào"
+              : "Không tìm thấy sản phẩm phù hợp"}
+          </div>
+          <p className="text-xs text-zinc-500 max-w-xs mx-auto">
+            {activeType === "saved"
+              ? "Chạm biểu tượng trái tim trên bất kỳ thỏi son hoặc phấn má nào để lưu lại so sánh."
+              : "Thử đổi từ khóa tìm kiếm hoặc chuyển sang danh mục khác."}
+          </p>
         </div>
       )}
 
       {filteredItems.length > visibleCount && (
-        <div className="flex justify-center pt-2">
+        <div className="flex justify-center pt-1">
           <button
             type="button"
-            onClick={() => setVisibleCount((c) => c + 6)}
-            className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 text-xs font-medium text-zinc-800 bg-white border border-zinc-300 rounded-xl md:rounded-md hover:bg-zinc-50 transition-colors cursor-pointer"
+            onClick={() => setVisibleCount((c) => c + 12)}
+            className="w-full sm:w-auto min-h-[44px] px-6 py-2.5 text-xs font-semibold text-zinc-800 bg-white border border-zinc-300 rounded-2xl hover:bg-zinc-50 transition-colors cursor-pointer"
           >
-            Xem thêm ({filteredItems.length - visibleCount} mã còn lại)
+            Xem thêm ({filteredItems.length - visibleCount} sản phẩm)
           </button>
         </div>
       )}
-    </section>
+    </div>
   );
 };

@@ -1,5 +1,10 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { renderChromophoreHeatmapRgba } from "../lib/beauty/chromophores";
+import {
+  applyVirtualMakeupToRgba,
+  computeLipAlphaMask,
+  type VirtualMakeupOptions,
+} from "../lib/beauty/virtualMakeup";
 import type { ConsultationReport, FaceLandmarksBox } from "../lib/beauty/types";
 import { PortraitSkeleton } from "./AnalysisSkeleton";
 
@@ -10,16 +15,13 @@ interface PortraitCanvasProps {
   mode: ViewportMode;
   showOverlay: boolean;
   box: FaceLandmarksBox;
+  virtualMakeup?: VirtualMakeupOptions;
+  zoomToLips?: boolean;
+  fit?: "contain" | "cover";
   className?: string;
   containerClassName?: string;
 }
 
-/**
- * Minimalist, balanced facial proportion points:
- * Forehead center (10), cheekbone highlights (116, 345),
- * jaw symmetry (172, 397), chin (152), cupid's bow (0), lip corners (61, 291).
- * Intentionally omits eye/nostril outlines so the overlay feels calm & editorial.
- */
 const BEAUTY_GLOW_LANDMARKS = [10, 116, 345, 172, 397, 152, 0, 61, 291];
 const CHEEK_BLOOM_LANDMARKS = [116, 345];
 
@@ -63,10 +65,19 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
   mode,
   showOverlay,
   box,
+  virtualMakeup,
+  zoomToLips = false,
+  fit = "contain",
   className = "",
   containerClassName = "bg-zinc-100",
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Cache feathered lip mask once per portrait so slider drags & shade taps run in <1ms
+  const cachedLipMask = useMemo(() => {
+    if (!report) return null;
+    return computeLipAlphaMask(report.width, report.height, report.neuralLandmarks, box);
+  }, [report, box]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -110,6 +121,25 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
       displayRgba = report.correctedRgba;
     }
 
+    if (
+      (mode === "corrected" || mode === "original") &&
+      virtualMakeup &&
+      (virtualMakeup.lipEnabled || virtualMakeup.blushEnabled)
+    ) {
+      displayRgba = applyVirtualMakeupToRgba(
+        displayRgba,
+        width,
+        height,
+        report.neuralLandmarks,
+        report.skinMask,
+        box,
+        {
+          ...virtualMakeup,
+          precomputedLipMask: cachedLipMask ?? undefined,
+        }
+      );
+    }
+
     const imageData = new ImageData(new Uint8ClampedArray(displayRgba), width, height);
     ctx.putImageData(imageData, 0, 0);
 
@@ -121,7 +151,6 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
       if (report.neuralLandmarks && report.neuralLandmarks.length >= 468) {
         const lms = report.neuralLandmarks;
 
-        // 1. Subtle ambient skin-sampling soft bloom over the cheeks
         const bloomR = Math.max(18, width * 0.08);
         CHEEK_BLOOM_LANDMARKS.forEach((lmIdx) => {
           const [x, y] = lms[lmIdx];
@@ -135,14 +164,12 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
           ctx.fill();
         });
 
-        // 2. Minimal luminous pearl dots (no wireframe mesh or eye/mouth cages)
         BEAUTY_GLOW_LANDMARKS.forEach((lmIdx) => {
           const [x, y] = lms[lmIdx];
           const isLipPoint = lmIdx === 0 || lmIdx === 61 || lmIdx === 291;
           drawSoftGlowDot(ctx, x, y, dotR, haloR, isLipPoint ? "rose" : "ivory");
         });
       } else {
-        // Gentle fallback soft-glow dots around estimated face proportions
         const cx = box.centerX * width;
         const cy = box.centerY * height;
         const rx = (box.faceWidth * width) / 2;
@@ -162,18 +189,37 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
 
       ctx.restore();
     }
-  }, [report, mode, showOverlay, box]);
+  }, [report, mode, showOverlay, box, virtualMakeup, cachedLipMask]);
 
   if (!report) {
     return <PortraitSkeleton className={className} />;
   }
 
+  const originX = `${Math.round((cachedLipMask?.centerXNorm ?? 0.5) * 100)}%`;
+  const originY = `${Math.round((cachedLipMask?.centerYNorm ?? 0.58) * 100)}%`;
+
   return (
-    <div className={`w-full flex items-center justify-center ${containerClassName}`}>
+    <div className={`w-full flex items-center justify-center overflow-hidden ${containerClassName}`}>
       <canvas
         ref={canvasRef}
-        className={`block max-w-full w-auto h-auto ${className}`}
-        aria-label="Chân dung phân tích tông da"
+        data-testid="portrait-canvas"
+        style={
+          zoomToLips
+            ? {
+                transformOrigin: `${originX} ${originY}`,
+                transform: "scale(1.65)",
+              }
+            : {
+                transformOrigin: `${originX} ${originY}`,
+                transform: "scale(1)",
+              }
+        }
+        className={
+          fit === "cover"
+            ? `block w-full h-full object-cover object-top transition-transform duration-300 ease-out will-change-transform ${className}`
+            : `block max-w-full w-auto h-auto transition-transform duration-300 ease-out will-change-transform ${className}`
+        }
+        aria-label="Chân dung phân tích tông da và thử son"
       />
     </div>
   );

@@ -3,12 +3,13 @@ import React from "react";
 export const PortraitSkeleton: React.FC<{
   className?: string;
   variant?: "light" | "studio";
-}> = ({ className = "", variant = "light" }) => {
+  statusMessage?: string;
+}> = ({ className = "", variant = "light", statusMessage = "Đang xử lý ảnh chân dung…" }) => {
   const isStudio = variant === "studio";
   return (
     <div
       role="status"
-      aria-label="Đang xử lý ảnh chân dung"
+      aria-label={statusMessage}
       className={`w-full flex flex-col items-center justify-center p-6 aspect-[4/5] max-h-[340px] sm:max-h-[420px] ${
         isStudio ? "bg-[#161514]" : "bg-[#F5F3F0]"
       } ${className}`}
@@ -18,7 +19,6 @@ export const PortraitSkeleton: React.FC<{
           isStudio ? "bg-white/10 animate-pulse" : "skeleton-shimmer"
         }`}
       >
-        {/* Subtle editorial portrait silhouette */}
         <div
           className={`w-16 h-20 sm:w-20 sm:h-24 rounded-full mb-2 ${
             isStudio ? "bg-white/15" : "bg-white/55"
@@ -32,11 +32,12 @@ export const PortraitSkeleton: React.FC<{
       </div>
 
       <div
-        className={`mt-5 w-44 h-2.5 rounded-full ${
-          isStudio ? "bg-white/15 animate-pulse" : "skeleton-shimmer"
+        className={`mt-5 text-xs font-medium ${
+          isStudio ? "text-white/75" : "text-zinc-500"
         }`}
-      />
-      <span className="sr-only">Đang xử lý ảnh chân dung...</span>
+      >
+        {statusMessage}
+      </div>
     </div>
   );
 };
@@ -48,8 +49,7 @@ export const ResultsSkeleton: React.FC = () => {
       aria-label="Đang phân tích tông da và gợi ý màu"
       className="space-y-4 sm:space-y-5"
     >
-      {/* Primary Diagnosis Card Skeleton */}
-      <div className="bg-white border border-zinc-200 rounded-2xl md:rounded-xl p-5 sm:p-6 space-y-5">
+      <div className="bg-white border border-zinc-200 rounded-2xl p-5 sm:p-6 space-y-5">
         <div className="space-y-3">
           <div className="h-3 w-40 rounded-full skeleton-shimmer" />
           <div className="flex items-center gap-3">
@@ -79,8 +79,7 @@ export const ResultsSkeleton: React.FC = () => {
         </div>
       </div>
 
-      {/* Makeup Guide Card Skeleton */}
-      <div className="bg-white border border-zinc-200 rounded-2xl md:rounded-xl p-5 sm:p-6 space-y-4">
+      <div className="bg-white border border-zinc-200 rounded-2xl p-5 sm:p-6 space-y-4">
         <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
           <div className="h-5 w-48 rounded-md skeleton-shimmer" />
           <div className="h-3 w-24 rounded-full skeleton-shimmer" />
