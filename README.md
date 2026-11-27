@@ -26,12 +26,14 @@
 
 All image processing runs on-device in the browser. A selfie never leaves the machine; the Express server only serves the app, the product catalogue, and the MediaPipe model files.
 
+Photos come from an upload, one of the bundled sample selfies (warm café, cool office, sunlit balcony), or the in-app camera. The camera view shows a face-alignment oval and reads the light level (from the `AmbientLightSensor` where the browser has it, otherwise from the frame itself) so the user can fix poor lighting before taking the shot.
+
 The app has four views (the UI is in Vietnamese):
 
-- **Tone (Tông da):** removes the room's color cast, measures skin and lip color, estimates ITA° and a 12-season palette, and suggests the best-matching products and makeup tips for the detected face shape.
-- **Try-on (Thử son):** renders lipstick and blush onto the portrait with a finite-layer Kubelka–Munk model, so a shade is shown as pigment over the person's own lip color rather than a flat overlay.
-- **Shop (Mỹ phẩm):** CIEDE2000 matching against a curated K-beauty catalogue, with filters, popularity scoring, and saved items.
-- **Insights (Chuyên sâu):** white-balance diagnostics, a relighting experiment (2700K to 6500K), and melanin / hemoglobin chromophore heatmaps.
+- **Tone (Tông da):** removes the room's color cast, measures skin and lip color, estimates ITA° and a 12-season palette, and suggests the best-matching products. It also gives makeup guides for the detected face shape, drawn as an interactive overlay on the portrait in routine order (eyes, nose contour, blush and jaw, lips, hair framing) and exportable as a PNG, plus eyewear frame shape and color suggestions.
+- **Try-on (Thử son):** renders lipstick and blush onto the portrait with a finite-layer Kubelka–Munk model, so a shade is shown as pigment over the person's own lip color rather than a flat overlay. A slider compares two shades, or either shade against bare lips. A verdict card scores the shade honestly: CIEDE2000 distance to the target becomes a 0–100 fit score with no artificial floor, so a real clash can score below 40.
+- **Shop (Mỹ phẩm):** CIEDE2000 matching against a curated K-beauty catalogue, with filters, popularity scoring, saved items, an estimated Vietnam retail price tier for budget filtering, and search links to Shopee and Hasaki.
+- **Insights (Chuyên sâu):** an analysis confidence score, automatic face-shape geometry, facial symmetry with contouring advice, a face audit that marks issue zones on the photo with short fixes, white-balance diagnostics, a relighting experiment (2700K to 6500K), and melanin / hemoglobin chromophore heatmaps.
 
 Outputs are decision support for product exploration. They are not dermatological assessments or guaranteed product matches.
 
@@ -46,10 +48,25 @@ beauty-ai-consultant/
 ├── src/
 │   ├── App.tsx                   # Tab shell, upload / camera flow, analysis state
 │   ├── main.tsx                  # Entry point with root error boundary
-│   ├── components/               # ToneHomeView, LipTryOnView, CatalogMatcher, ProInsightsView, ...
+│   ├── components/               # ToneHomeView, LipTryOnView, CatalogMatcher, ProInsightsView,
+│   │                             # CameraCaptureModal, HonestFaceAuditStudio, InteractiveFaceGuideOverlay, ...
 │   └── lib/beauty/
 │       ├── portraitPipeline.ts   # End-to-end analysis: landmarks → WB → skin/lip ROI → report
 │       ├── neuralLandmarks.ts    # MediaPipe Face Landmarker (WASM) and ROI polygon masks
+│       ├── faceMeshOverlay.ts    # 478-point mesh contours and landmark → anatomical zone mapping
+│       ├── analysisConfidence.ts # 0–100% reliability from lighting, landmarks, skin pixels, season margin
+│       ├── cameraAssistant.ts    # Live camera lighting level and face-alignment checks
+│       ├── autoFaceShapeAnalyzer.ts # Face-shape ratios from landmarks (face-box fallback)
+│       ├── facialSymmetry.ts     # Roll-invariant left/right symmetry and contouring advice
+│       ├── vnFeatureAnalysis.ts  # Nose, eyelid, cheek and jaw concerns for East-Asian makeup
+│       ├── honestLandmarkAudit.ts # Per-zone face audit with on-photo markers and fixes
+│       ├── honestMakeupAudit.ts  # Un-floored CIEDE2000 shade fit score and verdict
+│       ├── faceGuideMap.ts       # Makeup guide zones, strokes and routine order
+│       ├── faceGuideExport.ts    # Renders portrait + guide layers to a PNG
+│       ├── faceShapeStyleGuide.ts # Eyewear silhouettes and frame colors per face shape
+│       ├── vnBeautyGuide.ts      # Vietnam price tiers and Shopee / Hasaki search links
+│       ├── lipCompareState.ts    # Shade A / shade B / bare-lips compare slider state
+│       ├── haptics.ts            # Vibration API with an iOS Safari switch-haptic fallback
 │       ├── colorConstancy.ts     # Planckian / daylight-locus constrained illuminant estimation
 │       ├── bradfordCat.ts        # sRGB ↔ XYZ ↔ CIELAB and Bradford chromatic adaptation
 │       ├── chromophores.ts       # Linear-RGB Beer–Lambert melanin / hemoglobin decomposition
@@ -115,11 +132,12 @@ bun run build && bun run start
 4. **Skin and lip sampling.** Landmark polygons give the skin and inner / outer lip regions; skin pixels are further gated by HSV and YCbCr skin-color ranges.
 5. **Classification.** ITA° and CIELAB values feed a Gaussian-prototype 12-season classifier; facial ratios give the face shape.
 6. **Matching.** Target colors are softly blended in CIELAB and ranked against the catalogue with CIEDE2000, then re-scored for popularity and brand diversity.
+7. **Confidence.** Lighting quality (color temperature and off-locus cast, the heaviest weight), landmark coverage, skin pixel count, and season margin combine into a reliability score. The UI shows a caveat when it is low.
 
 ## 5. Research Status & Limitations
 
 - **Deterministic components:** illuminant estimation, Bradford adaptation, chromophore decomposition, Kubelka–Munk blending, and CIEDE2000 matching are implemented and unit-tested.
-- **Heuristic components:** face-shape classification and 12-season mapping are rule-based baselines, not validated expert classifications.
+- **Heuristic components:** face-shape classification, 12-season mapping, facial feature concerns, the face audit, and Vietnam price tiers are rule-based baselines, not validated expert classifications or live prices.
 - **Catalogue dependency:** recommendations are limited by the coverage and measurement quality of the product database. Hex swatches are treated as D65 sRGB.
 - **Image sensitivity:** camera processing, exposure, and compression still shift measured colors. A photo cannot guarantee an exact real-world match.
 - **Not a medical tool:** skin analysis is for cosmetic exploration only.
