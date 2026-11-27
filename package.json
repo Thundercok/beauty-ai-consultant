@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
-    "start": "node server.ts",
+    "start": "NODE_ENV=production tsx server.ts",
+    "test": "tsx --test src/lib/beauty/*.test.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
