@@ -1,16 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Droplets, ScanFace, ShoppingBag, SlidersHorizontal } from "lucide-react";
-import demoBrightUrl from "./assets/images/demo_beauty_bright_1795711946366.jpg";
-import demoSunlitUrl from "./assets/images/demo_beauty_sunlit_1795711975051.jpg";
-import demoWarmUrl from "./assets/images/demo_beauty_warm_1795711945979.jpg";
+import selfieCafeWarmUrl from "./assets/images/selfie_cafe_warm_1795755930772.jpg";
+import selfieOfficeCoolUrl from "./assets/images/selfie_office_cool_1795755934169.jpg";
+import selfieTanOutdoorUrl from "./assets/images/selfie_tan_outdoor_1795755933086.jpg";
+import {
+  CameraCaptureModal,
+  type CapturedCameraFrame,
+} from "./components/CameraCaptureModal";
 import { CatalogMatcher, type CatalogFilterId } from "./components/CatalogMatcher";
 import { GettingStartedEmptyState } from "./components/GettingStartedEmptyState";
 import { LipTryOnView } from "./components/LipTryOnView";
 import { PhotoPickerSheet, type DemoPortraitPreset } from "./components/PhotoPickerSheet";
-import { type ViewportMode } from "./components/PortraitCanvas";
 import { ProductDetailSheet } from "./components/ProductDetailSheet";
 import { ProInsightsView } from "./components/ProInsightsView";
-import { ToneHomeView } from "./components/ToneHomeView";
+import { ToastNotification, type ToastMessage, type ToastTone } from "./components/ToastNotification";
+import { ToneHomeView, type ToneViewportMode } from "./components/ToneHomeView";
 import { TopProgressBar } from "./components/TopProgressBar";
 import { labToRgb, rgbToHex } from "./lib/beauty/bradfordCat";
 import {
@@ -18,6 +22,8 @@ import {
   simulateIndoorLightingRgba,
   type ColorHarmonyPalette,
 } from "./lib/beauty/colorHarmony";
+import { triggerHaptic } from "./lib/beauty/haptics";
+import type { EnhancementStats } from "./lib/beauty/imageEnhancement";
 import { detectNeuralFaceLandmarks } from "./lib/beauty/neuralLandmarks";
 import { detectInitialFaceBox, runPortraitAnalysisPipeline } from "./lib/beauty/portraitPipeline";
 import { matchProducts } from "./lib/beauty/productMatcher";
@@ -45,23 +51,21 @@ interface LoadedImageBuffer {
 const DEMO_PORTRAIT_PRESETS: DemoPortraitPreset[] = [
   {
     id: "cafe_warm",
-    label: "Selfie đèn vàng",
-    subtitle: "Quán cà phê 3100K",
-    url: demoBrightUrl,
-    simulatedCctK: 3100,
+    label: "Quán cà phê tối",
+    subtitle: "Đèn vàng · Mặt mộc",
+    url: selfieCafeWarmUrl,
   },
   {
     id: "office_cool",
-    label: "Selfie đèn trắng",
-    subtitle: "Văn phòng 7800K",
-    url: demoWarmUrl,
-    simulatedCctK: 7800,
+    label: "Đèn văn phòng",
+    subtitle: "Huỳnh quang lạnh",
+    url: selfieOfficeCoolUrl,
   },
   {
     id: "daylight_tan",
-    label: "Ánh sáng tự nhiên",
-    subtitle: "Da nâu nắng",
-    url: demoSunlitUrl,
+    label: "Nắng ban công",
+    subtitle: "Da ngăm · Sáng lệch",
+    url: selfieTanOutdoorUrl,
   },
 ];
 
@@ -120,6 +124,8 @@ export default function App() {
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const processTokenRef = useRef(0);
   const progressTimersRef = useRef<number[]>([]);
+  const toastTimerRef = useRef<number | null>(null);
+  const toastSeqRef = useRef(0);
 
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -134,6 +140,7 @@ export default function App() {
   const [landmarkStatus, setLandmarkStatus] = useState<"loading" | "neural" | "fallback">(
     "loading"
   );
+  const [enhancementStats, setEnhancementStats] = useState<EnhancementStats | null>(null);
 
   // Subtle top viewport progress bar state
   const [progressValue, setProgressValue] = useState(0);
@@ -141,10 +148,12 @@ export default function App() {
   const [processingLabel, setProcessingLabel] = useState("Đang tải ảnh chân dung…");
 
   const [faceBox, setFaceBox] = useState<FaceLandmarksBox>(DEFAULT_FACE_BOX);
-  const [viewportMode, setViewportMode] = useState<ViewportMode>("corrected");
+  const [showOverlay, setShowOverlay] = useState(false);
+  const [viewportMode, setViewportMode] = useState<ToneViewportMode>("corrected");
   const [activeTab, setActiveTab] = useState<AppTab>("tone");
   const [shopCategory, setShopCategory] = useState<CatalogFilterId>("vn_popular");
   const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
+  const [cameraModalOpen, setCameraModalOpen] = useState(false);
   const [detailProduct, setDetailProduct] = useState<MatchedProduct | null>(null);
 
   const [wbMethod, setWbMethod] = useState<WhiteBalanceMethod>("planckian_grey_edge");
@@ -156,6 +165,21 @@ export default function App() {
   const [tryOnBlushEnabled, setTryOnBlushEnabled] = useState(false);
   const [tryOnBlushId, setTryOnBlushId] = useState<number | null>(null);
   const [savedIds, setSavedIds] = useState<Set<number>>(() => loadSavedProductIds());
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [pulsingMobileTab, setPulsingMobileTab] = useState<AppTab | null>(null);
+  const mobilePulseTimerRef = useRef<number | null>(null);
+
+  const showToast = useCallback((text: string, tone: ToastTone = "info") => {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    const id = ++toastSeqRef.current;
+    setToast({ id, text, tone });
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast((current) => (current?.id === id ? null : current));
+      toastTimerRef.current = null;
+    }, 2600);
+  }, []);
 
   const clearProgressTimers = useCallback(() => {
     progressTimersRef.current.forEach((id) => window.clearTimeout(id));
@@ -192,26 +216,125 @@ export default function App() {
     progressTimersRef.current.push(hideTimer);
   }, [clearProgressTimers]);
 
-  useEffect(() => clearProgressTimers, [clearProgressTimers]);
+  useEffect(() => {
+    return () => {
+      clearProgressTimers();
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+      if (mobilePulseTimerRef.current !== null) {
+        window.clearTimeout(mobilePulseTimerRef.current);
+      }
+    };
+  }, [clearProgressTimers]);
 
-  const handleToggleSave = useCallback((id: number) => {
-    setSavedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      try {
-        window.localStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify(Array.from(next)));
-      } catch {
-        // Ignore storage quota errors
+  const handleToggleSave = useCallback(
+    (id: number) => {
+      const removing = savedIds.has(id);
+      setSavedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        try {
+          window.localStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify(Array.from(next)));
+        } catch {
+          // Ignore storage quota errors
+        }
+        return next;
+      });
+      showToast(
+        removing ? "Đã bỏ lưu sản phẩm" : "Đã lưu sản phẩm yêu thích",
+        removing ? "info" : "heart"
+      );
+    },
+    [savedIds, showToast]
+  );
+
+  const handleOccasionChange = useCallback(
+    (next: OccasionType) => {
+      setOccasion(next);
+      const labels: Record<OccasionType, string> = {
+        daily: "Đi học",
+        office: "Đi chơi",
+        glam: "Đi tiệc",
+      };
+      showToast(`Đã chuyển phong cách: ${labels[next]}`, "setting");
+    },
+    [showToast]
+  );
+
+  const handleTextureChange = useCallback(
+    (next: SkinTextureType) => {
+      setTexture(next);
+      const labels: Record<SkinTextureType, string> = {
+        combination: "Da hỗn hợp",
+        oily: "Da dầu",
+        dry: "Da khô",
+      };
+      showToast(`Đã cập nhật loại da: ${labels[next]}`, "setting");
+    },
+    [showToast]
+  );
+
+  const handleWbMethodChange = useCallback(
+    (next: WhiteBalanceMethod) => {
+      setWbMethod(next);
+      const labels: Record<WhiteBalanceMethod, string> = {
+        planckian_grey_edge: "Planckian Grey-Edge",
+        planckian_sog: "Shades-of-Gray",
+        none: "Giữ ánh sáng gốc",
+      };
+      showToast(`Cân bằng sáng: ${labels[next]}`, "setting");
+    },
+    [showToast]
+  );
+
+  const handleCatalogIlluminantChange = useCallback(
+    (next: IlluminantName) => {
+      setCatalogIlluminant(next);
+      showToast(`Chuẩn ánh sáng bảng màu: ${next}`, "setting");
+    },
+    [showToast]
+  );
+
+  const handleToggleMeshPreview = useCallback(() => {
+    setShowOverlay((prev) => {
+      const next = !prev;
+      if (next) {
+        const count = neuralLandmarks?.length ?? 0;
+        showToast(
+          count >= 468
+            ? `Đang hiển thị lưới ${count} điểm khuôn mặt`
+            : "Đang hiển thị khung ước lượng khuôn mặt",
+          "setting"
+        );
+      } else {
+        showToast("Đã ẩn lưới khuôn mặt", "info");
       }
       return next;
     });
-  }, []);
+  }, [neuralLandmarks, showToast]);
 
   const switchTab = useCallback((tab: AppTab) => {
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
+
+  const handleMobileTabPress = useCallback(
+    (tab: AppTab) => {
+      triggerHaptic(tab === activeTab ? "soft" : "selection");
+      if (mobilePulseTimerRef.current !== null) {
+        window.clearTimeout(mobilePulseTimerRef.current);
+      }
+      setPulsingMobileTab(tab);
+      mobilePulseTimerRef.current = window.setTimeout(() => {
+        setPulsingMobileTab((current) => (current === tab ? null : current));
+        mobilePulseTimerRef.current = null;
+      }, 170);
+      switchTab(tab);
+    },
+    [activeTab, switchTab]
+  );
 
   const processLoadedBuffer = useCallback(
     async (buf: LoadedImageBuffer) => {
@@ -222,13 +345,19 @@ export default function App() {
       setIsDecodingImage(false);
       setFaceBox(autoBox);
       setNeuralLandmarks(null);
+      setEnhancementStats(null);
       setLandmarkStatus("loading");
       setProgressValue((p) => Math.max(p, 0.45));
       setProcessingLabel("Đang tinh chỉnh 478 điểm khuôn mặt…");
 
       try {
-        const { landmarks } = await detectNeuralFaceLandmarks(buf.rgba, buf.width, buf.height);
+        const { landmarks, enhancement } = await detectNeuralFaceLandmarks(
+          buf.rgba,
+          buf.width,
+          buf.height
+        );
         if (token !== processTokenRef.current) return;
+        setEnhancementStats(enhancement);
         setProcessingLabel("Hoàn tất nhận diện khuôn mặt");
         setProgressValue(0.92);
         if (landmarks && landmarks.length >= 468) {
@@ -245,10 +374,11 @@ export default function App() {
       } finally {
         if (token === processTokenRef.current) {
           finishProgress();
+          showToast("Phân tích hoàn tất", "success");
         }
       }
     },
-    [finishProgress]
+    [finishProgress, showToast]
   );
 
   const handleClearPortrait = useCallback(() => {
@@ -258,12 +388,22 @@ export default function App() {
     setImageError(null);
     setActiveDemoId(null);
     setNeuralLandmarks(null);
+    setEnhancementStats(null);
     setLandmarkStatus("fallback");
     setInspectedLipstick(null);
     setTryOnBlushEnabled(false);
     setTryOnBlushId(null);
     finishProgress();
   }, [finishProgress]);
+
+  const handleResetFaceBox = useCallback(() => {
+    if (!imageBuffer) {
+      setFaceBox(DEFAULT_FACE_BOX);
+    } else {
+      setFaceBox(detectInitialFaceBox(imageBuffer.rgba, imageBuffer.width, imageBuffer.height));
+    }
+    showToast("Đã đặt lại khung khuôn mặt mặc định", "setting");
+  }, [imageBuffer, showToast]);
 
   const loadDemoPreset = useCallback(
     (preset: DemoPortraitPreset) => {
@@ -377,6 +517,27 @@ export default function App() {
     event.target.value = "";
   };
 
+  const handleCapturedCameraFrame = useCallback(
+    (frame: CapturedCameraFrame) => {
+      setImageError(null);
+      setActiveDemoId(null);
+      setIsDecodingImage(false);
+      setLandmarkStatus("loading");
+      beginProgress("Đang phân tích ảnh selfie…");
+      setInspectedLipstick(null);
+      setTryOnBlushEnabled(false);
+      setTryOnBlushId(null);
+      setViewportMode("corrected");
+      setActiveTab("tone");
+      void processLoadedBuffer(frame);
+    },
+    [beginProgress, processLoadedBuffer]
+  );
+
+  const openLiveCamera = useCallback(() => {
+    setCameraModalOpen(true);
+  }, []);
+
   const report: ConsultationReport | null = useMemo(() => {
     if (!imageBuffer) return null;
     return runPortraitAnalysisPipeline(
@@ -399,7 +560,7 @@ export default function App() {
       lipsticks: matchProducts(report.blendedTargets.lip, products, {
         productType: "lipstick",
         lipBaseLab: report.lipMetrics.lipBaseLab,
-        topK: 60,
+        topK: 300,
         catalogIlluminant,
       }),
       blushes: matchProducts(report.blendedTargets.blush, products, {
@@ -444,9 +605,10 @@ export default function App() {
       if (closestLip) setInspectedLipstick(closestLip);
       if (closestBlush) setTryOnBlushId(closestBlush.id);
       setTryOnBlushEnabled(true);
+      showToast(`Đã áp dụng bộ màu ${palette.title}`, "success");
       switchTab("tryon");
     },
-    [topMatches.lipsticks, topMatches.blushes, switchTab]
+    [topMatches.lipsticks, topMatches.blushes, showToast, switchTab]
   );
 
   const handleOpenShopCategory = useCallback(
@@ -580,10 +742,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* Active App Screen with smooth compositor-only entry transition */}
+      {/* Active App Screen with generous mobile bottom padding so fixed 56px bottom nav NEVER clips content */}
       <main
         key={activeTab}
-        className="flex-1 max-w-[1280px] w-full mx-auto px-4 sm:px-6 pt-4 pb-24 md:py-7 animate-view-enter"
+        className="flex-1 max-w-[1280px] w-full mx-auto px-4 sm:px-6 pt-4 pb-28 md:py-7 animate-view-enter"
       >
         {(imageError || catalogError) && (
           <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-2xl text-xs">
@@ -597,7 +759,7 @@ export default function App() {
               tab="tone"
               demoPresets={DEMO_PORTRAIT_PRESETS}
               onPickGallery={() => galleryInputRef.current?.click()}
-              onPickCamera={() => cameraInputRef.current?.click()}
+              onPickCamera={openLiveCamera}
               onSelectDemo={loadDemoPreset}
             />
           ) : (
@@ -611,9 +773,9 @@ export default function App() {
               viewportMode={viewportMode}
               onViewportModeChange={setViewportMode}
               occasion={occasion}
-              onOccasionChange={setOccasion}
+              onOccasionChange={handleOccasionChange}
               texture={texture}
-              onTextureChange={setTexture}
+              onTextureChange={handleTextureChange}
               topLipstick={topMatches.lipsticks[0] ?? null}
               topBlush={topMatches.blushes[0] ?? null}
               topEyeshadow={topMatches.eyeshadows[0] ?? null}
@@ -622,7 +784,7 @@ export default function App() {
               onInspectProduct={setDetailProduct}
               onCycleDemoPortrait={handleCycleDemoPortrait}
               onPickGallery={() => galleryInputRef.current?.click()}
-              onPickCamera={() => cameraInputRef.current?.click()}
+              onPickCamera={openLiveCamera}
               onClearPortrait={handleClearPortrait}
               onTryLipstick={handleTryLipstick}
               onApplyHarmonyPalette={handleApplyHarmonyPalette}
@@ -637,7 +799,7 @@ export default function App() {
               tab="tryon"
               demoPresets={DEMO_PORTRAIT_PRESETS}
               onPickGallery={() => galleryInputRef.current?.click()}
-              onPickCamera={() => cameraInputRef.current?.click()}
+              onPickCamera={openLiveCamera}
               onSelectDemo={loadDemoPreset}
             />
           ) : (
@@ -654,6 +816,7 @@ export default function App() {
               onSelectBlushId={setTryOnBlushId}
               savedIds={savedIds}
               onToggleSave={handleToggleSave}
+              onNotify={(msg) => showToast(msg, "success")}
             />
           ))}
 
@@ -663,7 +826,7 @@ export default function App() {
               tab="shop"
               demoPresets={DEMO_PORTRAIT_PRESETS}
               onPickGallery={() => galleryInputRef.current?.click()}
-              onPickCamera={() => cameraInputRef.current?.click()}
+              onPickCamera={openLiveCamera}
               onSelectDemo={loadDemoPreset}
             />
           ) : (
@@ -688,7 +851,7 @@ export default function App() {
               tab="insights"
               demoPresets={DEMO_PORTRAIT_PRESETS}
               onPickGallery={() => galleryInputRef.current?.click()}
-              onPickCamera={() => cameraInputRef.current?.click()}
+              onPickCamera={openLiveCamera}
               onSelectDemo={loadDemoPreset}
             />
           ) : (
@@ -696,12 +859,16 @@ export default function App() {
               report={report}
               faceBox={faceBox}
               onFaceBoxChange={setFaceBox}
+              onResetFaceBox={handleResetFaceBox}
               landmarkStatus={landmarkStatus}
+              showMeshPreview={showOverlay}
+              onToggleMeshPreview={handleToggleMeshPreview}
+              enhancementStats={enhancementStats}
               sortedSeasons={sortedSeasons}
               wbMethod={wbMethod}
-              onWbMethodChange={setWbMethod}
+              onWbMethodChange={handleWbMethodChange}
               catalogIlluminant={catalogIlluminant}
-              onCatalogIlluminantChange={setCatalogIlluminant}
+              onCatalogIlluminantChange={handleCatalogIlluminantChange}
               onExportJson={handleExportJson}
             />
           ))}
@@ -715,30 +882,38 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Mobile Fixed Thumb-Zone Bottom Tab Bar (56px) */}
+      {/* Mobile Fixed Thumb-Zone Bottom Tab Bar (56px) with Haptic & Tactile Feedback */}
       <nav
+        data-testid="mobile-bottom-nav"
         aria-label="Điều hướng chính trên di động"
         className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-14 pb-safe bg-white/95 backdrop-blur-md border-t border-zinc-200/90 grid grid-cols-4 items-center"
       >
         {navItems.map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id;
+          const isPulsing = pulsingMobileTab === id;
           return (
             <button
               key={id}
               type="button"
-              onClick={() => switchTab(id)}
+              data-testid={`mobile-tab-${id}`}
+              onClick={() => handleMobileTabPress(id)}
               aria-current={isActive ? "page" : undefined}
-              className={`relative min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer ${
+              className={`relative min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium whitespace-nowrap select-none touch-manipulation transition-all duration-150 active:scale-92 cursor-pointer ${
                 isActive ? "text-rose-700 font-semibold" : "text-zinc-500 hover:text-zinc-900"
               }`}
             >
-              {isActive && (
-                <span
-                  aria-hidden="true"
-                  className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[2px] rounded-full bg-rose-700"
-                />
-              )}
-              <Icon className="w-[20px] h-[20px]" strokeWidth={isActive ? 2.2 : 1.75} />
+              <span
+                aria-hidden="true"
+                className={`absolute top-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-rose-700 transition-all duration-200 ease-out ${
+                  isActive ? "w-8 opacity-100" : "w-0 opacity-0"
+                }`}
+              />
+              <Icon
+                className={`w-[20px] h-[20px] transition-transform duration-150 ease-out ${
+                  isPulsing ? "scale-112" : "scale-100"
+                }`}
+                strokeWidth={isActive ? 2.2 : 1.75}
+              />
               <span>{label}</span>
             </button>
           );
@@ -752,10 +927,19 @@ export default function App() {
         activeDemoId={activeDemoId}
         hasPortrait={Boolean(report)}
         onClose={() => setPhotoSheetOpen(false)}
-        onPickCamera={() => cameraInputRef.current?.click()}
+        onPickCamera={openLiveCamera}
         onPickGallery={() => galleryInputRef.current?.click()}
         onSelectDemo={loadDemoPreset}
         onClearPortrait={handleClearPortrait}
+      />
+
+      {/* Live Selfie Camera Studio with Real-Time Lighting Assistant & Face Alignment Guide */}
+      <CameraCaptureModal
+        open={cameraModalOpen}
+        onClose={() => setCameraModalOpen(false)}
+        onCaptureFrame={handleCapturedCameraFrame}
+        onFallbackNativeCamera={() => cameraInputRef.current?.click()}
+        onFallbackGallery={() => galleryInputRef.current?.click()}
       />
 
       {/* Product Detail Bottom Sheet */}
@@ -771,6 +955,8 @@ export default function App() {
           onTryLipstick={handleTryLipstick}
         />
       )}
+      {/* Brief Floating Feedback Toast Notification */}
+      <ToastNotification toast={toast} />
     </div>
   );
 }

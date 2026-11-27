@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { adaptLabBradford, hexToLab, labToRgb, rgbToLab } from "./bradfordCat";
 import { extractRelativeChromophoresSrgb } from "./chromophores";
-import { illuminantLocusLinearRgb, projectToPlanckianLocus } from "./colorConstancy";
+import {
+  applyNaturalDaylightRelighting,
+  illuminantLocusLinearRgb,
+  projectToPlanckianLocus,
+} from "./colorConstancy";
 import { classifySeason } from "./faceAnalysis";
 import {
   adaptiveLowLightContrast,
@@ -295,5 +299,74 @@ test("selectTrendingProducts ranks matching multi-season popular items with bran
   assert.equal(scored[0].isPopular, true);
   assert.equal(scored[1].isPopular, false);
 });
+
+test("applyNaturalDaylightRelighting removes fluorescent green tint, avoids tungsten purple shift, and lifts side shadow", () => {
+  const width = 32;
+  const height = 32;
+  const n = width * height;
+  const faceMask = new Uint8Array(n);
+  for (let y = 8; y < 24; y++) {
+    for (let x = 8; x < 24; x++) {
+      faceMask[y * width + x] = 1;
+    }
+  }
+
+  // Case 1: Fluorescent cyan-green office light (7200K + green Duv spike) on neutral grey patch
+  const officeRgba = new Uint8ClampedArray(n * 4);
+  for (let i = 0; i < n; i++) {
+    officeRgba[i * 4] = 135;
+    officeRgba[i * 4 + 1] = 158;
+    officeRgba[i * 4 + 2] = 154;
+    officeRgba[i * 4 + 3] = 255;
+  }
+  const officeRawIll: [number, number, number] = [0.84, 1.07, 1.05];
+  const officeProj = projectToPlanckianLocus(officeRawIll);
+  const officeOut = applyNaturalDaylightRelighting(officeRgba, width, height, {
+    planckianIlluminant: officeProj.illuminantLinear,
+    rawIlluminant: officeProj.rawIlluminantLinear,
+    cctKelvin: officeProj.cctKelvin,
+    faceHullMask: faceMask,
+  });
+  const centerIdx = (16 * width + 16) * 4;
+  const officeBeforeLab = rgbToLab([officeRgba[centerIdx], officeRgba[centerIdx + 1], officeRgba[centerIdx + 2]]);
+  const officeAfterLab = rgbToLab([officeOut[centerIdx], officeOut[centerIdx + 1], officeOut[centerIdx + 2]]);
+  // Greenness (negative a*) should be substantially reduced toward neutral
+  assert.ok(
+    Math.abs(officeAfterLab[1]) < Math.abs(officeBeforeLab[1]),
+    `Expected fluorescent green tint reduction: before a*=${officeBeforeLab[1]}, after a*=${officeAfterLab[1]}`
+  );
+
+  // Case 2: Side-lit portrait (left cheek dark shadow, right cheek bright)
+  const sideLit = new Uint8ClampedArray(n * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const isDarkSide = x < 16;
+      sideLit[idx] = isDarkSide ? 115 : 205;
+      sideLit[idx + 1] = isDarkSide ? 86 : 162;
+      sideLit[idx + 2] = isDarkSide ? 70 : 132;
+      sideLit[idx + 3] = 255;
+    }
+  }
+  const neutralProj = projectToPlanckianLocus([1, 1, 1]);
+  const sideOut = applyNaturalDaylightRelighting(sideLit, width, height, {
+    planckianIlluminant: neutralProj.illuminantLinear,
+    rawIlluminant: [1, 1, 1],
+    cctKelvin: 5800,
+    faceHullMask: faceMask,
+  });
+  const leftBeforeL = rgbToLab([sideLit[(16 * width + 10) * 4], sideLit[(16 * width + 10) * 4 + 1], sideLit[(16 * width + 10) * 4 + 2]])[0];
+  const rightBeforeL = rgbToLab([sideLit[(16 * width + 21) * 4], sideLit[(16 * width + 21) * 4 + 1], sideLit[(16 * width + 21) * 4 + 2]])[0];
+  const leftAfterL = rgbToLab([sideOut[(16 * width + 10) * 4], sideOut[(16 * width + 10) * 4 + 1], sideOut[(16 * width + 10) * 4 + 2]])[0];
+  const rightAfterL = rgbToLab([sideOut[(16 * width + 21) * 4], sideOut[(16 * width + 21) * 4 + 1], sideOut[(16 * width + 21) * 4 + 2]])[0];
+  assert.ok(
+    rightAfterL - leftAfterL < rightBeforeL - leftBeforeL - 2,
+    `Expected side-shadow gap to shrink: before=${(rightBeforeL - leftBeforeL).toFixed(1)}, after=${(rightAfterL - leftAfterL).toFixed(1)}`
+  );
+  // Warm skin tone b* should stay positive (never pushed into purple-blue)
+  const leftAfterB = rgbToLab([sideOut[(16 * width + 10) * 4], sideOut[(16 * width + 10) * 4 + 1], sideOut[(16 * width + 10) * 4 + 2]])[2];
+  assert.ok(leftAfterB > 8, `Expected warm skin b* to stay natural, got ${leftAfterB}`);
+});
+
 
 

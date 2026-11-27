@@ -1,6 +1,15 @@
 import React, { useMemo } from "react";
-import { Camera, ChevronRight, Heart, ImagePlus, RefreshCw, Sparkles } from "lucide-react";
+import {
+  Camera,
+  ChevronRight,
+  Heart,
+  ImagePlus,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 import { PortraitSkeleton, ResultsSkeleton } from "./AnalysisSkeleton";
+import { FaceShapeStyleGuide } from "./FaceShapeStyleGuide";
+import { MakeupGuideSection } from "./MakeupGuideSection";
 import { PortraitCanvas, type ViewportMode } from "./PortraitCanvas";
 import {
   buildSeasonColorHarmonies,
@@ -8,8 +17,12 @@ import {
 } from "../lib/beauty/colorHarmony";
 import { deltaEToMatchPercent } from "../lib/beauty/virtualMakeup";
 import {
+  VN_SEASON_PLAIN_GUIDE,
+  estimateProductPriceVn,
+  evaluateVnStudentTraits,
+} from "../lib/beauty/vnBeautyGuide";
+import {
   PRODUCT_TYPE_VI_LABELS,
-  SEASON_VI_LABELS,
   SHAPE_VI_LABELS,
   UNDERTONE_VI_LABELS,
   translateItaCategory,
@@ -22,6 +35,8 @@ import type {
   SkinTextureType,
 } from "../lib/beauty/types";
 
+export type ToneViewportMode = ViewportMode;
+
 interface ToneHomeViewProps {
   report: ConsultationReport | null;
   isProcessing: boolean;
@@ -29,8 +44,8 @@ interface ToneHomeViewProps {
   isDemoPortrait: boolean;
   skinSwatchHex: string;
   faceBox: FaceLandmarksBox;
-  viewportMode: ViewportMode;
-  onViewportModeChange: (mode: ViewportMode) => void;
+  viewportMode: ToneViewportMode;
+  onViewportModeChange: (mode: ToneViewportMode) => void;
   occasion: OccasionType;
   onOccasionChange: (val: OccasionType) => void;
   texture: SkinTextureType;
@@ -52,37 +67,20 @@ interface ToneHomeViewProps {
 }
 
 const OCCASION_OPTIONS: Array<{ id: OccasionType; label: string }> = [
-  { id: "daily", label: "Hằng ngày" },
-  { id: "office", label: "Đi làm" },
+  { id: "daily", label: "Đi học" },
+  { id: "office", label: "Đi chơi" },
   { id: "glam", label: "Đi tiệc" },
 ];
 
-const TEXTURE_OPTIONS: Array<{ id: SkinTextureType; label: string }> = [
-  { id: "combination", label: "Hỗn hợp" },
-  { id: "oily", label: "Da dầu" },
-  { id: "dry", label: "Da khô" },
-];
-
-function shortSeasonName(fullTitle: string): string {
-  return fullTitle.replace(/\s*\([^)]*\)/, "");
-}
-
-function describeLightingCorrection(cctK: number | null, isOriginalView: boolean): string {
-  if (cctK === null) {
-    return isOriginalView ? "Ảnh gốc chưa cân bằng sáng" : "Tông màu cá nhân của bạn";
+function describeLightingPlainVi(cctK: number | null, mode: ToneViewportMode): string {
+  if (mode === "original") {
+    if (cctK !== null && cctK < 5200) return "Ảnh gốc chụp dưới ánh đèn vàng";
+    if (cctK !== null && cctK > 7200) return "Ảnh gốc chụp dưới đèn trắng lạnh";
+    return "Ảnh gốc trước khi cân bằng sáng";
   }
-  const rounded = Math.round(cctK / 100) * 100;
-  if (cctK < 5500) {
-    return isOriginalView
-      ? `Ảnh gốc ám đèn vàng (~${rounded}K)`
-      : `Đã khử đèn vàng (~${rounded}K) → ánh sáng chuẩn`;
-  }
-  if (cctK > 7200) {
-    return isOriginalView
-      ? `Ảnh gốc ám đèn lạnh (~${rounded}K)`
-      : `Đã khử đèn lạnh (~${rounded}K) → ánh sáng chuẩn`;
-  }
-  return isOriginalView ? "Ảnh gốc ánh sáng tự nhiên" : "Tông màu cá nhân của bạn";
+  if (cctK !== null && cctK < 5200) return "Đã khử ánh đèn vàng để đo đúng sắc da thật";
+  if (cctK !== null && cctK > 7200) return "Đã khử ánh đèn lạnh để đo đúng sắc da thật";
+  return "Màu da đã chuẩn ánh sáng tự nhiên";
 }
 
 export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
@@ -129,39 +127,39 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
     );
   }, [harmonyBundle, occasion]);
 
-  const isOriginalView = viewportMode === "original";
-  const isRoiView = viewportMode === "roi";
+  const plainGuide = report ? VN_SEASON_PLAIN_GUIDE[report.season.season] : null;
+
+  const effectiveMode: "corrected" | "original" =
+    viewportMode === "original" ? "original" : "corrected";
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 items-start">
-      {/* Left Column: Portrait Hero Mirror + Signature 3-Color Swatch Bar */}
+      {/* Left Column: Clean Full-Bleed Portrait Mirror + Own-Photo CTA (Zero Slider Clutter) */}
       <div className="lg:col-span-5">
         <div className="bg-white rounded-3xl overflow-hidden border border-zinc-200/85 shadow-[0_2px_20px_rgba(0,0,0,0.04)]">
-          {/* Explicit fixed responsive height + overflow-hidden prevents any canvas bleed */}
           <div
             data-testid="hero-portrait-frame"
-            className="relative h-[355px] sm:h-[435px] lg:h-[490px] w-full overflow-hidden bg-zinc-950"
+            className="relative h-[375px] sm:h-[445px] lg:h-[495px] w-full overflow-hidden bg-zinc-950"
           >
-            {/* Top floating minimal translucent controls */}
-            <div className="absolute top-3 inset-x-3 z-10 flex items-center justify-between gap-2 pointer-events-none">
-              <div className="pointer-events-auto inline-flex items-center p-0.5 rounded-full bg-black/50 backdrop-blur-md border border-white/15">
+            {/* Clean Top Floating Toggle: Daylight | Original + Switch Demo */}
+            <div className="absolute top-3 inset-x-3 z-20 flex items-center justify-between gap-2 pointer-events-none">
+              <div className="pointer-events-auto inline-flex items-center p-0.5 rounded-full bg-black/55 backdrop-blur-md border border-white/15">
                 {(
                   [
-                    ["corrected", "Ánh sáng chuẩn"],
-                    ["original", "Gốc"],
-                    ["roi", "Vùng đo"],
+                    ["corrected", "Chuẩn sáng"],
+                    ["original", "Ảnh gốc"],
                   ] as const
                 ).map(([id, label]) => {
-                  const active =
-                    viewportMode === id ||
-                    (id === "corrected" && viewportMode !== "original" && viewportMode !== "roi");
+                  const active = effectiveMode === id;
                   return (
                     <button
                       key={id}
                       type="button"
                       onClick={() => onViewportModeChange(id)}
-                      className={`min-h-[32px] px-2.5 sm:px-3 py-1 text-[11px] font-semibold rounded-full whitespace-nowrap transition-colors cursor-pointer ${
-                        active ? "bg-white text-zinc-900 shadow-2xs" : "text-white/85 hover:text-white"
+                      className={`min-h-[32px] px-3 py-1 text-[11px] font-semibold rounded-full whitespace-nowrap transition-colors cursor-pointer ${
+                        active
+                          ? "bg-white text-zinc-900 shadow-2xs"
+                          : "text-white/85 hover:text-white"
                       }`}
                     >
                       {label}
@@ -173,7 +171,7 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
               <button
                 type="button"
                 onClick={onCycleDemoPortrait}
-                className="pointer-events-auto min-h-[34px] px-2.5 sm:px-3 py-1 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-md border border-white/15 text-white text-[11px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
+                className="pointer-events-auto min-h-[34px] px-2.5 sm:px-3 py-1 rounded-full bg-black/55 hover:bg-black/75 backdrop-blur-md border border-white/15 text-white text-[11px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Mẫu khác</span>
@@ -189,29 +187,27 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
             ) : (
               <PortraitCanvas
                 report={report}
-                mode={isOriginalView ? "original" : isRoiView ? "roi" : "corrected"}
-                showOverlay={isRoiView}
+                mode={effectiveMode}
+                showOverlay={false}
+                meshPreview={false}
                 box={faceBox}
                 fit="cover"
                 containerClassName="h-full w-full bg-zinc-950"
               />
             )}
 
-            {/* Measured bottom contrast scrim showing lighting status + Personal Color verdict */}
-            <div className="absolute inset-x-0 bottom-0 pt-20 pb-4 px-4 sm:px-5 bg-gradient-to-t from-black/85 via-black/45 to-transparent pointer-events-none">
-              {isProcessing || !report ? (
+            {/* Plain-Vietnamese Skin Verdict Overlay */}
+            <div className="absolute inset-x-0 bottom-0 z-10 pt-20 pb-4 px-4 sm:px-5 bg-gradient-to-t from-black/85 via-black/45 to-transparent pointer-events-none">
+              {isProcessing || !report || !plainGuide ? (
                 <div className="space-y-2">
-                  <div className="h-3 w-28 rounded-full bg-white/25 animate-pulse" />
-                  <div className="h-6 w-48 rounded-md bg-white/30 animate-pulse" />
+                  <div className="h-3 w-36 rounded-full bg-white/25 animate-pulse" />
+                  <div className="h-6 w-52 rounded-md bg-white/30 animate-pulse" />
                   <div className="h-3.5 w-44 rounded-full bg-white/20 animate-pulse" />
                 </div>
               ) : (
                 <div className="space-y-1">
                   <div className="text-[11px] font-medium text-amber-200/95 truncate">
-                    {describeLightingCorrection(
-                      report.whiteBalance.estimatedCctK,
-                      isOriginalView
-                    )}
+                    {describeLightingPlainVi(report.whiteBalance.estimatedCctK, effectiveMode)}
                   </div>
                   <div className="flex items-center gap-2.5">
                     <span
@@ -219,8 +215,8 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                       style={{ backgroundColor: skinSwatchHex }}
                       aria-hidden="true"
                     />
-                    <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
-                      {shortSeasonName(SEASON_VI_LABELS[report.season.season].title)}
+                    <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight leading-snug truncate">
+                      {plainGuide.plainTitle}
                     </h1>
                   </div>
                   <div className="text-xs text-white/85 truncate">
@@ -233,101 +229,16 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
             </div>
           </div>
 
-          {/* Attached 3-Shade Signature Swatch Strip (clean flat surface, zero cards-within-cards) */}
-          <div
-            data-testid="hero-signature-palette"
-            className="bg-white px-4 sm:px-5 py-4 space-y-3.5"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-zinc-900">Bảng màu hợp da nhất</span>
-              {!isProcessing && report && (
-                <button
-                  type="button"
-                  onClick={() => onTryLipstick(topLipstick)}
-                  className="text-xs font-semibold text-rose-700 hover:text-rose-800 inline-flex items-center gap-0.5 cursor-pointer whitespace-nowrap"
-                >
-                  <span>Thử son lên môi</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            {isProcessing || !report ? (
-              <div className="grid grid-cols-3 gap-3">
-                {[0, 1, 2].map((idx) => (
-                  <div key={idx} className="space-y-2">
-                    <div className="h-11 rounded-xl skeleton-shimmer" />
-                    <div className="h-3 w-14 rounded-full skeleton-shimmer" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-3">
-                {(
-                  [
-                    {
-                      label: "Màu Son",
-                      hex: report.blendedTargets.lip,
-                      action: () => onTryLipstick(topLipstick),
-                      hint: "Thử ngay",
-                    },
-                    {
-                      label: "Má Hồng",
-                      hex: report.blendedTargets.blush,
-                      action: () => onOpenShopCategory("blush"),
-                      hint: "Xem mẫu",
-                    },
-                    {
-                      label: "Phấn Mắt",
-                      hex: report.blendedTargets.eyeshadow,
-                      action: () => onOpenShopCategory("eyeshadow"),
-                      hint: "Xem mẫu",
-                    },
-                  ] as const
-                ).map((swatch) => (
-                  <button
-                    key={swatch.label}
-                    type="button"
-                    onClick={swatch.action}
-                    className="group text-left space-y-1.5 cursor-pointer"
-                  >
-                    <div
-                      className="h-11 w-full rounded-xl ring-1 ring-black/6 group-hover:scale-[1.02] transition-transform duration-150"
-                      style={{ backgroundColor: swatch.hex }}
-                    />
-                    <div className="px-0.5">
-                      <div className="text-xs font-semibold text-zinc-900 leading-tight truncate">
-                        {swatch.label}
-                      </div>
-                      <div className="text-[11px] text-zinc-500 group-hover:text-rose-700 transition-colors truncate">
-                        {swatch.hint}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {!isProcessing && report && (
-              <p className="text-xs text-zinc-600 leading-relaxed pt-3 border-t border-zinc-100">
-                {SEASON_VI_LABELS[report.season.season].summary}
-                {report.season.isBorderline
-                  ? ` Bạn cũng hợp tông gần kề như ${shortSeasonName(
-                      SEASON_VI_LABELS[report.season.secondarySeason].title
-                    )}.`
-                  : ""}
-              </p>
-            )}
-
-            {/* Direct 1-tap User Photo Analysis Action Row */}
-            {!isProcessing && report && (
-              <div className="pt-3 border-t border-zinc-100 space-y-2">
-                <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-500">
-                  <span>
-                    {isDemoPortrait
-                      ? "Đang xem ảnh mẫu · Tải ảnh của bạn để đo chuẩn"
-                      : "Đang phân tích ảnh chân dung của bạn"}
-                  </span>
+          {/* Direct 1-tap Analyze Your Own Photo Action Bar */}
+          {!isProcessing && report && (
+            <div className="px-4 sm:px-5 py-3.5 bg-white space-y-2.5">
+              <div className="flex items-center justify-between gap-2 text-xs text-zinc-500">
+                <span>
+                  {isDemoPortrait
+                    ? "Đang xem ảnh mẫu · Thử với mặt bạn để đo chuẩn nhất"
+                    : "Đang phân tích ảnh của bạn"}
+                </span>
+                {!isDemoPortrait && (
                   <button
                     type="button"
                     onClick={onClearPortrait}
@@ -335,94 +246,123 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                   >
                     Xóa ảnh
                   </button>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={onPickGallery}
-                    className="min-h-[40px] px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
-                  >
-                    <ImagePlus className="w-3.5 h-3.5" />
-                    <span>Tải ảnh của bạn</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onPickCamera}
-                    className="min-h-[40px] px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>Chụp selfie</span>
-                  </button>
-                </div>
+                )}
               </div>
-            )}
-          </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={onPickCamera}
+                  className="min-h-[42px] px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Chụp selfie ngay</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onPickGallery}
+                  className="min-h-[42px] px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
+                >
+                  <ImagePlus className="w-3.5 h-3.5" />
+                  <span>Chọn ảnh có sẵn</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Right Column: Color Harmony, Instant Picks, Practical Makeup Guide */}
+      {/* Right Column: Plain-Vietnamese Summary + Unified 3-Swatch Palette + Try Now + Student Picks + Style Guide */}
       <div className="lg:col-span-7 space-y-5">
-        {isProcessing || !report ? (
+        {isProcessing || !report || !plainGuide ? (
           <ResultsSkeleton />
         ) : (
           <>
-            {/* Color Harmony Section — Complementary Eyeshadow, Blush & Lipstick Palettes */}
+            {/* Card 1: Plain-Vietnamese Verdict + Single Unified 3-Color Palette (Lip · Blush · Eye) + Try Now */}
             {harmonyBundle && activeHarmony && (
               <section
                 data-testid="color-harmony-section"
-                aria-label="Phối màu hài hòa"
+                aria-label="Kết luận tông da và 3 màu hợp nhất"
                 className="bg-white rounded-3xl border border-zinc-200/85 p-4 sm:p-5 space-y-4 shadow-[0_2px_16px_rgba(0,0,0,0.03)]"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
+                {/* Plain-Vietnamese Takeaway */}
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h2 className="text-base sm:text-lg font-bold tracking-tight text-zinc-900">
-                      Phối màu hài hòa
+                      Kết luận tông da của bạn
                     </h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      Bộ màu mắt · má · son chuẩn tông{" "}
-                      {shortSeasonName(SEASON_VI_LABELS[report.season.season].title)}
-                    </p>
+                    <span className="text-xs font-semibold text-rose-700">
+                      Nhóm {plainGuide.shortTag}
+                    </span>
                   </div>
-
-                  {/* Occasion / Look Switcher */}
-                  <div
-                    role="tablist"
-                    aria-label="Chọn phong cách phối màu"
-                    className="grid grid-cols-3 gap-1 p-1 bg-zinc-100 rounded-xl sm:w-[250px] shrink-0"
-                  >
-                    {OCCASION_OPTIONS.map((opt) => {
-                      const active = occasion === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          role="tab"
-                          aria-selected={active}
-                          onClick={() => onOccasionChange(opt.id)}
-                          className={`min-h-[38px] sm:min-h-[34px] px-2 text-xs font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
-                            active
-                              ? "bg-white text-zinc-900 shadow-xs font-semibold"
-                              : "text-zinc-600 hover:text-zinc-900"
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <p className="text-xs sm:text-sm text-zinc-700 leading-relaxed">
+                    {plainGuide.oneLiner}
+                  </p>
+                  <p className="text-xs text-zinc-500 leading-relaxed">
+                    Mẹo nhanh: {plainGuide.studentTip}
+                  </p>
                 </div>
 
-                {/* Connected 3-Tone Editorial Swatch Strip (Eyeshadow · Blush · Lipstick) */}
-                <div className="space-y-3">
-                  <div className="grid grid-cols-3 rounded-2xl overflow-hidden ring-1 ring-black/8">
+                {/* Look Switcher: Đi học | Đi chơi | Đi tiệc */}
+                <div className="pt-3 border-t border-zinc-100 space-y-3.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div>
+                      <div className="text-xs font-semibold text-zinc-900">
+                        3 màu Son · Má · Mắt hợp da nhất
+                      </div>
+                      <div className="text-[11px] text-zinc-500">
+                        {activeHarmony.title} · {activeHarmony.harmonyType}
+                      </div>
+                    </div>
+
+                    <div
+                      role="tablist"
+                      aria-label="Chọn dịp trang điểm"
+                      className="grid grid-cols-3 gap-1 p-1 bg-zinc-100 rounded-xl sm:w-[240px] shrink-0"
+                    >
+                      {OCCASION_OPTIONS.map((opt) => {
+                        const active = occasion === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={active}
+                            onClick={() => onOccasionChange(opt.id)}
+                            className={`min-h-[36px] sm:min-h-[32px] px-2 text-xs font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+                              active
+                                ? "bg-white text-zinc-900 shadow-xs font-semibold"
+                                : "text-zinc-600 hover:text-zinc-900"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Single Clean 3-Swatch Bar (Son môi · Má hồng · Phấn mắt) */}
+                  <div
+                    data-testid="hero-signature-palette"
+                    className="grid grid-cols-3 rounded-2xl overflow-hidden ring-1 ring-black/8"
+                  >
                     {[
-                      activeHarmony.eyeshadow,
-                      activeHarmony.blush,
                       activeHarmony.lipstick,
+                      activeHarmony.blush,
+                      activeHarmony.eyeshadow,
                     ].map((swatch) => (
-                      <div key={swatch.role} className="flex flex-col bg-white">
+                      <button
+                        key={swatch.role}
+                        type="button"
+                        onClick={() =>
+                          swatch.role === "lipstick"
+                            ? onApplyHarmonyPalette(activeHarmony)
+                            : onOpenShopCategory(swatch.role)
+                        }
+                        className="group flex flex-col bg-white text-left cursor-pointer"
+                      >
                         <div
-                          className="h-16 sm:h-[72px] w-full"
+                          className="h-16 sm:h-[72px] w-full transition-opacity group-hover:opacity-90"
                           style={{ backgroundColor: swatch.hex }}
                         />
                         <div className="px-2.5 sm:px-3 py-2.5 border-t border-zinc-100">
@@ -433,39 +373,40 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                             {swatch.shadeLabel}
                           </div>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
 
-                  {/* Practical harmony note + Try-on CTA */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-0.5">
-                    <div className="space-y-0.5 min-w-0">
-                      <div className="text-xs font-semibold text-zinc-900">
-                        {activeHarmony.title} ·{" "}
-                        <span className="font-medium text-rose-700">
-                          {activeHarmony.harmonyType}
-                        </span>
-                      </div>
-                      <p className="text-xs text-zinc-600 leading-relaxed">{activeHarmony.tip}</p>
-                    </div>
+                  <p className="text-xs text-zinc-600 leading-relaxed">{activeHarmony.tip}</p>
 
+                  {/* Primary Action: Try Now on Your Lips */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-0.5">
                     <button
                       type="button"
                       onClick={() => onApplyHarmonyPalette(activeHarmony)}
-                      className="min-h-[42px] sm:min-h-[38px] px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
+                      className="min-h-[44px] sm:min-h-[40px] px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
                     >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Thử bảng màu này</span>
+                      <Sparkles className="w-4 h-4" />
+                      <span>Thử ngay lên môi</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onOpenShopCategory("all")}
+                      className="min-h-[42px] sm:min-h-[40px] px-4 py-2 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-800 text-xs font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors cursor-pointer"
+                    >
+                      <span>Xem mỹ phẩm theo ngân sách</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
 
-                {/* Compact Avoid Colors Row */}
-                <div className="pt-3.5 border-t border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                {/* Compact Avoid Colors Line */}
+                <div className="pt-3 border-t border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <span className="text-xs font-medium text-zinc-500 shrink-0">
-                    Tông màu dễ làm xỉn da:
+                    Màu nên tránh kẻo xỉn da:
                   </span>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
                     {harmonyBundle.avoidSwatches.map((avoid) => (
                       <div key={avoid.label} className="inline-flex items-center gap-1.5">
                         <span
@@ -485,24 +426,27 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
               </section>
             )}
 
-            {/* Instant Top Picks Carousel */}
+            {/* Card 2: Personalized Step-by-Step Makeup Guide ('Hướng dẫn trang điểm') */}
+            <MakeupGuideSection report={report} texture={texture} />
+
+            {/* Card 3: Top 3 Real Product Picks with Student Price Range & Bare-Face / Teeth Cues */}
             {quickPicks.length > 0 && (
-              <section aria-label="Gợi ý nổi bật cho bạn" className="space-y-3">
+              <section aria-label="Gợi ý sản phẩm hợp nhất" className="space-y-3">
                 <div className="flex items-center justify-between gap-3 px-0.5">
                   <div>
-                    <h2 className="text-base sm:text-lg font-bold tracking-tight text-zinc-900">
-                      Gợi ý hợp nhất cho bạn
+                    <h2 className="text-base font-bold tracking-tight text-zinc-900">
+                      Gợi ý chọn mua nhanh
                     </h2>
                     <p className="text-xs text-zinc-500">
-                      Chọn nhanh theo sắc da và màu môi tự nhiên
+                      Khớp sẵn màu môi thật và sắc da của bạn
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => onOpenShopCategory("all")}
-                    className="min-h-[40px] px-2 text-xs font-semibold text-zinc-700 hover:text-zinc-900 inline-flex items-center gap-0.5 whitespace-nowrap cursor-pointer"
+                    className="min-h-[38px] px-2 text-xs font-semibold text-zinc-700 hover:text-zinc-900 inline-flex items-center gap-0.5 whitespace-nowrap cursor-pointer"
                   >
-                    <span>Xem tất cả</span>
+                    <span>Lọc theo giá</span>
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -512,10 +456,19 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                     const matchPct = deltaEToMatchPercent(item.deltaE);
                     const isSaved = savedIds.has(item.id);
                     const isLip = item.productType === "lipstick";
+                    const priceInfo = estimateProductPriceVn(item.brand, item.productType, item.name);
+                    const traits = evaluateVnStudentTraits({
+                      productType: item.productType,
+                      texture: item.texture,
+                      hex: item.hex,
+                      renderedHex: item.renderedHex,
+                      deltaE: item.deltaE,
+                    });
+
                     return (
                       <article
                         key={item.id}
-                        className="w-[215px] sm:w-auto shrink-0 snap-start bg-white rounded-2xl border border-zinc-200/85 overflow-hidden flex flex-col justify-between"
+                        className="w-[225px] sm:w-auto shrink-0 snap-start bg-white rounded-2xl border border-zinc-200/85 overflow-hidden flex flex-col justify-between"
                       >
                         <div>
                           <div className="relative h-16">
@@ -538,10 +491,10 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                               type="button"
                               onClick={() => onToggleSave(item.id)}
                               aria-label={isSaved ? `Bỏ lưu ${item.name}` : `Lưu ${item.name}`}
-                              className="absolute top-1.5 right-1.5 w-9 h-9 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+                              className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-xs transition-colors cursor-pointer"
                             >
                               <Heart
-                                className={`w-4 h-4 ${
+                                className={`w-3.5 h-3.5 ${
                                   isSaved ? "fill-rose-600 text-rose-600" : "text-zinc-600"
                                 }`}
                               />
@@ -554,16 +507,28 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                             className="w-full text-left p-3 space-y-1 cursor-pointer"
                           >
                             <div className="text-[11px] text-zinc-500 truncate">
-                              {item.brand} ·{" "}
-                              {PRODUCT_TYPE_VI_LABELS[item.productType] ?? item.productType}
+                              {item.brand} · {PRODUCT_TYPE_VI_LABELS[item.productType] ?? item.productType}
                             </div>
                             <h3 className="text-xs font-semibold text-zinc-900 line-clamp-1">
                               {item.name}
                             </h3>
                             <div className="text-xs text-zinc-600 truncate">{item.shade}</div>
-                            <div className="text-[11px] font-medium text-emerald-700 tabular-nums pt-0.5">
-                              {matchPct}% hợp da bạn
+                            <div className="pt-0.5 flex items-center gap-1.5 text-[11px] truncate">
+                              <span className="font-semibold text-emerald-700 tabular-nums">
+                                {matchPct}% hợp
+                              </span>
+                              <span className="text-zinc-300" aria-hidden="true">
+                                ·
+                              </span>
+                              <span className="font-medium text-zinc-700 tabular-nums truncate">
+                                {priceInfo.priceRangeLabel}
+                              </span>
                             </div>
+                            {traits.badges.length > 0 && (
+                              <div className="text-[11px] font-medium text-rose-700 truncate">
+                                {traits.badges[0]}
+                              </div>
+                            )}
                           </button>
                         </div>
 
@@ -572,7 +537,7 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                             <button
                               type="button"
                               onClick={() => onTryLipstick(item)}
-                              className="w-full min-h-[40px] sm:min-h-[36px] px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium transition-colors cursor-pointer whitespace-nowrap"
+                              className="w-full min-h-[38px] sm:min-h-[34px] px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium transition-colors cursor-pointer whitespace-nowrap"
                             >
                               Thử lên môi
                             </button>
@@ -580,9 +545,9 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                             <button
                               type="button"
                               onClick={() => onInspectProduct(item)}
-                              className="w-full min-h-[40px] sm:min-h-[36px] px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap"
+                              className="w-full min-h-[38px] sm:min-h-[34px] px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap"
                             >
-                              Xem chi tiết
+                              Xem &amp; tìm mua
                             </button>
                           )}
                         </div>
@@ -593,76 +558,13 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
               </section>
             )}
 
-            {/* Practical Face-Shape Makeup Guide with inline Skin Texture control */}
-            <section className="bg-white rounded-3xl border border-zinc-200/85 p-4 sm:p-5 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-bold text-zinc-900">
-                    Mẹo trang điểm cho {SHAPE_VI_LABELS[report.faceShape.primary]}
-                  </h2>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    {report.advice.executionParameters.intensity.replace(/\s*\([^)]*\)/, "")}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-100 rounded-xl sm:w-[230px] shrink-0">
-                  {TEXTURE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => onTextureChange(opt.id)}
-                      className={`min-h-[36px] sm:min-h-[32px] px-2 text-xs font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
-                        texture === opt.id
-                          ? "bg-white text-zinc-900 shadow-xs font-semibold"
-                          : "text-zinc-600 hover:text-zinc-900"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="divide-y divide-zinc-100 text-sm">
-                {[
-                  { label: "Tạo khối", text: report.advice.contour },
-                  { label: "Đánh má", text: report.advice.blush },
-                  { label: "Trang điểm mắt", text: report.advice.eyes },
-                  { label: "Cách đánh môi", text: report.advice.lip },
-                ].map((row) => (
-                  <div key={row.label} className="py-2.5 first:pt-0 last:pb-0">
-                    <div className="text-xs font-semibold text-zinc-900 mb-0.5">{row.label}</div>
-                    <p className="text-xs text-zinc-600 leading-relaxed">{row.text}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-3 border-t border-zinc-100 space-y-1.5 text-xs text-zinc-600 leading-relaxed">
-                <div>
-                  <span className="font-semibold text-zinc-900">Nền &amp; Dưỡng: </span>
-                  {report.advice.executionParameters.prep} ·{" "}
-                  {report.advice.executionParameters.textureStyle}
-                </div>
-                <div>
-                  <span className="font-semibold text-zinc-900">Nên hạn chế: </span>
-                  {report.advice.avoid.join(" · ")}
-                </div>
-              </div>
-
-              <div className="pt-2.5 border-t border-zinc-100 flex items-center justify-between gap-2">
-                <span className="text-xs text-zinc-500">
-                  Kiểm tra ánh đèn phòng &amp; bản đồ sắc tố da
-                </span>
-                <button
-                  type="button"
-                  onClick={onOpenInsights}
-                  className="text-xs font-semibold text-zinc-900 hover:text-rose-700 inline-flex items-center gap-0.5 whitespace-nowrap cursor-pointer"
-                >
-                  <span>Chuyên sâu</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </section>
+            {/* Card 3: Practical Face Shape Makeup & Eyewear Guide (no engineering ratios on Home) */}
+            <FaceShapeStyleGuide
+              report={report}
+              texture={texture}
+              onTextureChange={onTextureChange}
+              onOpenInsights={onOpenInsights}
+            />
           </>
         )}
       </div>

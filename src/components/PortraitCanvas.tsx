@@ -1,6 +1,11 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { renderChromophoreHeatmapRgba } from "../lib/beauty/chromophores";
 import {
+  FACE_MESH_CONTOURS,
+  classifyMeshLandmarkZone,
+  type MeshPointZone,
+} from "../lib/beauty/faceMeshOverlay";
+import {
   applyVirtualMakeupToRgba,
   computeLipAlphaMask,
   type VirtualMakeupOptions,
@@ -14,6 +19,7 @@ interface PortraitCanvasProps {
   report: ConsultationReport | null;
   mode: ViewportMode;
   showOverlay: boolean;
+  meshPreview?: boolean;
   box: FaceLandmarksBox;
   virtualMakeup?: VirtualMakeupOptions;
   zoomToLips?: boolean;
@@ -24,6 +30,123 @@ interface PortraitCanvasProps {
 
 const BEAUTY_GLOW_LANDMARKS = [10, 116, 345, 172, 397, 152, 0, 61, 291];
 const CHEEK_BLOOM_LANDMARKS = [116, 345];
+
+const CONTOUR_STROKE_STYLES: Record<Exclude<MeshPointZone, "face">, string> = {
+  oval: "rgba(255, 255, 255, 0.58)",
+  eye: "rgba(125, 211, 252, 0.82)",
+  brow: "rgba(186, 230, 253, 0.68)",
+  nose: "rgba(254, 243, 199, 0.65)",
+  lip: "rgba(253, 164, 175, 0.88)",
+  iris: "rgba(52, 211, 153, 0.92)",
+};
+
+const POINT_FILL_STYLES: Record<MeshPointZone, string> = {
+  oval: "rgba(255, 255, 255, 0.94)",
+  eye: "rgba(125, 211, 252, 0.98)",
+  brow: "rgba(186, 230, 253, 0.92)",
+  nose: "rgba(254, 243, 199, 0.94)",
+  lip: "rgba(251, 113, 133, 0.98)",
+  iris: "rgba(52, 211, 153, 0.98)",
+  face: "rgba(240, 249, 255, 0.86)",
+};
+
+function drawFullFaceMesh478(
+  ctx: CanvasRenderingContext2D,
+  landmarks: Array<[number, number, number]>,
+  width: number
+): void {
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  const baseLine = Math.max(0.85, width / 400);
+
+  // 1. Subtle anatomical feature contours so alignment on eyes, brows, nose, lips & jawline is immediate
+  for (const contour of FACE_MESH_CONTOURS) {
+    const valid = contour.indices.every((idx) => idx < landmarks.length);
+    if (!valid || contour.indices.length < 2) continue;
+
+    ctx.beginPath();
+    contour.indices.forEach((idx, step) => {
+      const [x, y] = landmarks[idx];
+      if (step === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    if (contour.closed) ctx.closePath();
+
+    ctx.strokeStyle = "rgba(9, 9, 11, 0.32)";
+    ctx.lineWidth = baseLine + 0.9;
+    ctx.stroke();
+
+    ctx.strokeStyle = CONTOUR_STROKE_STYLES[contour.zone];
+    ctx.lineWidth = contour.zone === "lip" || contour.zone === "iris" ? baseLine * 1.15 : baseLine;
+    ctx.stroke();
+  }
+
+  // 2. Plot every detected landmark point (all 478 points: 468 face mesh + 10 iris)
+  const faceDotR = Math.max(1.05, width / 345);
+  const featureDotR = Math.max(1.25, width / 295);
+  const irisDotR = Math.max(1.45, width / 260);
+
+  for (let i = 0; i < landmarks.length; i++) {
+    const [x, y] = landmarks[i];
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+
+    const zone = classifyMeshLandmarkZone(i);
+    const radius = zone === "iris" ? irisDotR : zone === "face" ? faceDotR : featureDotR;
+
+    // Subtle dark halo for crisp contrast on fair highlights and warm skin tones
+    ctx.fillStyle = "rgba(9, 9, 11, 0.45)";
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 0.55, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = POINT_FILL_STYLES[zone];
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function drawFallbackMeshGuide(
+  ctx: CanvasRenderingContext2D,
+  box: FaceLandmarksBox,
+  width: number,
+  height: number
+): void {
+  const cx = box.centerX * width;
+  const cy = box.centerY * height;
+  const rx = (box.faceWidth * width) / 2;
+  const ry = (box.faceHeight * height) / 2;
+  const lipY = box.lipCenterY * height;
+  const lipHalfW = (box.lipWidth * width) / 2;
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+  ctx.lineWidth = Math.max(1.2, width / 300);
+  ctx.setLineDash([5, 4]);
+
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Lip guide
+  ctx.strokeStyle = "rgba(253, 164, 175, 0.95)";
+  ctx.beginPath();
+  ctx.ellipse(cx, lipY, lipHalfW, Math.max(5, ry * 0.12), 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Eye line guide
+  ctx.strokeStyle = "rgba(125, 211, 252, 0.85)";
+  ctx.beginPath();
+  ctx.moveTo(cx - rx * 0.55, cy - ry * 0.12);
+  ctx.lineTo(cx + rx * 0.55, cy - ry * 0.12);
+  ctx.stroke();
+
+  ctx.restore();
+}
 
 function drawSoftGlowDot(
   ctx: CanvasRenderingContext2D,
@@ -60,10 +183,11 @@ function drawSoftGlowDot(
   ctx.restore();
 }
 
-export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
+export const PortraitCanvas: React.FC<PortraitCanvasProps> = React.memo(({
   report,
   mode,
   showOverlay,
+  meshPreview = false,
   box,
   virtualMakeup,
   zoomToLips = false,
@@ -143,7 +267,13 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
     const imageData = new ImageData(new Uint8ClampedArray(displayRgba), width, height);
     ctx.putImageData(imageData, 0, 0);
 
-    if (showOverlay) {
+    if (meshPreview) {
+      if (report.neuralLandmarks && report.neuralLandmarks.length >= 468) {
+        drawFullFaceMesh478(ctx, report.neuralLandmarks, width);
+      } else {
+        drawFallbackMeshGuide(ctx, box, width, height);
+      }
+    } else if (showOverlay) {
       ctx.save();
       const dotR = Math.max(1.8, width / 175);
       const haloR = Math.max(8, width / 38);
@@ -189,7 +319,7 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
 
       ctx.restore();
     }
-  }, [report, mode, showOverlay, box, virtualMakeup, cachedLipMask]);
+  }, [report, mode, showOverlay, meshPreview, box, virtualMakeup, cachedLipMask]);
 
   if (!report) {
     return <PortraitSkeleton className={className} />;
@@ -197,12 +327,15 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
 
   const originX = `${Math.round((cachedLipMask?.centerXNorm ?? 0.5) * 100)}%`;
   const originY = `${Math.round((cachedLipMask?.centerYNorm ?? 0.58) * 100)}%`;
+  const renderedMeshPoints = meshPreview ? (report.neuralLandmarks?.length ?? 0) : 0;
 
   return (
     <div className={`w-full flex items-center justify-center overflow-hidden ${containerClassName}`}>
       <canvas
         ref={canvasRef}
         data-testid="portrait-canvas"
+        data-mesh-active={meshPreview ? "true" : "false"}
+        data-mesh-points={renderedMeshPoints}
         style={
           zoomToLips
             ? {
@@ -223,4 +356,5 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = ({
       />
     </div>
   );
-};
+});
+PortraitCanvas.displayName = "PortraitCanvas";

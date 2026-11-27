@@ -2,6 +2,7 @@ import { linearChannelToSrgb, rgbToHex, rgbToLab, srgbChannelToLinear } from "./
 import { extractRelativeChromophoresSrgb } from "./chromophores";
 import {
   applyBradfordWhiteBalance,
+  applyNaturalDaylightRelighting,
   estimateNonskinIlluminant,
   illuminantLocusLinearRgb,
   projectToPlanckianLocus,
@@ -252,7 +253,7 @@ function buildNeuralMasks(
     Math.hypot(landmarks[a][0] - landmarks[b][0], landmarks[a][1] - landmarks[b][1]);
   const r1 = dist(10, 152) / (dist(234, 454) + 1e-6);
   const r2 = dist(172, 397) / (dist(234, 454) + 1e-6);
-  const r3 = dist(338, 297) / (dist(172, 397) + 1e-6);
+  const r3 = dist(54, 284) / (dist(172, 397) + 1e-6);
 
   return { faceHullMask, featureExclusionMask, innerLipMask, outerLipMask, ratios: { r1, r2, r3 } };
 }
@@ -420,9 +421,14 @@ export function runPortraitAnalysisPipeline(
     };
   } else {
     const rawMethod = options.wbMethod === "planckian_grey_edge" ? "grey_edge" : "sog";
-    const rawIll = estimateNonskinIlluminant(originalRgba, width, height, faceHullMask, rawMethod, 6.0);
+    const rawIll = estimateNonskinIlluminant(originalRgba, width, height, faceHullMask, rawMethod, 3.5);
     const proj = projectToPlanckianLocus(rawIll);
-    correctedRgba = applyBradfordWhiteBalance(originalRgba, proj.illuminantLinear);
+    correctedRgba = applyNaturalDaylightRelighting(originalRgba, width, height, {
+      planckianIlluminant: proj.illuminantLinear,
+      rawIlluminant: proj.rawIlluminantLinear,
+      cctKelvin: proj.cctKelvin,
+      faceHullMask,
+    });
     wbDiagnostics = {
       method: options.wbMethod,
       estimatedCctK: Number(proj.cctKelvin.toFixed(1)),

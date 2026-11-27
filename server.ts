@@ -150,10 +150,66 @@ async function startServer() {
     });
   } else {
     const disableHmr = process.env.DISABLE_HMR === "true";
+    if (disableHmr) {
+      const NOOP_VITE_CLIENT_JS = `
+const sheetsMap = new Map();
+export function updateStyle(id, content) {
+  let style = sheetsMap.get(id);
+  if (!style) {
+    style = document.createElement("style");
+    style.setAttribute("type", "text/css");
+    style.setAttribute("data-vite-dev-id", id);
+    style.textContent = content;
+    document.head.appendChild(style);
+    sheetsMap.set(id, style);
+  } else {
+    style.textContent = content;
+  }
+}
+export function removeStyle(id) {
+  const style = sheetsMap.get(id);
+  if (style) {
+    document.head.removeChild(style);
+    sheetsMap.delete(id);
+  }
+}
+export function createHotContext() {
+  const hot = {
+    data: {},
+    accept() {},
+    acceptExports() {},
+    dispose() {},
+    prune() {},
+    decline() {},
+    invalidate() {},
+    on() {},
+    off() {},
+    send() {},
+  };
+  return hot;
+}
+export function injectQuery(url, queryToInject) {
+  if (!url || !queryToInject) return url;
+  return url.includes("?") ? url + "&" + queryToInject : url + "?" + queryToInject;
+}
+export class ErrorOverlay extends HTMLElement {
+  close() {
+    this.remove();
+  }
+}
+`;
+      app.get("/@vite/client", (_req, res) => {
+        res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+        res.setHeader("Cache-Control", "no-cache");
+        res.send(NOOP_VITE_CLIENT_JS);
+      });
+    }
+
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
         hmr: disableHmr ? false : { server: httpServer },
+        ws: disableHmr ? false : undefined,
       },
       appType: "spa",
     });

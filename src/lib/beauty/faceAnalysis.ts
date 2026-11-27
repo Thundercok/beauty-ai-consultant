@@ -46,8 +46,8 @@ const SHAPE_PARAMETERS: Record<FaceShapeName, { mean: [number, number, number]; 
 
 export function classifyFaceShapeFromRatios(r1: number, r2: number, r3: number): FaceShapeResult {
   const ratios: [number, number, number] = [r1, r2, r3];
-  const scores = {} as Record<FaceShapeName, number>;
-  let total = 1e-12;
+  const logScores = {} as Record<FaceShapeName, number>;
+  let maxLog = -Infinity;
 
   (Object.keys(SHAPE_PARAMETERS) as FaceShapeName[]).forEach((shape) => {
     const { mean, std } = SHAPE_PARAMETERS[shape];
@@ -55,7 +55,15 @@ export function classifyFaceShapeFromRatios(r1: number, r2: number, r3: number):
       ((ratios[0] - mean[0]) / std[0]) ** 2 +
       ((ratios[1] - mean[1]) / std[1]) ** 2 +
       ((ratios[2] - mean[2]) / std[2]) ** 2;
-    const score = Math.exp(-0.5 * z2);
+    const logVal = -0.5 * z2;
+    logScores[shape] = logVal;
+    if (logVal > maxLog) maxLog = logVal;
+  });
+
+  const scores = {} as Record<FaceShapeName, number>;
+  let total = 1e-12;
+  (Object.keys(logScores) as FaceShapeName[]).forEach((shape) => {
+    const score = Math.exp(logScores[shape] - maxLog);
     scores[shape] = score;
     total += score;
   });
@@ -153,34 +161,34 @@ export const OCCASION_MODIFIERS: Record<
   { intensity: string; textureStyle: string; eyeDepth: string }
 > = {
   daily: {
-    intensity: "Tự nhiên trong trẻo (0.4)",
-    textureStyle: "Glasting Water Tint / Dewy Balm",
-    eyeDepth: "Nhấn nhẹ mi & phấn nhạt",
+    intensity: "Nhẹ nhàng đi học",
+    textureStyle: "Son tint bóng hoặc son dưỡng có màu đánh lòng môi",
+    eyeDepth: "Kẹp mi cong tự nhiên & phớt mắt nâu nhạt",
   },
   office: {
-    intensity: "Thanh lịch chỉn chu (0.6)",
-    textureStyle: "Blur Water Tint / Satin",
-    eyeDepth: "Tạo hốc mắt nhẹ tự nhiên",
+    intensity: "Tươi tắn đi chơi",
+    textureStyle: "Son tint mịn mờ hoặc son kem nhung tán mờ viền",
+    eyeDepth: "Nhấn nhẹ đuôi mắt nâu & bọng mắt trong veo",
   },
   glam: {
-    intensity: "Nổi bật cuốn hút (1.0)",
-    textureStyle: "Hazy Lip Clay / Glossy Layering",
-    eyeDepth: "Nhấn nhũ mịn & eyeliner đuôi dài",
+    intensity: "Nổi bật đi tiệc",
+    textureStyle: "Son bùn lì mịn hoặc chồng thêm lớp son bóng kính",
+    eyeDepth: "Nhấn nhũ mịn giữa bầu mắt & kẻ đuôi mắt nâu mảnh",
   },
 };
 
 export const TEXTURE_MODIFIERS: Record<SkinTextureType, { prep: string; setting: string }> = {
   oily: {
-    prep: "Kem lót kiềm dầu Niacinamide Matte Primer",
-    setting: "Phấn phủ Translucent Bake Powder vùng T-zone",
+    prep: "Chống nắng ráo mịn + cushion bán lì kiềm dầu mỏng nhẹ",
+    setting: "Dặm phấn phủ bột kiềm dầu vùng chữ T để bền nền trời nóng ẩm",
   },
   dry: {
-    prep: "Xịt khoáng cấp ẩm Hyaluronic Mist",
-    setting: "Xịt khóa nền bóng Dewy Glow Setting Spray",
+    prep: "Kem dưỡng ẩm nhẹ + cushion ẩm mịn căng bóng",
+    setting: "Xịt khóa nền cấp ẩm giúp da mịn mướt không bị mốc",
   },
   combination: {
-    prep: "Kem lót kiềm dầu vùng T-Zone",
-    setting: "Phấn phủ nhẹ vùng T-Zone",
+    prep: "Cushion mỏng nhẹ tiệp da, che khuyết điểm mỏng vùng thâm",
+    setting: "Phủ nhẹ phấn kiềm dầu vùng mũi & trán, giữ gò má căng tự nhiên",
   },
 };
 

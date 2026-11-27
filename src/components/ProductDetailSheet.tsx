@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { Check, Copy, Heart, X } from "lucide-react";
+import { Check, Copy, ExternalLink, Heart, X } from "lucide-react";
 import { deltaEToMatchPercent } from "../lib/beauty/virtualMakeup";
+import {
+  buildVnShopLinks,
+  estimateProductPriceVn,
+  evaluateVnStudentTraits,
+} from "../lib/beauty/vnBeautyGuide";
 import {
   PRODUCT_TYPE_VI_LABELS,
   SEASON_VI_LABELS,
@@ -50,7 +55,16 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
   const matchPct = deltaEToMatchPercent(product.deltaE);
   const typeLabel = PRODUCT_TYPE_VI_LABELS[product.productType] ?? product.productType;
   const textureLabel = TEXTURE_VI_LABELS[product.texture] ?? product.texture;
-  const seasonShort = SEASON_VI_LABELS[userSeason].title.replace(/\s*\([^)]*\)/, "");
+  const seasonShort = SEASON_VI_LABELS[userSeason].title;
+  const priceInfo = estimateProductPriceVn(product.brand, product.productType, product.name);
+  const traits = evaluateVnStudentTraits({
+    productType: product.productType,
+    texture: product.texture,
+    hex: product.hex,
+    renderedHex: product.renderedHex,
+    deltaE: product.deltaE,
+  });
+  const shopLinks = buildVnShopLinks(product.brand, product.name, product.shade);
 
   const handleCopy = async () => {
     const text = `${product.brand} ${product.name} ${product.shade}`;
@@ -73,7 +87,7 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl border border-zinc-200/80"
+        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl border border-zinc-200/80 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Swatch Showcase */}
@@ -125,7 +139,7 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
           </button>
         </div>
 
-        <div className="p-5 pb-6 space-y-4">
+        <div className="p-5 pb-7 space-y-4">
           <div className="space-y-1">
             <div className="text-xs text-zinc-500">
               {product.brand} · {typeLabel} · {textureLabel}
@@ -134,11 +148,16 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
               {product.name}
             </h2>
             <div className="text-sm text-zinc-700">{product.shade}</div>
+            {traits.badges.length > 0 && (
+              <div className="text-xs font-semibold text-rose-700 pt-0.5">
+                {traits.badges.join(" · ")}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-3 py-3 border-y border-zinc-100 text-xs">
             <div>
-              <div className="text-zinc-500">Độ hợp tông {seasonShort}</div>
+              <div className="text-zinc-500">Độ hợp da ({seasonShort})</div>
               <div
                 className={`text-sm font-bold tabular-nums mt-0.5 ${
                   matchPct >= 90 ? "text-emerald-700" : "text-zinc-900"
@@ -148,20 +167,20 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
               </div>
             </div>
             <div className="text-right">
-              <div className="text-zinc-500">Sắc độ</div>
-              <div className="text-xs font-medium text-zinc-800 mt-0.5">
-                {product.undertone}
+              <div className="text-zinc-500">Giá tham khảo VN</div>
+              <div className="text-sm font-bold text-zinc-900 tabular-nums mt-0.5">
+                {priceInfo.priceRangeLabel}
               </div>
             </div>
           </div>
 
           <p className="text-xs text-zinc-600 leading-relaxed">
             {isLip
-              ? "Màu đã được tính sẵn độ hòa trộn với nền môi tự nhiên của bạn để tránh bị lệch tông khi đánh thật."
-              : `Gam màu hài hòa với sắc da ${seasonShort}, dễ phối cùng trang điểm hằng ngày mà không làm xỉn da.`}
+              ? "Màu đã được tính sẵn độ hòa trộn với sắc môi mộc của bạn để khi mua về đánh thật sẽ không bị lệch tông hay xỉn da."
+              : `Gam màu hài hòa với sắc da ${seasonShort}, dễ đánh mỏng hằng ngày khi đi học hoặc đi chơi mà không làm nặng mặt.`}
           </p>
 
-          <div className="grid grid-cols-1 gap-2.5 pt-1">
+          <div className="space-y-2.5 pt-1">
             {isLip && (
               <button
                 type="button"
@@ -169,17 +188,40 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
                   onClose();
                   onTryLipstick(product);
                 }}
-                className="w-full min-h-[46px] px-4 py-2.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-semibold transition-colors cursor-pointer"
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-semibold transition-colors cursor-pointer"
               >
                 Thử màu son này lên môi
               </button>
             )}
 
+            {/* Quick-Buy Links: Shopee & TikTok Shop */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <a
+                href={shopLinks.shopeeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-h-[42px] px-3 py-2 rounded-2xl bg-[#EE4D2D] hover:bg-[#d84324] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <span>Tìm trên Shopee</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+
+              <a
+                href={shopLinks.tiktokShopUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-h-[42px] px-3 py-2 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <span>Tìm TikTok Shop</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
             <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={() => onToggleSave(product.id)}
-                className={`min-h-[44px] px-3.5 py-2 rounded-2xl border text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                className={`min-h-[42px] px-3 py-2 rounded-2xl border text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                   isSaved
                     ? "bg-rose-50 border-rose-200 text-rose-700"
                     : "bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50"
@@ -192,7 +234,7 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
               <button
                 type="button"
                 onClick={handleCopy}
-                className="min-h-[44px] px-3.5 py-2 rounded-2xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-900 text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                className="min-h-[42px] px-3 py-2 rounded-2xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-900 text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
                 {copied ? (
                   <>
@@ -202,7 +244,7 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5" />
-                    <span>Chép tên tìm mua</span>
+                    <span>Chép tên màu</span>
                   </>
                 )}
               </button>
