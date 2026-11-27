@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { Download, RotateCcw, Scale, ScanFace, SlidersHorizontal } from "lucide-react";
+import { AutoFaceShapeCard } from "./AutoFaceShapeCard";
+import { HonestFaceAuditStudio } from "./HonestFaceAuditStudio";
+import type { DemoPortraitPreset } from "./PhotoPickerSheet";
 import { PortraitCanvas } from "./PortraitCanvas";
 import { RelightingLab } from "./RelightingLab";
 import { computeAnalysisConfidence } from "../lib/beauty/analysisConfidence";
@@ -8,15 +11,14 @@ import { analyzeFacialSymmetry } from "../lib/beauty/facialSymmetry";
 import type { EnhancementStats } from "../lib/beauty/imageEnhancement";
 import {
   SEASON_VI_LABELS,
-  SHAPE_VI_LABELS,
   describeCctVi,
   translateItaCategory,
 } from "../lib/beauty/viLabels";
 import type {
   ConsultationReport,
   FaceLandmarksBox,
-  FaceShapeName,
   IlluminantName,
+  MatchedProduct,
   SeasonName,
   WhiteBalanceMethod,
 } from "../lib/beauty/types";
@@ -36,6 +38,13 @@ interface ProInsightsViewProps {
   catalogIlluminant: IlluminantName;
   onCatalogIlluminantChange: (ill: IlluminantName) => void;
   onExportJson: () => void;
+  topLipstick: MatchedProduct | null;
+  topBlush: MatchedProduct | null;
+  topEyeshadow: MatchedProduct | null;
+  demoPresets: DemoPortraitPreset[];
+  activeDemoId: string | null;
+  onSelectDemo: (preset: DemoPortraitPreset) => void;
+  onOpenPhotoPicker: () => void;
 }
 
 const ConfidenceRing: React.FC<{
@@ -108,8 +117,17 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
   catalogIlluminant,
   onCatalogIlluminantChange,
   onExportJson,
+  topLipstick,
+  topBlush,
+  topEyeshadow,
+  demoPresets,
+  activeDemoId,
+  onSelectDemo,
+  onOpenPhotoPicker,
 }) => {
-  const [subTab, setSubTab] = useState<"lighting" | "skinmaps" | "metrics">("lighting");
+  const [subTab, setSubTab] = useState<
+    "honest_audit" | "faceshape" | "lighting" | "skinmaps" | "metrics"
+  >("honest_audit");
   const [showAllSeasons, setShowAllSeasons] = useState(false);
   const [showRoiTuning, setShowRoiTuning] = useState(landmarkStatus === "fallback");
   const [showRoiOverlay, setShowRoiOverlay] = useState(true);
@@ -135,44 +153,40 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
     [report.neuralLandmarks, faceBox, report.width, report.height, landmarkStatus]
   );
 
-  const rankedShapes = useMemo(() => {
-    return (Object.keys(report.faceShape.probabilities) as FaceShapeName[])
-      .map((name) => ({ name, prob: report.faceShape.probabilities[name] }))
-      .sort((a, b) => b.prob - a.prob);
-  }, [report.faceShape.probabilities]);
-
   return (
-    <div className="space-y-5">
-      {/* Header Row: Title + Export JSON cleanly separated from the 3-tab control so mobile NEVER collides */}
-      <div className="space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-zinc-900">
+    <div className="space-y-6">
+      {/* Architectural Editorial Header Row with Crisp Hairline Underline Tabs */}
+      <div className="space-y-4 border-b border-[#E5E5E5]">
+        <div className="flex items-end justify-between gap-4">
+          <div className="min-w-0 space-y-1">
+            <h1 className="text-2xl sm:text-[30px] font-bold tracking-[-0.03em] text-[#111111] leading-tight">
               Phân tích chuyên sâu
             </h1>
-            <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-              Ánh đèn phòng, lưới 478 điểm, bản đồ Melanin/Hemoglobin và chỉ số CIELAB, ITA°
+            <p className="text-xs sm:text-sm text-[#666666]">
+              Đánh dấu đỏ trực tiếp điểm lệch trên ảnh gốc, dáng mặt, ánh đèn và chỉ số màu da
             </p>
           </div>
 
           <button
             type="button"
             onClick={onExportJson}
-            className="min-h-[38px] px-3 py-1.5 text-xs font-medium text-zinc-900 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-xl inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+            className="min-h-[36px] px-3.5 py-1.5 text-xs font-semibold text-[#111111] bg-white hover:bg-[#111111] hover:text-white border border-[#D4D4D4] hover:border-[#111111] rounded-[4px] inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Xuất JSON</span>
           </button>
         </div>
 
-        {/* Dedicated Full-Width 3-Tab Segmented Bar on Mobile, Compact on Desktop */}
+        {/* Clean Architectural Underline Sub-Tab Bar */}
         <div
           role="tablist"
           aria-label="Chọn mục phân tích chuyên sâu"
-          className="grid grid-cols-3 sm:inline-grid sm:grid-cols-3 gap-1 p-1 bg-zinc-100 rounded-xl w-full sm:w-auto"
+          className="flex items-center gap-1 sm:gap-7 overflow-x-auto no-scrollbar -mb-px"
         >
           {(
             [
+              ["honest_audit", "Chẩn đoán thẳng thắn"],
+              ["faceshape", "Dáng mặt"],
               ["lighting", "Ánh đèn"],
               ["skinmaps", "Bản đồ da"],
               ["metrics", "Chỉ số"],
@@ -182,12 +196,13 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
               key={id}
               type="button"
               role="tab"
+              data-testid={`pro-subtab-${id}`}
               aria-selected={subTab === id}
               onClick={() => setSubTab(id)}
-              className={`min-h-[38px] sm:min-h-[36px] px-2.5 sm:px-4 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap text-center transition-colors cursor-pointer ${
+              className={`min-h-[40px] px-2.5 sm:px-0 py-2 text-xs sm:text-[13px] border-b-2 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
                 subTab === id
-                  ? "bg-white text-zinc-900 shadow-xs font-semibold"
-                  : "text-zinc-600 hover:text-zinc-900"
+                  ? "border-[#DC2626] text-[#111111] font-semibold"
+                  : "border-transparent text-[#666666] hover:text-[#111111] font-medium"
               }`}
             >
               {label}
@@ -196,25 +211,49 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
         </div>
       </div>
 
+      {subTab === "honest_audit" && (
+        <HonestFaceAuditStudio
+          report={report}
+          faceBox={faceBox}
+          topLipstick={topLipstick}
+          topBlush={topBlush}
+          topEyeshadow={topEyeshadow}
+          demoPresets={demoPresets}
+          activeDemoId={activeDemoId}
+          onSelectDemo={onSelectDemo}
+          onOpenPhotoPicker={onOpenPhotoPicker}
+        />
+      )}
+
+      {subTab === "faceshape" && (
+        <AutoFaceShapeCard
+          neuralLandmarks={report.neuralLandmarks}
+          faceBox={faceBox}
+          width={report.width}
+          height={report.height}
+          undertone={report.season.undertone}
+        />
+      )}
+
       {subTab === "lighting" && <RelightingLab report={report} />}
 
       {subTab === "skinmaps" && (
-        <div className="space-y-4 sm:space-y-5">
-          {/* Moved from Tone Home: 478-Point Face Mesh & Skin ROI Verification Card */}
+        <div className="space-y-5">
+          {/* 478-Point Face Mesh & Skin ROI Verification Panel */}
           <div
             data-testid="mesh-preview-bar"
-            className="bg-white border border-zinc-200 rounded-2xl overflow-hidden"
+            className="bg-white border border-[#E5E5E5] overflow-hidden"
           >
-            <div className="px-4 py-3 border-b border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="px-4 sm:px-5 py-3.5 border-b border-[#E5E5E5] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <span className="w-8 h-8 rounded-xl bg-zinc-100 text-zinc-800 flex items-center justify-center shrink-0">
+                <span className="w-8 h-8 rounded-[4px] bg-[#F5F5F5] border border-[#E5E5E5] text-[#111111] flex items-center justify-center shrink-0">
                   <ScanFace className="w-4 h-4" />
                 </span>
                 <div className="min-w-0">
-                  <h2 className="text-sm font-semibold text-zinc-900">
+                  <h2 className="text-sm font-semibold text-[#111111]">
                     Vùng đo da (ROI) &amp; Lưới 478 điểm
                   </h2>
-                  <p className="text-xs text-zinc-500 truncate">{meshSummary.statusLabel}</p>
+                  <p className="text-xs text-[#666666] truncate">{meshSummary.statusLabel}</p>
                 </div>
               </div>
 
@@ -222,10 +261,10 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowRoiOverlay((v) => !v)}
-                  className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                  className={`min-h-[34px] px-3 py-1 rounded-[4px] text-xs font-medium border transition-colors cursor-pointer ${
                     showRoiOverlay
-                      ? "bg-zinc-900 text-white border-zinc-900"
-                      : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+                      ? "bg-[#111111] text-white border-[#111111]"
+                      : "bg-white text-[#525252] border-[#D4D4D4] hover:border-[#111111]"
                   }`}
                 >
                   {showRoiOverlay ? "Vùng đo da: Bật" : "Vùng đo da: Tắt"}
@@ -235,10 +274,10 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
                   role="switch"
                   aria-checked={showMeshPreview}
                   onClick={onToggleMeshPreview}
-                  className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                  className={`min-h-[34px] px-3 py-1 rounded-[4px] text-xs font-medium border transition-colors cursor-pointer ${
                     showMeshPreview
-                      ? "bg-rose-600 text-white border-rose-600"
-                      : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+                      ? "bg-[#DC2626] text-white border-[#DC2626]"
+                      : "bg-white text-[#525252] border-[#D4D4D4] hover:border-[#111111]"
                   }`}
                 >
                   {showMeshPreview ? "Lưới 478 điểm: Bật" : "Hiện lưới 478 điểm"}
@@ -361,7 +400,7 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
       )}
 
       {subTab === "metrics" && (
-        <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-6 space-y-6">
+        <div className="bg-white border border-[#E5DFD7] rounded-2xl p-4 sm:p-6 space-y-6">
           {/* Moved from Tone Home: Analysis Confidence Ring + Factor Breakdown */}
           <div
             data-testid="skin-metrics-confidence-card"
@@ -605,96 +644,43 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
             )}
           </section>
 
-          {/* Biometric Face Shape Ratios (R1 / R2 / R3) + 6-Shape Probabilities */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-5 border-b border-zinc-100">
-            <div className="space-y-3">
+          {/* Full 12-Season Probability Breakdown */}
+          <div className="pb-5 border-b border-zinc-100 space-y-3">
+            <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-zinc-900">
-                Tỷ lệ dáng mặt ({SHAPE_VI_LABELS[report.faceShape.primary]})
+                Xác suất {showAllSeasons ? "12 nhóm mùa" : "4 nhóm mùa gần nhất"}
               </h2>
-              <div className="grid grid-cols-3 gap-2.5">
-                {[
-                  { code: "R1", label: "Dài / Rộng", value: report.faceShape.ratios.r1 },
-                  { code: "R2", label: "Hàm / Gò má", value: report.faceShape.ratios.r2 },
-                  { code: "R3", label: "Trán / Hàm", value: report.faceShape.ratios.r3 },
-                ].map((m) => (
-                  <div
-                    key={m.code}
-                    className="rounded-xl bg-zinc-50 border border-zinc-200/70 p-3 space-y-0.5"
-                  >
-                    <div className="text-[11px] text-zinc-500">{m.label}</div>
-                    <div className="font-mono tabular-nums text-sm font-bold text-zinc-900">
-                      {m.value.toFixed(2)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-1.5 pt-1">
-                {rankedShapes.map((item, idx) => {
-                  const pct = Math.round(item.prob * 100);
-                  return (
-                    <div key={item.name} className="flex items-center gap-2.5 text-xs">
-                      <span
-                        className={`w-28 truncate ${
-                          idx === 0 ? "font-semibold text-zinc-900" : "text-zinc-600"
-                        }`}
-                      >
-                        {SHAPE_VI_LABELS[item.name]}
-                      </span>
-                      <div className="flex-1 h-1.5 rounded-full bg-zinc-100 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${
-                            idx === 0 ? "bg-zinc-900" : "bg-zinc-300"
-                          }`}
-                          style={{ width: `${Math.max(3, pct)}%` }}
-                        />
-                      </div>
-                      <span className="w-9 text-right font-mono tabular-nums text-[11px] text-zinc-600">
-                        {pct}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowAllSeasons((v) => !v)}
+                className="text-xs font-semibold text-rose-700 hover:text-rose-800 whitespace-nowrap cursor-pointer"
+              >
+                {showAllSeasons ? "Thu gọn" : "Xem tất cả 12 mùa"}
+              </button>
             </div>
-
-            {/* Full 12-Season Probability Breakdown */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-zinc-900">
-                  Xác suất {showAllSeasons ? "12 nhóm mùa" : "4 nhóm mùa gần nhất"}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setShowAllSeasons((v) => !v)}
-                  className="text-xs font-semibold text-rose-700 hover:text-rose-800 whitespace-nowrap cursor-pointer"
-                >
-                  {showAllSeasons ? "Thu gọn" : "Xem tất cả 12 mùa"}
-                </button>
-              </div>
-              <div className="space-y-2.5">
-                {visibleSeasons.map((item, idx) => (
-                  <div key={item.name} className="space-y-1">
-                    <div className="flex justify-between text-xs gap-2">
-                      <span
-                        className={idx === 0 ? "font-semibold text-zinc-900" : "text-zinc-600"}
-                      >
-                        {SEASON_VI_LABELS[item.name].title} ({item.name})
-                      </span>
-                      <span className="font-mono tabular-nums text-zinc-700 shrink-0">
-                        {(item.prob * 100).toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${
-                          idx === 0 ? "bg-zinc-900" : "bg-zinc-400"
-                        }`}
-                        style={{ width: `${Math.max(2, item.prob * 100)}%` }}
-                      />
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2.5">
+              {visibleSeasons.map((item, idx) => (
+                <div key={item.name} className="space-y-1">
+                  <div className="flex justify-between text-xs gap-2">
+                    <span
+                      className={idx === 0 ? "font-semibold text-zinc-900" : "text-zinc-600"}
+                    >
+                      {SEASON_VI_LABELS[item.name].title} ({item.name})
+                    </span>
+                    <span className="font-mono tabular-nums text-zinc-700 shrink-0">
+                      {(item.prob * 100).toFixed(1)}%
+                    </span>
                   </div>
-                ))}
-              </div>
+                  <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${
+                        idx === 0 ? "bg-zinc-900" : "bg-zinc-400"
+                      }`}
+                      style={{ width: `${Math.max(2, item.prob * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

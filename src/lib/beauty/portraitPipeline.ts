@@ -378,11 +378,35 @@ function sampleSkinFromImage(
     }
   }
 
+  // Reject specular glare (L*>88), deep shadow (L*<20), and localized acne redness spikes
+  // (a* > median(a) + 9) when measuring true baseline skin undertone, while keeping skinMask intact.
+  let cleanL = lVals;
+  let cleanA = aVals;
+  let cleanB = bVals;
+  if (lVals.length >= 120) {
+    const medA = median(aVals);
+    const fL: number[] = [];
+    const fA: number[] = [];
+    const fB: number[] = [];
+    for (let i = 0; i < lVals.length; i++) {
+      if (lVals[i] >= 20 && lVals[i] <= 88 && aVals[i] <= medA + 9.0) {
+        fL.push(lVals[i]);
+        fA.push(aVals[i]);
+        fB.push(bVals[i]);
+      }
+    }
+    if (fL.length >= 80) {
+      cleanL = fL;
+      cleanA = fA;
+      cleanB = fB;
+    }
+  }
+
   return {
     skinMask,
-    skinL: trimmedMean(lVals, 0.1),
-    skinA: trimmedMean(aVals, 0.1),
-    skinB: trimmedMean(bVals, 0.1),
+    skinL: trimmedMean(cleanL, 0.12),
+    skinA: trimmedMean(cleanA, 0.12),
+    skinB: trimmedMean(cleanB, 0.12),
     melIndex: melIndexSum / Math.max(1, skinCount),
     hemIndex: hemIndexSum / Math.max(1, skinCount),
     skinCount,
@@ -488,14 +512,41 @@ export function runPortraitAnalysisPipeline(
     }
   }
 
+  // Exclude dark mouth-slit shadow pixels (L* < 18) when enough genuine lip tissue pixels exist
+  let validLipL = innerL;
+  let validLipA = innerA;
+  let validLipB = innerB;
+  if (innerL.length >= 20) {
+    const fL: number[] = [];
+    const fA: number[] = [];
+    const fB: number[] = [];
+    for (let i = 0; i < innerL.length; i++) {
+      if (innerL[i] >= 18) {
+        fL.push(innerL[i]);
+        fA.push(innerA[i]);
+        fB.push(innerB[i]);
+      }
+    }
+    if (fL.length >= 12) {
+      validLipL = fL;
+      validLipA = fA;
+      validLipB = fB;
+    }
+  }
+
   const lipBaseLab: [number, number, number] = [
-    innerL.length ? median(innerL) : 52,
-    innerA.length ? median(innerA) : 18,
-    innerB.length ? median(innerB) : 10,
+    validLipL.length ? median(validLipL) : 52,
+    validLipA.length ? median(validLipA) : 18,
+    validLipB.length ? median(validLipB) : 10,
   ];
-  const borderL = outerL.length ? median(outerL) : lipBaseLab[0] - 2;
+  const validOuterL = outerL.filter((l) => l >= 18);
+  const borderL = validOuterL.length
+    ? median(validOuterL)
+    : outerL.length
+      ? median(outerL)
+      : lipBaseLab[0] - 2;
   const lipDarkness = Math.max(0, lipBaseLab[0] - borderL);
-  const hasDarkLipBorder = borderL < 43 || lipDarkness > 5;
+  const hasDarkLipBorder = borderL < 43 || lipDarkness > 5.2;
   const lipBaseHex =
     lipCount > 0
       ? rgbToHex([lipRSum / lipCount, lipGSum / lipCount, lipBSum / lipCount])

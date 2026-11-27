@@ -267,73 +267,71 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
         })}
       </div>
 
-      {/* Budget Tier & Vietnamese Student Needs Filter Bar */}
+      {/* Budget Tier & Vietnamese Student Needs Filter Bar (Clean Hairline Divided, Zero Nested Box Clutter) */}
       <div
         data-testid="budget-filter-bar"
-        className="bg-white rounded-2xl border border-zinc-200/85 p-3 sm:p-3.5 space-y-2.5"
+        className="py-2.5 border-y border-zinc-200/75 space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          {/* Price Tier Segmented Buttons */}
-          <div className="grid grid-cols-4 sm:flex sm:items-center gap-1.5">
-            {BUDGET_OPTIONS.map((opt) => {
-              const active = budgetTier === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  data-testid={`budget-btn-${opt.id}`}
-                  aria-pressed={active}
-                  onClick={() => {
-                    setBudgetTier(opt.id);
-                    setVisibleCount(12);
-                  }}
-                  className={`min-h-[34px] px-2 sm:px-3 py-1 text-[11px] sm:text-xs font-medium rounded-lg whitespace-nowrap text-center border transition-colors cursor-pointer ${
-                    active
-                      ? "bg-rose-700 text-white border-rose-700"
-                      : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
+        {/* Price Tier Segmented Buttons */}
+        <div className="grid grid-cols-4 sm:flex sm:items-center gap-1.5">
+          {BUDGET_OPTIONS.map((opt) => {
+            const active = budgetTier === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                data-testid={`budget-btn-${opt.id}`}
+                aria-pressed={active}
+                onClick={() => {
+                  setBudgetTier(opt.id);
+                  setVisibleCount(12);
+                }}
+                className={`min-h-[34px] px-1.5 sm:px-3 py-1 text-[11px] sm:text-xs font-medium rounded-lg whitespace-nowrap text-center border transition-colors cursor-pointer ${
+                  active
+                    ? "bg-rose-700 text-white border-rose-700"
+                    : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
 
-          {/* Student Suitability Quick Filters */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-            <button
-              type="button"
-              data-testid="filter-bareface"
-              aria-pressed={onlyBareFace}
-              onClick={() => {
-                setOnlyBareFace((v) => !v);
-                setVisibleCount(12);
-              }}
-              className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-lg whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
-                onlyBareFace
-                  ? "bg-zinc-900 text-white border-zinc-900"
-                  : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
-              }`}
-            >
-              Hợp mặt mộc đi học
-            </button>
-            <button
-              type="button"
-              data-testid="filter-teeth-bright"
-              aria-pressed={onlyTeethBright}
-              onClick={() => {
-                setOnlyTeethBright((v) => !v);
-                setVisibleCount(12);
-              }}
-              className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-lg whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
-                onlyTeethBright
-                  ? "bg-zinc-900 text-white border-zinc-900"
-                  : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
-              }`}
-            >
-              Sáng răng · Không xỉn da
-            </button>
-          </div>
+        {/* Student Suitability Quick Filters */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+          <button
+            type="button"
+            data-testid="filter-bareface"
+            aria-pressed={onlyBareFace}
+            onClick={() => {
+              setOnlyBareFace((v) => !v);
+              setVisibleCount(12);
+            }}
+            className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-lg whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
+              onlyBareFace
+                ? "bg-zinc-900 text-white border-zinc-900"
+                : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+            }`}
+          >
+            Hợp mặt mộc đi học
+          </button>
+          <button
+            type="button"
+            data-testid="filter-teeth-bright"
+            aria-pressed={onlyTeethBright}
+            onClick={() => {
+              setOnlyTeethBright((v) => !v);
+              setVisibleCount(12);
+            }}
+            className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-lg whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
+              onlyTeethBright
+                ? "bg-zinc-900 text-white border-zinc-900"
+                : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+            }`}
+          >
+            Sáng răng · Không xỉn da
+          </button>
         </div>
       </div>
 
@@ -412,19 +410,16 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
                     </h3>
                     <div className="text-xs text-zinc-600 truncate">{item.shade}</div>
 
-                    {/* Price + Match % inline */}
-                    <div className="pt-1 flex items-center gap-1.5 text-[11px] truncate">
+                    {/* Price + Match % cleanly wrapping with zero price truncation on 360px cards */}
+                    <div className="pt-1 flex flex-wrap items-baseline justify-between gap-x-1.5 gap-y-0.5 text-[11px]">
                       <span
-                        className={`font-semibold tabular-nums ${
+                        className={`font-semibold tabular-nums whitespace-nowrap ${
                           matchPct >= 90 ? "text-emerald-700" : "text-zinc-800"
                         }`}
                       >
                         {matchPct}% hợp
                       </span>
-                      <span className="text-zinc-300" aria-hidden="true">
-                        ·
-                      </span>
-                      <span className="font-semibold text-zinc-900 tabular-nums truncate">
+                      <span className="font-semibold text-zinc-900 tabular-nums whitespace-nowrap">
                         {price.priceRangeLabel}
                       </span>
                     </div>

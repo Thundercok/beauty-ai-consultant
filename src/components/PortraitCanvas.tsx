@@ -8,6 +8,7 @@ import {
 import {
   applyVirtualMakeupToRgba,
   computeLipAlphaMask,
+  hasActiveVirtualMakeup,
   type VirtualMakeupOptions,
 } from "../lib/beauty/virtualMakeup";
 import type { ConsultationReport, FaceLandmarksBox } from "../lib/beauty/types";
@@ -247,8 +248,7 @@ export const PortraitCanvas: React.FC<PortraitCanvasProps> = React.memo(({
 
     if (
       (mode === "corrected" || mode === "original") &&
-      virtualMakeup &&
-      (virtualMakeup.lipEnabled || virtualMakeup.blushEnabled)
+      hasActiveVirtualMakeup(virtualMakeup)
     ) {
       displayRgba = applyVirtualMakeupToRgba(
         displayRgba,

@@ -14,6 +14,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { hexToLab, hexToRgb, rgbToHex, rgbToLab } from "../lib/beauty/bradfordCat";
+import { evaluateHonestMakeupAudit } from "../lib/beauty/honestMakeupAudit";
 import { DEFAULT_KS, TEXTURE_KS_MAP, kubelkaMunkLipBlend } from "../lib/beauty/kubelkaMunk";
 import {
   buildCompareBuyingVerdict,
@@ -36,6 +37,7 @@ import {
   type PriceTierId,
 } from "../lib/beauty/vnBeautyGuide";
 import type { ConsultationReport, FaceLandmarksBox, MatchedProduct } from "../lib/beauty/types";
+import { HonestMakeupVerdictCard } from "./HonestMakeupVerdictCard";
 import { LipCompareSliderPortrait, type SliderSideSpec } from "./LipCompareSliderPortrait";
 import { PortraitCanvas } from "./PortraitCanvas";
 
@@ -163,6 +165,8 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
 
   const [customTexture, setCustomTexture] = useState<string | null>(null);
   const [thicknessOverride, setThicknessOverride] = useState<number | null>(null);
+  const [blushIntensity, setBlushIntensity] = useState<number>(0.28);
+  const [makeupCompareLipOn, setMakeupCompareLipOn] = useState<boolean>(true);
   const [compareBare, setCompareBare] = useState(false);
   const [holdingBare, setHoldingBare] = useState(false);
   const [zoomToLips, setZoomToLips] = useState(false);
@@ -175,6 +179,8 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
   const activeBlush =
     availableBlushes.find((b) => b.id === selectedBlushId) ?? availableBlushes[0] ?? null;
   const effectiveBlushHex = activeBlush?.hex ?? report.blendedTargets.blush;
+  const bestAiLipstick = availableLipsticks[0] ?? null;
+  const bestAiBlush = availableBlushes[0] ?? null;
 
   // Filtered list of lipsticks so user can quickly pick ANY shade in the catalog
   const displayedShades = useMemo(() => {
@@ -267,8 +273,9 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
       blushEnabled: false,
       blushHex: effectiveBlushHex,
       blushIntensity: 0,
+      faceShape: report.faceShape.primary,
     }),
-    [report.lipMetrics.lipBaseHex, effectiveBlushHex]
+    [report.lipMetrics.lipBaseHex, effectiveBlushHex, report.faceShape.primary]
   );
 
   const virtualMakeupA: VirtualMakeupOptions = useMemo(
@@ -282,7 +289,8 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
       lipThickness: effectiveThickness,
       blushEnabled: !isBareSingleActive && blushEnabled,
       blushHex: effectiveBlushHex,
-      blushIntensity: 0.24,
+      blushIntensity,
+      faceShape: report.faceShape.primary,
     }),
     [
       isBareSingleActive,
@@ -294,6 +302,8 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
       effectiveThickness,
       blushEnabled,
       effectiveBlushHex,
+      blushIntensity,
+      report.faceShape.primary,
     ]
   );
 
@@ -304,6 +314,16 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
       blushEnabled,
     }),
     [virtualMakeupA, blushEnabled]
+  );
+
+  const virtualMakeupAiCompareAfter: VirtualMakeupOptions = useMemo(
+    () => ({
+      ...virtualMakeupA,
+      lipEnabled: makeupCompareLipOn,
+      blushEnabled,
+      blushIntensity,
+    }),
+    [virtualMakeupA, makeupCompareLipOn, blushEnabled, blushIntensity]
   );
 
   const virtualMakeupB: VirtualMakeupOptions = useMemo(
@@ -317,7 +337,8 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
       lipThickness: effectiveThickness,
       blushEnabled,
       blushHex: effectiveBlushHex,
-      blushIntensity: 0.24,
+      blushIntensity,
+      faceShape: report.faceShape.primary,
     }),
     [
       simB.productHex,
@@ -328,6 +349,8 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
       effectiveThickness,
       blushEnabled,
       effectiveBlushHex,
+      blushIntensity,
+      report.faceShape.primary,
     ]
   );
 
@@ -364,26 +387,75 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
   const focusedShopLinks = isCompareTwo && activeSlot === "B" ? shopLinksB : shopLinksA;
   const isFocusedSaved = focusedProduct ? savedIds.has(focusedProduct.id) : false;
 
+  // Scientifically calibrated brutally honest audits (un-floored 0..100, checks undertone, washout, teeth, lip-blush harmony)
+  const auditA = useMemo(
+    () =>
+      evaluateHonestMakeupAudit({
+        report,
+        lipstick: productA,
+        renderedLipHex: simA.renderedHex,
+        lipThickness: effectiveThickness,
+        blushEnabled,
+        blushHex: effectiveBlushHex,
+        blushIntensity,
+        blushProduct: activeBlush,
+      }),
+    [report, productA, simA.renderedHex, effectiveThickness, blushEnabled, effectiveBlushHex, blushIntensity, activeBlush]
+  );
+
+  const auditB = useMemo(
+    () =>
+      evaluateHonestMakeupAudit({
+        report,
+        lipstick: productB,
+        renderedLipHex: simB.renderedHex,
+        lipThickness: effectiveThickness,
+        blushEnabled,
+        blushHex: effectiveBlushHex,
+        blushIntensity,
+        blushProduct: activeBlush,
+      }),
+    [report, productB, simB.renderedHex, effectiveThickness, blushEnabled, effectiveBlushHex, blushIntensity, activeBlush]
+  );
+
+  const focusedAudit = isCompareTwo && activeSlot === "B" ? auditB : auditA;
+
+  const scoreToneClass = (score: number) =>
+    score >= 82 ? "text-emerald-700" : score >= 65 ? "text-amber-700" : "text-rose-700";
+  const scrimScoreToneClass = (score: number) =>
+    score >= 82 ? "text-emerald-300" : score >= 65 ? "text-amber-300" : "text-rose-300";
+
   const compareVerdict = useMemo(() => {
     if (!productA || !productB) return null;
     return buildCompareBuyingVerdict({
       productA,
       productB,
-      matchPercentA: simA.matchPercent,
-      matchPercentB: simB.matchPercent,
+      matchPercentA: auditA.overallScore,
+      matchPercentB: auditB.overallScore,
       priceA,
       priceB,
       traitsA,
       traitsB,
     });
-  }, [productA, productB, simA.matchPercent, simB.matchPercent, priceA, priceB, traitsA, traitsB]);
+  }, [productA, productB, auditA.overallScore, auditB.overallScore, priceA, priceB, traitsA, traitsB]);
 
-  const matchVerdict =
-    focusedSim.renderedDeltaE <= 5.5
-      ? "Lên môi rất sáng da và tự nhiên"
-      : focusedSim.renderedDeltaE <= 10.5
-        ? "Hài hòa, dễ dùng hằng ngày đi học & đi chơi"
-        : "Màu son cá tính — tán nhẹ lòng môi sẽ tự nhiên hơn";
+  const handleApplyBestAiPair = () => {
+    if (bestAiLipstick) {
+      onSelectLipstick(bestAiLipstick);
+      setCustomTexture(null);
+      setThicknessOverride(null);
+    }
+    if (bestAiBlush) {
+      onSelectBlushId(bestAiBlush.id);
+    }
+    onBlushEnabledChange(true);
+    setMakeupCompareLipOn(true);
+    setBlushIntensity(0.26);
+    setCompareBare(false);
+    setShadeQuery("");
+    setBudgetFilter("all");
+    onNotify?.("Đã áp dụng cặp Son + Phấn má AI hợp tông da nhất");
+  };
 
   const handleSwitchMode = (nextMode: TryOnMode) => {
     setTryOnMode(nextMode);
@@ -392,6 +464,14 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
     } else if (nextMode === "bare_vs_lip") {
       setActiveSlot("A");
       setCompareBare(false);
+      setMakeupCompareLipOn(true);
+      // Entering 'So sánh Makeup' automatically activates AI blush + lipstick so before/after shows both!
+      if (!blushEnabled) {
+        onBlushEnabledChange(true);
+      }
+      if (selectedBlushId === null && bestAiBlush) {
+        onSelectBlushId(bestAiBlush.id);
+      }
     } else if (nextMode === "compare_two") {
       setCompareBare(false);
       // Focus slot B so the user can immediately tap any 2nd shade to compare with their current shade A
@@ -437,9 +517,9 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
 
   const bareLeftSpec: SliderSideSpec | null = productA
     ? {
-        prefix: "Không son",
+        prefix: "Mặt mộc",
         label: "",
-        footerCaption: "Không son · Môi mộc",
+        footerCaption: "Trước · Mặt mộc",
         swatchHex: report.lipMetrics.lipBaseHex,
         makeup: virtualMakeupBare,
       }
@@ -447,11 +527,30 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
 
   const bareRightSpec: SliderSideSpec | null = productA
     ? {
-        prefix: "Có son",
-        label: productA.shade,
-        footerCaption: `Có son · ${productA.brand}`,
-        swatchHex: simA.renderedHex,
-        makeup: virtualMakeupAWithLip,
+        prefix:
+          makeupCompareLipOn && blushEnabled
+            ? "Makeup AI"
+            : makeupCompareLipOn
+              ? "Chỉ son"
+              : blushEnabled
+                ? "Chỉ má"
+                : "Mặt mộc",
+        label:
+          makeupCompareLipOn && blushEnabled
+            ? "Son + Má"
+            : makeupCompareLipOn
+              ? productA.shade
+              : activeBlush?.shade ?? "",
+        footerCaption:
+          makeupCompareLipOn && blushEnabled
+            ? "Sau · Son + Má AI"
+            : makeupCompareLipOn
+              ? `Sau · Son ${productA.brand}`
+              : blushEnabled
+                ? `Sau · Má ${activeBlush?.brand ?? "AI"}`
+                : "Chưa bật makeup",
+        swatchHex: makeupCompareLipOn ? simA.renderedHex : effectiveBlushHex,
+        makeup: virtualMakeupAiCompareAfter,
         isSelected: true,
       }
     : null;
@@ -566,25 +665,29 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
           report.neuralLandmarks,
           report.skinMask,
           faceBox,
-          virtualMakeupAWithLip
+          virtualMakeupAiCompareAfter
         );
         ctx.drawImage(renderRgbaToCanvas(report.correctedRgba), 0, 0);
         ctx.drawImage(renderRgbaToCanvas(rgbaLip), report.width + gap, 0);
 
         ctx.fillStyle = "#18181b";
         ctx.font = "bold 14px system-ui, sans-serif";
-        ctx.fillText("Không son", 12, report.height + 26);
+        ctx.fillText("Trước · Mặt mộc", 12, report.height + 26);
         ctx.fillStyle = "#52525b";
         ctx.font = "12px system-ui, sans-serif";
-        ctx.fillText("Môi mộc tự nhiên", 12, report.height + 48);
+        ctx.fillText("Chưa thoa son & phấn má", 12, report.height + 48);
 
         ctx.fillStyle = "#18181b";
         ctx.font = "bold 14px system-ui, sans-serif";
-        ctx.fillText(`Có son: ${productA.brand}`, report.width + gap + 12, report.height + 26);
+        ctx.fillText(
+          blushEnabled ? `Sau Makeup AI: ${productA.brand} + Má` : `Sau: ${productA.brand}`,
+          report.width + gap + 12,
+          report.height + 26
+        );
         ctx.fillStyle = "#52525b";
         ctx.font = "12px system-ui, sans-serif";
         ctx.fillText(
-          `${productA.shade} · ${simA.matchPercent}% hợp da`,
+          `${productA.shade} · ${auditA.overallScore}/100 (${auditA.verdictTagVi})`,
           report.width + gap + 12,
           report.height + 48
         );
@@ -613,7 +716,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
         ctx.fillStyle = "#52525b";
         ctx.font = "12px system-ui, sans-serif";
         ctx.fillText(
-          `${productA.shade} · ${priceA?.priceRangeLabel ?? ""} · ${simA.matchPercent}% hợp da`,
+          `${productA.shade} · ${priceA?.priceRangeLabel ?? ""} · ${auditA.overallScore}/100 (${auditA.verdictTagVi})`,
           12,
           report.height + 48
         );
@@ -627,7 +730,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
       a.download = isCompareTwo
         ? "so-sanh-2-mau-son.png"
         : isBareVsLip
-          ? "khong-son-co-son.png"
+          ? "so-sanh-makeup-ai.png"
           : "thu-mau-son.png";
       a.click();
       onNotify?.(
@@ -671,7 +774,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
             type="button"
             role="tab"
             aria-selected={isBareVsLip}
-            data-testid="bare-vs-lip-tab"
+            data-testid="makeup-compare-tab"
             onClick={() => handleSwitchMode("bare_vs_lip")}
             className={`min-h-[38px] px-1.5 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
               isBareVsLip
@@ -680,7 +783,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
             }`}
           >
             <SlidersHorizontal className="hidden sm:inline-block w-3.5 h-3.5 shrink-0" />
-            <span>Không son / Có son</span>
+            <span>So sánh Makeup</span>
           </button>
 
           <button
@@ -696,7 +799,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
             }`}
           >
             <Columns2 className="hidden sm:inline-block w-3.5 h-3.5 shrink-0" />
-            <span>Slider so sánh</span>
+            <span>So 2 màu son</span>
           </button>
         </div>
 
@@ -710,9 +813,9 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-        {/* Left: Sticky Portrait Mirror Studio */}
-        <div className="lg:col-span-5 lg:sticky lg:top-20 space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 lg:gap-8 items-start">
+        {/* Left: Sticky Portrait Mirror Studio (Tablet & Desktop) */}
+        <div className="md:col-span-5 md:sticky md:top-20 space-y-3">
           {isCompareTwo &&
           productA &&
           productB &&
@@ -746,6 +849,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                         price: priceA,
                         traits: traitsA,
                         sim: simA,
+                        audit: auditA,
                         links: shopLinksA,
                       },
                       {
@@ -755,10 +859,11 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                         price: priceB,
                         traits: traitsB,
                         sim: simB,
+                        audit: auditB,
                         links: shopLinksB,
                       },
                     ] as const
-                  ).map(({ slot, product, makeup, price, traits, sim, links }) => {
+                  ).map(({ slot, product, makeup, price, traits, sim, audit, links }) => {
                     const isSelectedSlot = activeSlot === slot;
                     return (
                       <div
@@ -815,8 +920,8 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                               {product.shade}
                             </div>
                             <div className="text-[11px] text-zinc-500 tabular-nums truncate">
-                              <span className="font-semibold text-emerald-700">
-                                {sim.matchPercent}% hợp
+                              <span className={`font-semibold ${scoreToneClass(audit.overallScore)}`}>
+                                {audit.overallScore}/100 · {audit.verdictTagVi}
                               </span>{" "}
                               · {price?.priceRangeLabel}
                             </div>
@@ -950,6 +1055,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                           product: productA,
                           price: priceA,
                           sim: simA,
+                          audit: auditA,
                           links: shopLinksA,
                         },
                         {
@@ -958,10 +1064,11 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                           product: productB,
                           price: priceB,
                           sim: simB,
+                          audit: auditB,
                           links: shopLinksB,
                         },
                       ] as const
-                    ).map(({ slot, sideLabel, product, price, sim, links }) => {
+                    ).map(({ slot, sideLabel, product, price, sim, audit, links }) => {
                       const isSelectedSlot = activeSlot === slot;
                       return (
                         <div
@@ -989,8 +1096,8 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                               >
                                 Màu {slot} · {sideLabel}
                               </span>
-                              <span className="font-semibold text-emerald-700 tabular-nums">
-                                {sim.matchPercent}%
+                              <span className={`font-semibold tabular-nums ${scoreToneClass(audit.overallScore)}`}>
+                                {audit.overallScore}/100
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5 min-w-0">
@@ -1040,52 +1147,45 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                 zoomToLips={zoomToLips}
                 splitPct={bareSplitPct}
                 onSplitPctChange={setBareSplitPct}
-                ariaLabel="Thanh trượt so sánh không son và có son trực tiếp trên môi"
-                hintText="Kéo so không son · có son"
-                testId="bare-vs-lip-slider"
+                ariaLabel="Thanh trượt so sánh khuôn mặt trước và sau khi áp dụng son môi và phấn má gợi ý từ AI"
+                hintText="Kéo so trước · sau makeup"
+                testId="makeup-compare-slider"
               />
 
-              {/* Single-row Bare-vs-Lip Quick Snap & Studio Controls */}
-              <div className="bg-white rounded-2xl border border-zinc-200/85 px-2.5 sm:px-3 py-2 flex items-center justify-between gap-2">
-                <div className="inline-grid grid-cols-3 gap-0.5 p-0.5 bg-zinc-100 rounded-xl shrink-0">
-                  {[
-                    { label: "Không son", pct: 100 },
-                    { label: "50/50", pct: 50 },
-                    { label: "Có son", pct: 0 },
-                  ].map((snap) => {
-                    const active = Math.abs(bareSplitPct - snap.pct) <= 8;
-                    return (
-                      <button
-                        key={snap.label}
-                        type="button"
-                        onClick={() => setBareSplitPct(snap.pct)}
-                        className={`min-h-[32px] px-2 sm:px-2.5 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                          active
-                            ? "bg-white text-zinc-950 shadow-2xs font-semibold"
-                            : "text-zinc-600 hover:text-zinc-900"
-                        }`}
-                      >
-                        {snap.label}
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* Dedicated 'So sánh Makeup' Studio Control Strip */}
+              <div
+                data-testid="makeup-compare-controls"
+                className="bg-white rounded-2xl border border-zinc-200/85 overflow-hidden"
+              >
+                <div className="px-2 sm:px-3 py-2 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
+                  <div className="inline-grid grid-cols-3 gap-0.5 p-0.5 bg-zinc-100 rounded-xl shrink-0">
+                    {[
+                      { label: "Mặt mộc", pct: 100 },
+                      { label: "50/50", pct: 50 },
+                      { label: "Có makeup", pct: 0 },
+                    ].map((snap) => {
+                      const active = Math.abs(bareSplitPct - snap.pct) <= 8;
+                      return (
+                        <button
+                          key={snap.label}
+                          type="button"
+                          onClick={() => setBareSplitPct(snap.pct)}
+                          className={`min-h-[32px] px-1.5 sm:px-2.5 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                            active
+                              ? "bg-white text-zinc-950 shadow-2xs font-semibold"
+                              : "text-zinc-600 hover:text-zinc-900"
+                          }`}
+                        >
+                          {snap.label}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                <div className="flex items-center gap-2.5 sm:gap-3 text-[11px] sm:text-xs">
-                  <button
-                    type="button"
-                    aria-pressed={blushEnabled}
-                    onClick={() => onBlushEnabledChange(!blushEnabled)}
-                    className={`min-h-[32px] font-medium whitespace-nowrap cursor-pointer ${
-                      blushEnabled ? "text-rose-700 font-semibold" : "text-zinc-600 hover:text-zinc-900"
-                    }`}
-                  >
-                    {blushEnabled ? "Má: Bật" : "+ Má"}
-                  </button>
                   <button
                     type="button"
                     onClick={() => setZoomToLips((v) => !v)}
-                    className="min-h-[32px] font-semibold text-zinc-900 hover:text-rose-700 inline-flex items-center gap-1 whitespace-nowrap cursor-pointer"
+                    className="min-h-[32px] px-1 text-[11px] sm:text-xs font-semibold text-zinc-900 hover:text-rose-700 inline-flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
                   >
                     {zoomToLips ? (
                       <ZoomOut className="w-3.5 h-3.5" />
@@ -1095,11 +1195,83 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                     <span>{zoomToLips ? "Toàn mặt" : "Phóng môi"}</span>
                   </button>
                 </div>
+
+                {/* Independent AI Lip + Blush Layer Toggles & Blush Strength */}
+                <div className="px-3 py-2 border-t border-zinc-100 bg-zinc-50/60 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      data-testid="makeup-compare-toggle-lip"
+                      aria-pressed={makeupCompareLipOn}
+                      onClick={() => setMakeupCompareLipOn((v) => !v)}
+                      className={`min-h-[30px] px-2.5 rounded-lg border font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                        makeupCompareLipOn
+                          ? "bg-zinc-900 text-white border-zinc-900 font-semibold"
+                          : "bg-white text-zinc-600 border-zinc-200 hover:text-zinc-900"
+                      }`}
+                    >
+                      {makeupCompareLipOn ? "Son: Bật" : "Son: Tắt"}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="makeup-compare-toggle-blush"
+                      aria-pressed={blushEnabled}
+                      onClick={() => onBlushEnabledChange(!blushEnabled)}
+                      className={`min-h-[30px] px-2.5 rounded-lg border font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                        blushEnabled
+                          ? "bg-rose-600 text-white border-rose-600 font-semibold"
+                          : "bg-white text-zinc-600 border-zinc-200 hover:text-zinc-900"
+                      }`}
+                    >
+                      {blushEnabled ? "Má hồng: Bật" : "Má hồng: Tắt"}
+                    </button>
+                  </div>
+
+                  {blushEnabled ? (
+                    <div
+                      role="group"
+                      aria-label="Độ đậm phấn má"
+                      className="inline-flex items-center gap-0.5 p-0.5 bg-zinc-200/65 rounded-lg"
+                    >
+                      {(
+                        [
+                          { label: "Má nhẹ", val: 0.18 },
+                          { label: "Vừa", val: 0.28 },
+                          { label: "Rõ nét", val: 0.38 },
+                        ] as const
+                      ).map((preset) => {
+                        const active = Math.abs(blushIntensity - preset.val) < 0.04;
+                        return (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => setBlushIntensity(preset.val)}
+                            className={`min-h-[26px] px-2 rounded-md text-[11px] whitespace-nowrap transition-colors cursor-pointer ${
+                              active
+                                ? "bg-white text-zinc-950 font-semibold shadow-2xs"
+                                : "text-zinc-600 hover:text-zinc-900 font-medium"
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleApplyBestAiPair}
+                      className="min-h-[30px] text-[11px] font-semibold text-rose-700 hover:text-rose-800 whitespace-nowrap cursor-pointer"
+                    >
+                      Bật lại cặp AI gợi ý
+                    </button>
+                  )}
+                </div>
               </div>
             </>
           ) : (
             <div
-              className="relative bg-zinc-950 rounded-3xl overflow-hidden border border-zinc-200/80 shadow-[0_8px_30px_rgba(0,0,0,0.06)] h-[375px] sm:h-[455px] lg:h-[510px] w-full select-none"
+              className="relative bg-zinc-950 rounded-3xl overflow-hidden border border-zinc-200/80 shadow-[0_8px_30px_rgba(0,0,0,0.06)] h-[380px] sm:h-[430px] md:h-[400px] lg:h-[510px] w-full select-none"
               onPointerDown={(e) => {
                 if ((e.target as HTMLElement).closest("button")) return;
                 setHoldingBare(true);
@@ -1171,14 +1343,19 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                   <div className="flex items-end justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-[11px] text-white/80 truncate">
-                        {productA.brand} · {priceA?.priceRangeLabel} · Nhấn giữ ảnh xem không son
+                        {productA.brand} · {priceA?.priceRangeLabel}
+                        <span className="hidden lg:inline"> · Nhấn giữ ảnh xem không son</span>
                       </div>
                       <div className="text-sm font-bold text-white leading-snug line-clamp-2">
                         {productA.name} — {productA.shade}
                       </div>
                     </div>
-                    <span className="text-xs font-semibold text-emerald-300 tabular-nums shrink-0">
-                      {isBareSingleActive ? "Không son" : `${simA.matchPercent}% hợp`}
+                    <span
+                      className={`text-xs font-semibold tabular-nums shrink-0 ${
+                        isBareSingleActive ? "text-white/85" : scrimScoreToneClass(auditA.overallScore)
+                      }`}
+                    >
+                      {isBareSingleActive ? "Mặt mộc" : `${auditA.overallScore}/100 · ${auditA.verdictTagVi}`}
                     </span>
                   </div>
                 </div>
@@ -1221,8 +1398,8 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
         </div>
 
         {/* Right: Contiguous Product Studio, Full-Catalog Picker, Finish & Buying Verdict */}
-        <div className="lg:col-span-7 space-y-5">
-          <div className="bg-white rounded-3xl border border-zinc-200/85 p-5 sm:p-6 space-y-5 shadow-[0_2px_16px_rgba(0,0,0,0.03)]">
+        <div className="md:col-span-7 space-y-5">
+          <div className="bg-white rounded-3xl border border-zinc-200/85 p-4 sm:p-6 space-y-5 shadow-[0_2px_16px_rgba(0,0,0,0.03)]">
             {/* Active Slot Selector when in "Chọn so sánh" mode */}
             {isCompareTwo && productA && productB && (
               <div className="space-y-1.5">
@@ -1269,7 +1446,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
 
             {/* Focused Product Editorial Header + Quick Actions */}
             {focusedProduct && (
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3.5 pb-4 border-b border-zinc-100">
+              <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-3.5 pb-4 border-b border-zinc-100">
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-zinc-500">
                     <span className="font-medium text-zinc-700">{focusedProduct.brand}</span>
@@ -1278,8 +1455,12 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                       {focusedPrice?.priceRangeLabel}
                     </span>
                     <span aria-hidden="true">·</span>
-                    <span className="font-semibold text-emerald-700 tabular-nums">
-                      {focusedSim.matchPercent}% hợp da
+                    <span
+                      className={`font-semibold tabular-nums ${scoreToneClass(
+                        focusedAudit.overallScore
+                      )}`}
+                    >
+                      {focusedAudit.overallScore}/100 · {focusedAudit.verdictTagVi}
                     </span>
                   </div>
                   <h1 className="text-base sm:text-lg font-bold tracking-tight text-zinc-950 leading-snug">
@@ -1292,16 +1473,16 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 shrink-0 w-full xl:w-auto">
                   {!isCompareTwo && (
                     <button
                       type="button"
                       data-testid="quick-choose-compare-btn"
                       onClick={() => handleSwitchMode("compare_two")}
-                      className="min-h-[38px] px-3 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-xs font-semibold text-zinc-900 inline-flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
+                      className="min-h-[38px] px-3 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-xs font-semibold text-zinc-900 inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
                     >
                       <Columns2 className="w-3.5 h-3.5" />
-                      <span>Slider so sánh</span>
+                      <span>So 2 màu</span>
                     </button>
                   )}
 
@@ -1309,7 +1490,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                     type="button"
                     onClick={() => onToggleSave(focusedProduct.id)}
                     aria-label={isFocusedSaved ? "Bỏ lưu màu son" : "Lưu màu son"}
-                    className={`min-h-[38px] px-3 rounded-xl border text-xs font-medium inline-flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer ${
+                    className={`min-h-[38px] px-3 rounded-xl border text-xs font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer ${
                       isFocusedSaved
                         ? "bg-rose-50 border-rose-200 text-rose-700"
                         : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50"
@@ -1326,7 +1507,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                   <button
                     type="button"
                     onClick={handleSaveLookPng}
-                    className="sm:hidden min-h-[38px] px-3 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-medium text-zinc-700 inline-flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
+                    className="sm:hidden min-h-[38px] px-3 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-medium text-zinc-700 inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Lưu ảnh</span>
@@ -1337,7 +1518,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                       href={focusedShopLinks.shopeeUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="min-h-[38px] px-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors"
+                      className="min-h-[38px] px-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors"
                     >
                       <span>Tìm Shopee</span>
                       <ExternalLink className="w-3.5 h-3.5" />
@@ -1368,7 +1549,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                 </button>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col lg:flex-row gap-2">
                 <div className="relative flex-1">
                   <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
@@ -1526,7 +1707,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                           setThicknessOverride(preset.thickness);
                           setCompareBare(false);
                         }}
-                        className={`min-h-[36px] sm:min-h-[32px] px-2 text-xs font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+                        className={`min-h-[36px] sm:min-h-[32px] px-1 sm:px-2 text-[11px] sm:text-xs font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
                           active
                             ? "bg-white text-zinc-950 shadow-xs font-semibold"
                             : "text-zinc-600 hover:text-zinc-900"
@@ -1556,20 +1737,16 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
 
               <div className="divide-y divide-zinc-100 text-xs">
                 <div className="py-2.5 grid grid-cols-3 gap-2 items-center">
-                  <span className="text-zinc-500">Độ hợp da</span>
+                  <span className="text-zinc-500">Điểm hợp thật</span>
                   <span
-                    className={`font-semibold tabular-nums ${
-                      simA.matchPercent >= simB.matchPercent ? "text-emerald-700" : "text-zinc-700"
-                    }`}
+                    className={`font-semibold tabular-nums ${scoreToneClass(auditA.overallScore)}`}
                   >
-                    A: {simA.matchPercent}%
+                    A: {auditA.overallScore}/100 ({auditA.verdictTagVi})
                   </span>
                   <span
-                    className={`font-semibold tabular-nums ${
-                      simB.matchPercent >= simA.matchPercent ? "text-emerald-700" : "text-zinc-700"
-                    }`}
+                    className={`font-semibold tabular-nums ${scoreToneClass(auditB.overallScore)}`}
                   >
-                    B: {simB.matchPercent}%
+                    B: {auditB.overallScore}/100 ({auditB.verdictTagVi})
                   </span>
                 </div>
 
@@ -1596,113 +1773,129 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
                 <div className="py-2.5 grid grid-cols-3 gap-2 items-center">
                   <span className="text-zinc-500">Hiệu ứng răng</span>
                   <span className="text-zinc-800">
-                    {traitsA?.teethBrightening ? "Sáng răng" : "Tự nhiên"}
+                    {auditA.checks.find((c) => c.id === "teeth")?.verdictShort ?? "Trung tính"}
                   </span>
                   <span className="text-zinc-800">
-                    {traitsB?.teethBrightening ? "Sáng răng" : "Tự nhiên"}
+                    {auditB.checks.find((c) => c.id === "teeth")?.verdictShort ?? "Trung tính"}
                   </span>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-3xl border border-zinc-200/85 p-5 sm:p-6 space-y-4 shadow-[0_2px_16px_rgba(0,0,0,0.03)]">
-              <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-                <div className="rounded-2xl overflow-hidden border border-zinc-200/85">
-                  <div
-                    className="h-14 sm:h-16"
-                    style={{ backgroundColor: report.lipMetrics.lipBaseHex }}
-                  />
-                  <div className="p-2.5 bg-white">
-                    <div className="text-[11px] text-zinc-500">Không son</div>
-                    <div className="text-xs font-semibold text-zinc-900 truncate mt-0.5">
-                      Nền môi mộc
+            <>
+              <HonestMakeupVerdictCard
+                audit={focusedAudit}
+                onApplyBestAiPair={handleApplyBestAiPair}
+                showAiPairCta={Boolean(
+                  bestAiLipstick &&
+                    (focusedAudit.verdictTier !== "buy" ||
+                      productA?.id !== bestAiLipstick.id ||
+                      (isBareVsLip &&
+                        (!blushEnabled ||
+                          !makeupCompareLipOn ||
+                          (bestAiBlush && activeBlush?.id !== bestAiBlush.id))))
+                )}
+              />
+
+              <div className="bg-white rounded-3xl border border-zinc-200/85 p-5 sm:p-6 space-y-4 shadow-[0_2px_16px_rgba(0,0,0,0.03)]">
+                <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+                  <div className="rounded-2xl overflow-hidden border border-zinc-200/85">
+                    <div
+                      className="h-14 sm:h-16"
+                      style={{ backgroundColor: report.lipMetrics.lipBaseHex }}
+                    />
+                    <div className="p-2.5 bg-white">
+                      <div className="text-[11px] text-zinc-500">Không son</div>
+                      <div className="text-xs font-semibold text-zinc-900 truncate mt-0.5">
+                        Nền môi mộc
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="rounded-2xl overflow-hidden border border-zinc-200/85">
-                  <div className="h-14 sm:h-16" style={{ backgroundColor: focusedSim.productHex }} />
-                  <div className="p-2.5 bg-white">
-                    <div className="text-[11px] text-zinc-500">Màu trên thỏi</div>
-                    <div className="text-xs font-semibold text-zinc-900 truncate mt-0.5">
-                      {focusedProduct ? focusedProduct.shade : "Màu gợi ý"}
+                  <div className="rounded-2xl overflow-hidden border border-zinc-200/85">
+                    <div
+                      className="h-14 sm:h-16"
+                      style={{ backgroundColor: focusedSim.productHex }}
+                    />
+                    <div className="p-2.5 bg-white">
+                      <div className="text-[11px] text-zinc-500">Màu trên thỏi</div>
+                      <div className="text-xs font-semibold text-zinc-900 truncate mt-0.5">
+                        {focusedProduct ? focusedProduct.shade : "Màu gợi ý"}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="rounded-2xl overflow-hidden border-2 border-zinc-900">
-                  <div
-                    className="h-14 sm:h-16"
-                    style={{ backgroundColor: focusedSim.renderedHex }}
-                  />
-                  <div className="p-2.5 bg-zinc-50">
-                    <div className="text-[11px] font-semibold text-zinc-900">Lên môi thật</div>
-                    <div className="text-xs font-semibold text-emerald-700 tabular-nums mt-0.5">
-                      {focusedSim.matchPercent}% hợp da
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-zinc-100 space-y-2.5">
-                <div className="text-xs font-semibold text-zinc-900">
-                  Xem màu theo từng lớp thoa
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {focusedSim.layerSteps.map((step) => {
-                    const isActive =
-                      step.thickness === 0
-                        ? isBareSingleActive || (isBareVsLip && bareSplitPct >= 92)
-                        : !isBareSingleActive && Math.abs(effectiveThickness - step.thickness) < 0.25;
-                    return (
-                      <button
-                        key={step.label}
-                        type="button"
-                        onClick={() => {
-                          if (step.thickness === 0) {
-                            if (isBareVsLip) {
-                              setBareSplitPct(100);
-                            } else {
-                              setCompareBare(true);
-                            }
-                          } else {
-                            setCompareBare(false);
-                            setThicknessOverride(step.thickness);
-                            if (isBareVsLip && bareSplitPct >= 90) {
-                              setBareSplitPct(50);
-                            }
-                          }
-                        }}
-                        className="group text-left space-y-1.5 cursor-pointer"
+                  <div className="rounded-2xl overflow-hidden border-2 border-zinc-900">
+                    <div
+                      className="h-14 sm:h-16"
+                      style={{ backgroundColor: focusedSim.renderedHex }}
+                    />
+                    <div className="p-2.5 bg-zinc-50">
+                      <div className="text-[11px] font-semibold text-zinc-900">Lên môi thật</div>
+                      <div
+                        className={`text-xs font-semibold tabular-nums mt-0.5 ${scoreToneClass(
+                          focusedAudit.overallScore
+                        )}`}
                       >
-                        <div
-                          className={`h-8 rounded-xl transition-all ${
-                            isActive
-                              ? "ring-2 ring-zinc-900 ring-offset-1"
-                              : "ring-1 ring-black/8 group-hover:scale-[1.02]"
-                          }`}
-                          style={{ backgroundColor: step.hex }}
-                        />
-                        <div
-                          className={`text-[11px] text-center ${
-                            isActive ? "font-semibold text-zinc-900" : "text-zinc-500"
-                          }`}
+                        {focusedAudit.overallScore}/100 · {focusedAudit.verdictTagVi}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-zinc-100 space-y-2.5">
+                  <div className="text-xs font-semibold text-zinc-900">
+                    Xem màu theo từng lớp thoa
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {focusedSim.layerSteps.map((step) => {
+                      const isActive =
+                        step.thickness === 0
+                          ? isBareSingleActive || (isBareVsLip && bareSplitPct >= 92)
+                          : !isBareSingleActive && Math.abs(effectiveThickness - step.thickness) < 0.25;
+                      return (
+                        <button
+                          key={step.label}
+                          type="button"
+                          onClick={() => {
+                            if (step.thickness === 0) {
+                              if (isBareVsLip) {
+                                setBareSplitPct(100);
+                              } else {
+                                setCompareBare(true);
+                              }
+                            } else {
+                              setCompareBare(false);
+                              setThicknessOverride(step.thickness);
+                              if (isBareVsLip && bareSplitPct >= 90) {
+                                setBareSplitPct(50);
+                              }
+                            }
+                          }}
+                          className="group text-left space-y-1.5 cursor-pointer"
                         >
-                          {step.label}
-                        </div>
-                      </button>
-                    );
-                  })}
+                          <div
+                            className={`h-8 rounded-xl transition-all ${
+                              isActive
+                                ? "ring-2 ring-zinc-900 ring-offset-1"
+                                : "ring-1 ring-black/8 group-hover:scale-[1.02]"
+                            }`}
+                            style={{ backgroundColor: step.hex }}
+                          />
+                          <div
+                            className={`text-[11px] text-center ${
+                              isActive ? "font-semibold text-zinc-900" : "text-zinc-500"
+                            }`}
+                          >
+                            {step.label}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-
-              <div className="pt-3 border-t border-zinc-100 space-y-1 text-xs">
-                <div className="font-semibold text-zinc-900">{matchVerdict}</div>
-                <p className="text-zinc-600 leading-relaxed">
-                  {report.lipMetrics.coverageRequirement}
-                </p>
-              </div>
-            </div>
+            </>
           )}
         </div>
       </div>

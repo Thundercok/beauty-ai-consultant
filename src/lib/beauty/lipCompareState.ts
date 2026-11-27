@@ -140,8 +140,18 @@ export function buildCompareBuyingVerdict(
     traitsB,
   } = input;
 
+  const maxMatch = Math.max(matchPercentA, matchPercentB);
   const diff = matchPercentA - matchPercentB;
   const priceDiffK = averagePriceK(priceA) - averagePriceK(priceB);
+
+  // Brutal honesty: never flatter two poor shades as "cả hai đều rất hợp"
+  if (maxMatch < 62) {
+    return {
+      headlineVi: "Nói thẳng: cả 2 màu này đều dễ dìm tông da của bạn",
+      sublineVi: `Cả Màu A (${matchPercentA}%) lẫn Màu B (${matchPercentB}%) đều lệch sắc da thật — nên đổi sang 4 màu đầu danh sách để tránh phí tiền.`,
+      recommendedSlot: "tie",
+    };
+  }
 
   if (Math.abs(diff) >= 3) {
     const winnerSlot: CompareSlot = diff > 0 ? "A" : "B";
@@ -156,7 +166,10 @@ export function buildCompareBuyingVerdict(
     if (winnerTraits?.bareFaceFriendly) reasons.push("dễ dùng mặt mộc đi học");
 
     return {
-      headlineVi: `Nên chốt Màu ${winnerSlot} (${winnerProd.shade})`,
+      headlineVi:
+        winnerMatch < 72
+          ? `Màu ${winnerSlot} (${winnerProd.shade}) đỡ lệch hơn, nhưng vẫn chưa tối ưu`
+          : `Nên chốt Màu ${winnerSlot} (${winnerProd.shade})`,
       sublineVi: `Ưu thế: ${reasons.join(" · ")}.`,
       recommendedSlot: winnerSlot,
     };

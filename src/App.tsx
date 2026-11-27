@@ -670,7 +670,7 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen overflow-x-clip flex flex-col bg-[#FAF9F8] text-zinc-900">
+    <div className="min-h-screen overflow-x-clip flex flex-col bg-white text-[#111111]">
       {/* Subtle Top-of-Viewport Image Processing Progress Bar */}
       <TopProgressBar
         progress={progressValue}
@@ -696,19 +696,19 @@ export default function App() {
       />
 
       {/* 3-Zone Top Bar Contract (52px mobile + 56px bottom bar = 108px <= 12.8% of 844px) */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-zinc-200/80">
-        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-[52px] md:h-16 flex items-center justify-between gap-4 md:gap-8">
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-[#E5E5E5]">
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-[52px] md:h-[60px] flex items-center justify-between gap-4 md:gap-8">
           <button
             type="button"
             onClick={() => switchTab("tone")}
-            className="text-base sm:text-lg font-bold tracking-tight text-zinc-900 whitespace-nowrap shrink-0 cursor-pointer"
+            className="text-[17px] sm:text-[18px] font-bold tracking-[-0.035em] text-[#111111] whitespace-nowrap shrink-0 cursor-pointer"
           >
             Beauty AI
           </button>
 
           <nav
             aria-label="Điều hướng chính"
-            className="hidden md:flex items-center gap-7 text-sm font-medium"
+            className="hidden md:flex items-center gap-8 text-[13px] font-medium h-full"
           >
             {navItems.map((item) => {
               const isActive = activeTab === item.id;
@@ -717,10 +717,10 @@ export default function App() {
                   key={item.id}
                   type="button"
                   onClick={() => switchTab(item.id)}
-                  className={`py-1 border-b-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  className={`h-full inline-flex items-center border-b-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                     isActive
-                      ? "border-zinc-900 text-zinc-900 font-semibold"
-                      : "border-transparent text-zinc-500 hover:text-zinc-900"
+                      ? "border-[#111111] text-[#111111] font-semibold"
+                      : "border-transparent text-[#666666] hover:text-[#111111]"
                   }`}
                 >
                   {item.label}
@@ -733,7 +733,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setPhotoSheetOpen(true)}
-              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] md:min-h-[38px] px-3.5 sm:px-4 py-1.5 text-xs font-medium text-white bg-zinc-900 hover:bg-zinc-800 rounded-full md:rounded-xl transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[36px] px-4 py-1.5 text-xs font-semibold text-white bg-[#111111] hover:bg-[#2B2B2B] rounded-[4px] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Camera className="w-3.5 h-3.5" />
               <span>Phân tích ảnh</span>
@@ -745,10 +745,10 @@ export default function App() {
       {/* Active App Screen with generous mobile bottom padding so fixed 56px bottom nav NEVER clips content */}
       <main
         key={activeTab}
-        className="flex-1 max-w-[1280px] w-full mx-auto px-4 sm:px-6 pt-4 pb-28 md:py-7 animate-view-enter"
+        className="flex-1 max-w-[1280px] w-full mx-auto px-4 sm:px-6 pt-5 pb-28 md:py-8 animate-view-enter"
       >
         {(imageError || catalogError) && (
-          <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-2xl text-xs">
+          <div className="mb-5 bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] px-4 py-3 rounded-[4px] text-xs">
             {imageError || catalogError}
           </div>
         )}
@@ -870,15 +870,22 @@ export default function App() {
               catalogIlluminant={catalogIlluminant}
               onCatalogIlluminantChange={handleCatalogIlluminantChange}
               onExportJson={handleExportJson}
+              topLipstick={topMatches.lipsticks[0] ?? null}
+              topBlush={topMatches.blushes[0] ?? null}
+              topEyeshadow={topMatches.eyeshadows[0] ?? null}
+              demoPresets={DEMO_PORTRAIT_PRESETS}
+              activeDemoId={activeDemoId}
+              onSelectDemo={loadDemoPreset}
+              onOpenPhotoPicker={() => setPhotoSheetOpen(true)}
             />
           ))}
       </main>
 
       {/* Quiet Desktop Footer */}
-      <footer className="hidden md:block border-t border-zinc-200/80 bg-white mt-auto">
-        <div className="max-w-[1280px] mx-auto px-6 py-4 flex items-center justify-between text-xs text-zinc-500">
-          <span>Beauty AI Consultant · Phân tích tông da &amp; thử màu son tự nhiên</span>
-          <span>{products.length} sản phẩm tham chiếu</span>
+      <footer className="hidden md:block border-t border-[#E5E5E5] bg-white mt-auto">
+        <div className="max-w-[1280px] mx-auto px-6 py-4 flex items-center justify-between text-xs text-[#737373]">
+          <span>Beauty AI Consultant · Phân tích tông da &amp; hiệu chỉnh trang điểm thực tế</span>
+          <span className="font-mono tabular-nums">{products.length} sản phẩm tham chiếu</span>
         </div>
       </footer>
 
@@ -886,7 +893,7 @@ export default function App() {
       <nav
         data-testid="mobile-bottom-nav"
         aria-label="Điều hướng chính trên di động"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-14 pb-safe bg-white/95 backdrop-blur-md border-t border-zinc-200/90 grid grid-cols-4 items-center"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-14 pb-safe bg-white/96 backdrop-blur-md border-t border-[#E5E5E5] grid grid-cols-4 items-center"
       >
         {navItems.map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id;
@@ -899,12 +906,12 @@ export default function App() {
               onClick={() => handleMobileTabPress(id)}
               aria-current={isActive ? "page" : undefined}
               className={`relative min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium whitespace-nowrap select-none touch-manipulation transition-all duration-150 active:scale-92 cursor-pointer ${
-                isActive ? "text-rose-700 font-semibold" : "text-zinc-500 hover:text-zinc-900"
+                isActive ? "text-[#111111] font-semibold" : "text-[#737373] hover:text-[#111111]"
               }`}
             >
               <span
                 aria-hidden="true"
-                className={`absolute top-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-rose-700 transition-all duration-200 ease-out ${
+                className={`absolute top-0 left-1/2 -translate-x-1/2 h-[2px] bg-[#DC2626] transition-all duration-200 ease-out ${
                   isActive ? "w-8 opacity-100" : "w-0 opacity-0"
                 }`}
               />
@@ -912,7 +919,7 @@ export default function App() {
                 className={`w-[20px] h-[20px] transition-transform duration-150 ease-out ${
                   isPulsing ? "scale-112" : "scale-100"
                 }`}
-                strokeWidth={isActive ? 2.2 : 1.75}
+                strokeWidth={isActive ? 2.1 : 1.65}
               />
               <span>{label}</span>
             </button>

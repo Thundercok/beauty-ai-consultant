@@ -1,4 +1,9 @@
 import React, { useMemo, useState } from "react";
+import { Eye } from "lucide-react";
+import {
+  mapConcernToGuideZone,
+  type FaceGuideZoneId,
+} from "../lib/beauty/faceGuideMap";
 import {
   analyzeVnFacialFeaturesFromReport,
   buildPersonalizedMakeupGuide,
@@ -11,6 +16,9 @@ import type { ConsultationReport, SkinTextureType } from "../lib/beauty/types";
 interface MakeupGuideSectionProps {
   report: ConsultationReport;
   texture: SkinTextureType;
+  activeGuideLayers?: readonly FaceGuideZoneId[];
+  onShowZoneOnFace?: (zone: FaceGuideZoneId) => void;
+  onShowContourOnFace?: () => void;
 }
 
 const SEVERITY_META: Record<ConcernSeverity, { label: string; className: string }> = {
@@ -33,7 +41,13 @@ function splitStepLead(step: string): { lead: string | null; detail: string } {
   return { lead: null, detail: step };
 }
 
-export const MakeupGuideSection: React.FC<MakeupGuideSectionProps> = ({ report, texture }) => {
+export const MakeupGuideSection: React.FC<MakeupGuideSectionProps> = ({
+  report,
+  texture,
+  activeGuideLayers = [],
+  onShowZoneOnFace,
+  onShowContourOnFace,
+}) => {
   const analysis = useMemo(() => analyzeVnFacialFeaturesFromReport(report), [report]);
   const guide = useMemo(
     () => buildPersonalizedMakeupGuide(analysis, report.season.undertone, texture),
@@ -57,6 +71,9 @@ export const MakeupGuideSection: React.FC<MakeupGuideSectionProps> = ({ report, 
     }
     return featuredItems;
   }, [guide.items, featuredItems, activeTab]);
+
+  const contourActive =
+    activeGuideLayers.includes("nose") && activeGuideLayers.includes("cheek_jaw");
 
   return (
     <section
@@ -82,11 +99,29 @@ export const MakeupGuideSection: React.FC<MakeupGuideSectionProps> = ({ report, 
         data-testid="highlight-contour-plan"
         className="pt-3 pb-3.5 border-y border-zinc-100 space-y-2.5"
       >
-        <div className="flex flex-wrap items-baseline justify-between gap-1.5">
-          <h3 className="text-xs font-bold text-zinc-900">
-            Kỹ thuật Highlight &amp; Contour cho dáng {highlightContour.faceShapeVi.toLowerCase()}
-          </h3>
-          <span className="text-[11px] text-zinc-500">{highlightContour.goalVi}</span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="space-y-0.5">
+            <h3 className="text-xs font-bold text-zinc-900">
+              Kỹ thuật Highlight &amp; Contour cho dáng {highlightContour.faceShapeVi.toLowerCase()}
+            </h3>
+            <div className="text-[11px] text-zinc-500">{highlightContour.goalVi}</div>
+          </div>
+
+          {onShowContourOnFace && (
+            <button
+              type="button"
+              data-testid="show-contour-on-face-btn"
+              onClick={onShowContourOnFace}
+              className={`min-h-[30px] px-2.5 py-1 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
+                contourActive
+                  ? "border-rose-200 bg-rose-50 text-rose-700"
+                  : "border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-800"
+              }`}
+            >
+              <Eye className="w-3 h-3" />
+              <span>{contourActive ? "Đang vẽ khối" : "Xem khối trên mặt"}</span>
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs leading-relaxed">
@@ -151,15 +186,35 @@ export const MakeupGuideSection: React.FC<MakeupGuideSectionProps> = ({ report, 
       <div className="divide-y divide-zinc-100">
         {visibleItems.map((item) => {
           const meta = SEVERITY_META[item.severity];
+          const mappedZone = mapConcernToGuideZone(item.id);
+          const isShownOnFace = Boolean(mappedZone && activeGuideLayers.includes(mappedZone));
+
           return (
             <article key={item.id} className="py-4 first:pt-1 last:pb-0 space-y-2.5">
-              {/* Kicker + Title */}
-              <div className="space-y-0.5">
+              {/* Kicker + Title + Direct Portrait Overlay Link */}
+              <div className="space-y-1">
                 <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[11px]">
                   <span className="text-zinc-500 font-medium">{item.detectedStatusVi}</span>
                   <span className={`whitespace-nowrap ${meta.className}`}>{meta.label}</span>
                 </div>
-                <h3 className="text-sm font-bold text-zinc-900 leading-snug">{item.titleVi}</h3>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold text-zinc-900 leading-snug">{item.titleVi}</h3>
+                  {mappedZone && onShowZoneOnFace && (
+                    <button
+                      type="button"
+                      data-testid={`show-on-face-${item.id}`}
+                      onClick={() => onShowZoneOnFace(mappedZone)}
+                      className={`min-h-[28px] px-2.5 py-0.5 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
+                        isShownOnFace
+                          ? "border-rose-200 bg-rose-50 text-rose-700"
+                          : "border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-800"
+                      }`}
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>{isShownOnFace ? "Đang vẽ trên mặt" : "Xem vẽ trên mặt"}</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* 3 Concrete Numbered Steps */}

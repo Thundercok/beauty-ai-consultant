@@ -37,6 +37,7 @@ interface LipCompareSliderPortraitProps {
   ariaLabel?: string;
   hintText?: string;
   testId?: string;
+  portraitMode?: "corrected" | "original";
 }
 
 /**
@@ -58,6 +59,7 @@ export const LipCompareSliderPortrait: React.FC<LipCompareSliderPortraitProps> =
   ariaLabel = "Thanh trượt so sánh trực tiếp trên môi",
   hintText = "Kéo qua lại trên môi",
   testId = "lip-compare-slider",
+  portraitMode = "corrected",
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const clipLayerRef = useRef<HTMLDivElement | null>(null);
@@ -214,10 +216,10 @@ export const LipCompareSliderPortrait: React.FC<LipCompareSliderPortraitProps> =
     visible: boolean,
     refCb: (el: HTMLElement | null) => void
   ) => {
-    const baseClasses = `absolute top-3.5 ${positionClass} z-20 max-w-[44%] min-h-[34px] px-3 py-1.5 rounded-full backdrop-blur-md border text-left inline-flex items-center gap-2 transition-all duration-150 ${
+    const baseClasses = `absolute top-3.5 ${positionClass} z-20 max-w-[44%] min-h-[32px] px-2.5 py-1 rounded-lg backdrop-blur-md border text-left inline-flex items-center gap-2 transition-all duration-150 ${
       side.isSelected
-        ? "bg-white text-zinc-950 border-white shadow-[0_4px_14px_rgba(0,0,0,0.22)]"
-        : "bg-zinc-950/65 text-white border-white/15"
+        ? "bg-white/95 text-[#171513] border-white shadow-[0_4px_14px_rgba(0,0,0,0.22)]"
+        : "bg-[#171513]/72 text-white border-white/15"
     }`;
 
     const content = (
@@ -269,13 +271,13 @@ export const LipCompareSliderPortrait: React.FC<LipCompareSliderPortraitProps> =
       onPointerUp={commitDragEnd}
       onPointerCancel={commitDragEnd}
       onDoubleClick={handleDoubleClick}
-      className="relative h-[375px] sm:h-[455px] lg:h-[510px] w-full rounded-3xl overflow-hidden border border-zinc-200/80 bg-zinc-950 select-none touch-pan-y cursor-ew-resize shadow-[0_8px_30px_rgba(0,0,0,0.06)]"
+      className="relative h-[410px] sm:h-[460px] lg:h-[520px] w-full rounded-2xl overflow-hidden border border-[#DED7CD] bg-[#171513] select-none touch-pan-y cursor-ew-resize"
     >
       {/* Right Base Layer */}
       <div className="absolute inset-0">
         <PortraitCanvas
           report={report}
-          mode="corrected"
+          mode={portraitMode}
           showOverlay={false}
           box={box}
           virtualMakeup={rightSide.makeup}
@@ -293,7 +295,7 @@ export const LipCompareSliderPortrait: React.FC<LipCompareSliderPortraitProps> =
       >
         <PortraitCanvas
           report={report}
-          mode="corrected"
+          mode={portraitMode}
           showOverlay={false}
           box={box}
           virtualMakeup={leftSide.makeup}
