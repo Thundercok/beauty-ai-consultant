@@ -201,7 +201,7 @@ test("analyzeVnFacialFeatures returns balanced ratings cleanly when features are
   assert.equal(byId.undereye.severity, "balanced");
 });
 
-test("buildPersonalizedMakeupGuide tailors 3-step tips for mũi tẹt, mắt một mí, and da mụn to undertone and skin texture", () => {
+test("buildPersonalizedMakeupGuide provides dedicated acne-safe and monolid/hooded-eye guides tailored to undertone and skin texture", () => {
   const width = 120;
   const height = 120;
   const { rgba, skinMask, hemoDelta } = makeSyntheticFaceBuffer(width, height, {
@@ -230,18 +230,67 @@ test("buildPersonalizedMakeupGuide tailors 3-step tips for mũi tẹt, mắt m�
   assert.equal(coolOily.items.length, 5);
   assert.deepEqual(
     coolOily.items.map((i) => i.quickTabLabel),
-    ["Mũi tẹt", "Mắt một mí", "Da mụn", "Mặt tròn", "Quầng thâm"]
+    ["Da mụn", "Mắt một mí / mí lót", "Mũi tẹt", "Mặt tròn", "Quầng thâm"]
   );
+
+  const acneCool = coolOily.items[0];
+  const eyesCool = coolOily.items[1];
+  const noseCool = coolOily.items[2];
+  const acneWarm = warmDry.items[0];
+  const eyesWarm = warmDry.items[1];
+  const noseWarm = warmDry.items[2];
+
+  assert.equal(acneCool.titleVi, "Hướng dẫn trang điểm cho da mụn");
+  assert.equal(eyesCool.titleVi, "Trang điểm mắt một mí/mí lót");
 
   for (const item of coolOily.items) {
     assert.equal(item.stepsVi.length, 3);
     assert.ok(!/#[0-9a-fA-F]{6}/.test(item.stepsVi.join(" ")));
   }
 
-  // Undertone & skin texture genuinely personalize the recommendations
-  assert.match(coolOily.items[0].shadePickVi, /nâu xám tro lạnh/i);
-  assert.match(warmDry.items[0].shadePickVi, /nâu be xám dịu/i);
-  assert.match(coolOily.items[2].shadePickVi, /kiềm dầu/i);
-  assert.match(warmDry.items[2].shadePickVi, /cấp ẩm|ẩm mịn/i);
+  // Acne guide covers pore-safe non-comedogenic foundation + natural concealer
+  assert.match(acneCool.stepsVi.join(" "), /bít tắc lỗ chân lông/i);
+  assert.match(acneCool.stepsVi.join(" "), /non-comedogenic/i);
+  assert.match(acneCool.stepsVi.join(" "), /che khuyết điểm/i);
+  assert.match(acneCool.shadePickVi, /kiềm dầu/i);
+  assert.match(acneWarm.shadePickVi, /cấp ẩm|dưỡng ẩm/i);
+
+  // Monolid/hooded eye guide covers eyeshadow depth + thin eyeliner tailored to undertone
+  assert.match(eyesCool.stepsVi.join(" "), /eyeliner/i);
+  assert.match(eyesCool.stepsVi.join(" "), /2–3mm/i);
+  assert.match(eyesCool.stepsVi.join(" "), /hồng đất lạnh/i);
+  assert.match(eyesWarm.stepsVi.join(" "), /nâu trà sữa/i);
+
+  // Nose contour still adapts to undertone
+  assert.match(noseCool.shadePickVi, /nâu xám tro lạnh/i);
+  assert.match(noseWarm.shadePickVi, /nâu be xám dịu/i);
+});
+
+test("buildVnHighlightContourPlan covers all 6 face shapes with natural Vietnamese student highlight and contour zones", async () => {
+  const { buildVnHighlightContourPlan } = await import("./vnFeatureAnalysis");
+  const shapes: Array<FaceShapeResult["primary"]> = [
+    "Oval",
+    "Round",
+    "Square",
+    "Heart",
+    "Oblong",
+    "Diamond",
+  ];
+
+  for (const primary of shapes) {
+    const plan = buildVnHighlightContourPlan(
+      { ...OVAL_SHAPE, primary },
+      primary === "Round" ? "Cool (Pink/Blue)" : "Warm (Golden)"
+    );
+    assert.ok(plan.faceShapeVi.length > 0);
+    assert.ok(plan.highlightZonesVi.length > 20);
+    assert.ok(plan.contourZonesVi.length > 20);
+    assert.ok(!/#[0-9a-fA-F]{6}/.test(plan.highlightZonesVi + plan.contourZonesVi + plan.productToneVi));
+    assert.ok(!/bắt sáng\s+bắt sáng/i.test(plan.productToneVi));
+  }
+
+  const roundCool = buildVnHighlightContourPlan(ROUND_SHAPE, "Cool (Pink/Blue)");
+  assert.equal(roundCool.faceShapeVi, "Mặt tròn");
+  assert.match(roundCool.productToneVi, /nâu xám tro lạnh/i);
 });
 

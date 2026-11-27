@@ -634,17 +634,113 @@ function getUndertonePaletteCues(undertone: SeasonClassification["undertone"]) {
 
 function getSkinBaseCue(texture: SkinTextureType): string {
   if (texture === "oily") {
-    return "Cushion bán lì kiềm dầu mỏng nhẹ + phấn phủ bột không màu vùng chữ T";
+    return "Kem nền gốc nước không chứa dầu, hạn chế bít tắc lỗ chân lông (non-comedogenic) hoặc cushion bán lì mỏng nhẹ + phấn bột khoáng kiềm dầu vùng chữ T";
   }
   if (texture === "dry") {
-    return "Kem dưỡng ẩm mỏng + cushion ẩm mịn căng bóng + xịt khóa nền cấp ẩm";
+    return "Kem dưỡng ẩm dịu nhẹ không hương liệu + nền lỏng gốc nước mỏng, hạn chế bít tắc (non-comedogenic) + xịt khóa nền cấp ẩm";
   }
-  return "Cushion mỏng nhẹ tiệp da + dặm phấn kiềm dầu riêng ở mũi và trán";
+  return "Kem nền lỏng gốc nước mỏng nhẹ, hạn chế bít tắc lỗ chân lông (non-comedogenic) tiệp da + dặm phấn bột khoáng kiềm dầu riêng ở mũi và trán";
+}
+
+export interface VnHighlightContourPlan {
+  faceShapeVi: string;
+  goalVi: string;
+  highlightZonesVi: string;
+  contourZonesVi: string;
+  productToneVi: string;
+}
+
+const FACE_SHAPE_VI_LABELS: Record<FaceShapeResult["primary"], string> = {
+  Oval: "Trái xoan",
+  Round: "Mặt tròn",
+  Square: "Mặt vuông",
+  Heart: "Mặt trái tim",
+  Oblong: "Mặt dài",
+  Diamond: "Mặt kim cương",
+};
+
+/**
+ * Generates natural, Vietnamese student-friendly Highlight & Contour placement
+ * combining detected face shape geometry and undertone (zero heavy Western bronzing).
+ */
+export function buildVnHighlightContourPlan(
+  faceShape: FaceShapeResult,
+  undertone: SeasonClassification["undertone"]
+): VnHighlightContourPlan {
+  const cues = getUndertonePaletteCues(undertone);
+  const faceShapeVi = FACE_SHAPE_VI_LABELS[faceShape.primary] ?? "Trái xoan";
+  const highlightLabel =
+    cues.highlightTone.charAt(0).toUpperCase() + cues.highlightTone.slice(1);
+  const productToneVi = `${highlightLabel} · Phấn khối ${cues.contourTone}`;
+
+  switch (faceShape.primary) {
+    case "Round":
+      return {
+        faceShapeVi,
+        goalVi: "Tạo cảm giác mặt thon dài, sáng gọn trục giữa khi đi học hằng ngày",
+        highlightZonesVi:
+          "Chấm nhẹ giữa trán, 2 điểm tách rời ở sống & đầu mũi, và đầu cằm để kéo dài trục dọc — tránh quét bắt sáng lan sang hai bên má.",
+        contourZonesVi:
+          "Phớt cực mỏng từ dưới mang tai trượt dọc rìa dưới xương hàm vào cằm, cộng thêm nét chữ C nhạt nối đầu chân mày xuống sống mũi.",
+        productToneVi,
+      };
+    case "Square":
+      return {
+        faceShapeVi,
+        goalVi: "Làm mềm góc hàm và giữ ánh nhìn tập trung vào vùng mắt – mũi tươi tắn",
+        highlightZonesVi:
+          "Đặt bắt sáng mịn ở tam giác sáng dưới mắt, giữa sống mũi và trung tâm cằm để gương mặt trông thanh thoát, dịu nét hơn.",
+        contourZonesVi:
+          "Dùng cọ bông mềm phớt nhẹ ở hai góc xương hàm dưới và rìa trán hai bên thái dương, tán mờ đều tay để không lộ vệt khối.",
+        productToneVi,
+      };
+    case "Heart":
+      return {
+        faceShapeVi,
+        goalVi: "Cân bằng phần trán rộng với chiếc cằm nhỏ gọn tự nhiên kiểu Hàn – Việt",
+        highlightZonesVi:
+          "Bắt sáng nhẹ ở sống mũi ngang mắt, rãnh cười vùng giữa má và một chấm thật nhỏ ở viền cằm dưới.",
+        contourZonesVi:
+          "Phớt mỏng sát chân tóc hai bên thái dương và đầu chân mày xuống hốc mắt; không cần đánh khối mạnh ở cằm.",
+        productToneVi,
+      };
+    case "Oblong":
+      return {
+        faceShapeVi,
+        goalVi: "Rút gọn chiều dài mặt nhẹ nhàng, tạo cảm giác má đầy đặn trẻ trung",
+        highlightZonesVi:
+          "Chấm bắt sáng ngang trên đỉnh gò má (tán hướng ngang nhẹ ra ngoài) và sống mũi ngang mắt — hạn chế bắt sáng ở đầu cằm và đỉnh trán.",
+        contourZonesVi:
+          "Phớt cực nhạt sát chân tóc giữa trán và ngay rìa dưới đầu cằm để tỷ lệ gương mặt trông cân đối, bầu bĩnh đáng yêu hơn.",
+        productToneVi,
+      };
+    case "Diamond":
+      return {
+        faceShapeVi,
+        goalVi: "Làm dịu độ nhô gò má và tạo độ đầy hài hòa cho trán – hàm",
+        highlightZonesVi:
+          "Tập trung làm sáng nhẹ giữa trán, vùng tam giác dưới mắt và trung tâm cằm để cân đối với phần gò má.",
+        contourZonesVi:
+          "Phớt rất mỏng ngay rìa ngoài gò má hướng về mang tai và sống mũi đầu mày, giữ nét mềm mại tự nhiên.",
+        productToneVi,
+      };
+    case "Oval":
+    default:
+      return {
+        faceShapeVi,
+        goalVi: "Tôn sẵn tỉ lệ hài hòa với lớp sáng – khối mỏng trong veo đi học",
+        highlightZonesVi:
+          "Chấm nhẹ ở đầu mắt, 2 điểm tách rời trên sống & đầu mũi và viền môi trên (nhân trung) giúp mặt bắt sáng tự nhiên dưới đèn lớp học.",
+        contourZonesVi:
+          "Chỉ cần phớt thật nhẹ hình chữ C nối đầu mày xuống 1/3 sống mũi và quét lướt dưới viền hàm nếu muốn gương mặt ăn ảnh hơn.",
+        productToneVi,
+      };
+  }
 }
 
 /**
  * Builds a concrete, step-by-step Vietnamese makeup guide for the 5 most common
- * facial & skin concerns ("mũi tẹt", "mắt một mí", "da mụn", "mặt tròn", "quầng thâm"),
+ * facial & skin concerns ("da mụn", "mắt một mí/mí lót", "mũi tẹt", "mặt tròn", "quầng thâm"),
  * dynamically adapted to the user's analyzed facial features, undertone, and skin type.
  */
 export function buildPersonalizedMakeupGuide(
@@ -667,58 +763,54 @@ export function buildPersonalizedMakeupGuide(
 
   const items: PersonalizedMakeupGuideItem[] = [
     {
+      id: "skin_blemish",
+      quickTabLabel: "Da mụn",
+      titleVi: "Hướng dẫn trang điểm cho da mụn",
+      detectedStatusVi: skin.detectedLabel,
+      severity: skin.severity,
+      autoDetected: skin.autoDetected,
+      stepsVi: [
+        `Chọn nền thoáng, hạn chế bít tắc lỗ chân lông: Ưu tiên ${baseCue.toLowerCase()}, dặm duy nhất 1 lớp thật mỏng bằng bông mút ẩm sạch (vỗ nhẹ, không kéo miết dày cả mặt).`,
+        "Che khuyết điểm mụn tự nhiên: Chấm lượng siêu nhỏ triệt sắc xanh lá nhạt đúng lên nốt mụn đỏ (hoặc đào nhạt cho thâm nâu), đợi 15 giây rồi dùng cọ đầu nhỏ dặm kem che khuyết điểm tiệp màu da quanh viền nốt mụn — không đè mạnh lên đỉnh mụn sưng.",
+        "Khóa nền nhẹ & giữ thoáng da đi học: Phủ thật mỏng phấn bột khoáng không màu ở vùng chữ T để kiềm dầu, tránh tán phấn má nhũ to lên vùng mụn ẩn, và tẩy trang dịu nhẹ thật kỹ cuối ngày.",
+      ],
+      shadePickVi: baseCue,
+      avoidVi:
+        "Tránh chồng nhiều lớp nền đặc chứa dầu nặng, dùng mút bẩn hoặc chà miết mạnh lên nốt mụn vì dễ gây bít tắc lỗ chân lông và mốc nền.",
+    },
+    {
+      id: "eyes",
+      quickTabLabel: "Mắt một mí / mí lót",
+      titleVi: "Trang điểm mắt một mí/mí lót",
+      detectedStatusVi: eyes.detectedLabel,
+      severity: eyes.severity,
+      autoDetected: eyes.autoDetected,
+      stepsVi: [
+        `Tán phấn mắt tạo chiều sâu khi mở mắt: Mở mắt nhìn thẳng gương rồi dùng cọ bông tán phấn lì màu ${cues.eyeBaseTone} loang cao hơn đường mí 2–3mm để khi mở mắt màu vẫn hiện tự nhiên, không bị nuốt mí.`,
+        "Kẻ eyeliner mảnh kiểu sinh viên Việt: Chỉ dùng chì hoặc gel nâu mảnh viền sát chân mi trong và kéo đuôi ngang hoặc hơi chếch nhẹ ~3mm ở 1/3 đuôi mắt ngoài giúp mắt to dài thanh thoát.",
+        "Kẹp mi cong gốc & nhấn đuôi mắt dưới: Bấm mi cong sát gốc rồi chuốt mascara tơi cả mi trên lẫn mi dưới, phớt thêm chút phấn nâu nhạt vào 1/3 đuôi mắt dưới cho ánh nhìn sâu, trong trẻo đi học hằng ngày.",
+      ],
+      shadePickVi: `Phấn mắt lì ${cues.eyeBaseTone} · Chì/gel kẻ mắt nâu mảnh`,
+      avoidVi:
+        "Tránh kẻ eyeliner đen dày cả bầu mí (dễ làm hẹp mí và khiến mắt trông dữ) hoặc tán phấn nhũ hạt to khắp bầu mắt gây cảm giác mí bị sưng.",
+    },
+    {
       id: "nose",
       quickTabLabel: "Mũi tẹt",
       titleVi:
         nose.severity === "balanced"
-          ? "Tạo khối mũi thanh tự nhiên"
+          ? "Tạo khối mũi thanh gọn tự nhiên"
           : "Khắc phục mũi tẹt & cánh mũi tròn",
       detectedStatusVi: nose.detectedLabel,
       severity: nose.severity,
       autoDetected: nose.autoDetected,
       stepsVi: [
-        `Dùng cọ vát nhỏ lấy phấn khối ${cues.contourTone}, đặt nhẹ hình chữ C nối từ đầu chân mày xuống hốc mắt và 1/3 sống mũi.`,
-        "Vẽ chữ V thật nhỏ ngay viền dưới chóp mũi rồi tán mờ nhẹ sang hai bên cánh mũi để đầu mũi trông gọn và cao hơn.",
-        `Chấm 1 điểm ${cues.highlightTone} ngay giữa sống mũi (ngang mắt) và 1 chấm nhỏ ở đầu mũi — tách thành 2 điểm chứ không kéo 1 vạch dài.`,
+        `Đặt khối đầu mày thanh gọn: Dùng cọ vát nhỏ lấy phấn khối ${cues.contourTone}, đặt nhẹ hình chữ C nối từ đầu chân mày xuống hốc mắt và 1/3 sống mũi.`,
+        "Thu gọn đầu & cánh mũi: Vẽ chữ V thật nhỏ ngay viền dưới chóp mũi rồi tán mờ nhẹ sang hai bên cánh mũi để đầu mũi trông gọn và cao hơn.",
+        `Chấm bắt sáng tách 2 điểm: Chấm 1 điểm ${cues.highlightTone} ngay giữa sống mũi (ngang mắt) và 1 chấm nhỏ ở đầu mũi — không kéo 1 vạch dài dễ lộ phấn.`,
       ],
       shadePickVi: `Phấn khối ${cues.contourTone} · ${cues.highlightTone}`,
       avoidVi: nose.avoidVi,
-    },
-    {
-      id: "eyes",
-      quickTabLabel: "Mắt một mí",
-      titleVi:
-        eyes.severity === "balanced"
-          ? "Nhấn mắt sâu nhẹ kiểu Á Đông"
-          : "Khắc phục mắt một mí & mí lót",
-      detectedStatusVi: eyes.detectedLabel,
-      severity: eyes.severity,
-      autoDetected: eyes.autoDetected,
-      stepsVi: [
-        `Mở mắt nhìn thẳng gương rồi tán phấn lỳ màu ${cues.eyeBaseTone} loang cao hơn viền mí khoảng 2–3mm để khi mở mắt màu vẫn hiện rõ.`,
-        "Dùng chì/gel nâu kẻ sát mí trong và chỉ kéo đuôi eyeliner mảnh ngang hoặc chếch nhẹ 3mm ở 1/3 đuôi mắt (giúp mắt dài và to mà không bị nuốt mí).",
-        "Kẹp mi cong sát gốc rồi chuốt mascara tơi cả mi trên lẫn mi dưới; nhấn thêm chút nâu nhạt vào 1/3 đuôi mắt dưới để tạo chiều sâu.",
-      ],
-      shadePickVi: `Phấn mắt lì ${cues.eyeBaseTone} · Kẻ mắt nâu mảnh`,
-      avoidVi: eyes.avoidVi,
-    },
-    {
-      id: "skin_blemish",
-      quickTabLabel: "Da mụn",
-      titleVi:
-        skin.severity === "balanced"
-          ? "Đánh nền mỏng trong veo hằng ngày"
-          : "Che da mụn đỏ & thâm không bị mốc",
-      detectedStatusVi: skin.detectedLabel,
-      severity: skin.severity,
-      autoDetected: skin.autoDetected,
-      stepsVi: [
-        "Chấm một lượng siêu nhỏ triệt sắc màu xanh lá nhạt đúng lên nốt mụn đỏ (hoặc màu đào nhạt lên nốt thâm nâu), để yên 15 giây cho se bề mặt.",
-        "Dùng cọ đầu nhỏ chấm kem che khuyết điểm tiệp đúng màu da lên xung quanh viền nốt mụn, tán nhẹ mép ngoài — không chà mạnh lên đỉnh nốt mụn.",
-        `Cả mặt chỉ dặm 1 lớp nền thật mỏng (${baseCue.toLowerCase()}) để da thoáng, không bị cakey dưới thời tiết nóng ẩm.`,
-      ],
-      shadePickVi: baseCue,
-      avoidVi: skin.avoidVi,
     },
     {
       id: "face_fullness",
@@ -731,9 +823,9 @@ export function buildPersonalizedMakeupGuide(
       severity: fullness.severity,
       autoDetected: fullness.autoDetected,
       stepsVi: [
-        `Dùng cọ bông mềm phớt phấn khối ${cues.contourTone} thật mỏng từ dưới mang tai trượt dọc rìa dưới xương hàm vào cằm để tạo bóng gọn tự nhiên.`,
-        `Tán má hồng màu ${cues.blushTone} theo hướng xéo nhẹ từ gò má cao kéo lên thái dương giúp nâng cơ và thu hẹp chiều ngang mặt.`,
-        "Kết hợp chấm bắt sáng nhẹ ở giữa trán và đầu cằm để trục dọc gương mặt trông thanh thoát hơn.",
+        `Tạo bóng gọn viền hàm: Dùng cọ bông mềm phớt phấn khối ${cues.contourTone} thật mỏng từ dưới mang tai trượt dọc rìa dưới xương hàm vào cằm.`,
+        `Đánh má hồng nâng mặt: Tán má hồng màu ${cues.blushTone} theo hướng xéo nhẹ từ gò má cao kéo lên thái dương giúp nâng cơ và thu hẹp chiều ngang mặt.`,
+        "Kéo dài trục giữa nhẹ nhàng: Chấm bắt sáng mịn ở giữa trán và đầu cằm để gương mặt trông thanh thoát hơn.",
       ],
       shadePickVi: `Má hồng ${cues.blushTone} · Khối ${cues.contourTone}`,
       avoidVi: fullness.avoidVi,
@@ -749,9 +841,9 @@ export function buildPersonalizedMakeupGuide(
       severity: undereye.severity,
       autoDetected: undereye.autoDetected,
       stepsVi: [
-        "Thoa lớp kem dưỡng mắt mỏng để vùng da dưới mắt đủ ẩm, hạn chế đọng kem vào rãnh cười.",
-        "Chấm 2 chấm nhỏ triệt sắc tông đào nhạt đúng vào rãnh thâm tối nhất (cách hàng mi dưới ~3mm), vỗ nhẹ bằng đầu ngón áp út.",
-        "Phủ thêm 1 chấm nhỏ che khuyết điểm tiệp da rồi dặm phấn phủ hạt mịn thật mỏng bằng cọ nhỏ để khóa bền màu.",
+        "Cấp ẩm mỏng trước khi che: Thoa lớp kem dưỡng mắt mỏng để vùng da dưới mắt đủ ẩm, hạn chế đọng kem vào rãnh cười.",
+        "Triệt sắc đúng rãnh tối: Chấm 2 chấm nhỏ triệt sắc tông đào nhạt vào rãnh thâm tối nhất (cách hàng mi dưới ~3mm), vỗ nhẹ bằng đầu ngón áp út.",
+        "Khóa nhẹ không mốc: Phủ thêm 1 chấm nhỏ che khuyết điểm tiệp da rồi dặm phấn phủ hạt mịn thật mỏng bằng cọ nhỏ để giữ bền màu.",
       ],
       shadePickVi: "Triệt sắc màu đào nhạt · Che khuyết điểm lỏng mỏng",
       avoidVi: undereye.avoidVi,
@@ -765,8 +857,8 @@ export function buildPersonalizedMakeupGuide(
 
   const summaryLineVi =
     detectedNames.length > 0
-      ? `Từ ảnh của bạn, nên ưu tiên mẹo cho: ${detectedNames.join(", ")} — hoặc chọn nhanh từng nhược điểm bên dưới để xem 3 bước làm cụ thể.`
-      : "Tỉ lệ nét mặt và bề mặt da của bạn khá hài hòa — chọn nhanh từng mục bên dưới để xem mẹo trang điểm chi tiết theo tông da.";
+      ? `Từ ảnh của bạn, nên chú ý: ${detectedNames.join(", ")} — kèm sẵn hướng dẫn trang điểm cho da mụn & mắt một mí/mí lót theo tông da của bạn.`
+      : "Tỉ lệ nét mặt và da bạn khá hài hòa — xem sẵn mẹo trang điểm tự nhiên cho da mụn, mắt một mí/mí lót hoặc chọn nhanh từng mục bên dưới.";
 
   return {
     summaryLineVi,

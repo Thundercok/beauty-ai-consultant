@@ -6,50 +6,64 @@ import {
   computeSplitPercentFromPointer,
 } from "../lib/beauty/beforeAfterSlider";
 import type { VirtualMakeupOptions } from "../lib/beauty/virtualMakeup";
-import type { ConsultationReport, FaceLandmarksBox, MatchedProduct } from "../lib/beauty/types";
+import type { ConsultationReport, FaceLandmarksBox } from "../lib/beauty/types";
 import { PortraitCanvas } from "./PortraitCanvas";
+
+export interface SliderSideSpec {
+  /** Short prefix shown in top floating tag (e.g. "Không son", "Có son", "A", "B") */
+  prefix: string;
+  /** Secondary shade/state text next to prefix */
+  label: string;
+  /** Concise footer caption (e.g. "Môi mộc tự nhiên" or "A · Rom&nd") */
+  footerCaption: string;
+  /** Swatch circle color */
+  swatchHex: string;
+  /** Virtual makeup rendering configuration for this side */
+  makeup: VirtualMakeupOptions;
+  /** Highlighted when this side is the active editable slot (optional) */
+  isSelected?: boolean;
+  /** Click handler on the top tag (optional, e.g. pick slot A or B) */
+  onSelect?: () => void;
+}
 
 interface LipCompareSliderPortraitProps {
   report: ConsultationReport;
   box: FaceLandmarksBox;
-  productA: MatchedProduct;
-  productB: MatchedProduct;
-  swatchHexA: string;
-  swatchHexB: string;
-  makeupA: VirtualMakeupOptions;
-  makeupB: VirtualMakeupOptions;
-  activeSlot: "A" | "B";
-  onActiveSlotChange: (slot: "A" | "B") => void;
+  leftSide: SliderSideSpec;
+  rightSide: SliderSideSpec;
   zoomToLips: boolean;
   splitPct: number;
   onSplitPctChange: (pct: number) => void;
+  ariaLabel?: string;
+  hintText?: string;
+  testId?: string;
 }
 
 /**
- * High-precision 2-shade lipstick comparison slider directly over the user's face & lips.
- * Left curtain renders Màu A, right base renders Màu B, using GPU-composited clip-path
- * for buttery 60/120fps dragging with zero React re-renders during pointer movement.
+ * High-precision interactive split slider directly over the user's face & lips.
+ * Supports both:
+ *  - "Không son / Có son" (bare natural lips left vs selected lipstick right)
+ *  - "Chọn so sánh" (Lipstick A left vs Lipstick B right)
+ * Uses GPU-composited clip-path + rAF throttling for 60/120fps dragging with zero
+ * React re-renders during active pointer movement.
  */
 export const LipCompareSliderPortrait: React.FC<LipCompareSliderPortraitProps> = ({
   report,
   box,
-  productA,
-  productB,
-  swatchHexA,
-  swatchHexB,
-  makeupA,
-  makeupB,
-  activeSlot,
-  onActiveSlotChange,
+  leftSide,
+  rightSide,
   zoomToLips,
   splitPct,
   onSplitPctChange,
+  ariaLabel = "Thanh trượt so sánh trực tiếp trên môi",
+  hintText = "Kéo qua lại trên môi",
+  testId = "lip-compare-slider",
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const clipLayerRef = useRef<HTMLDivElement | null>(null);
   const dividerRef = useRef<HTMLDivElement | null>(null);
-  const leftBadgeRef = useRef<HTMLButtonElement | null>(null);
-  const rightBadgeRef = useRef<HTMLButtonElement | null>(null);
+  const leftBadgeRef = useRef<HTMLElement | null>(null);
+  const rightBadgeRef = useRef<HTMLElement | null>(null);
 
   const draggingRef = useRef(false);
   const liveSplitRef = useRef(splitPct);
@@ -59,33 +73,39 @@ export const LipCompareSliderPortrait: React.FC<LipCompareSliderPortraitProps> =
 
   const [isDragging, setIsDragging] = useState(false);
 
-  const applyVisualSplit = useCallback((pct: number) => {
-    const clamped = clampSplitPercent(pct);
-    liveSplitRef.current = clamped;
-    const rounded = Math.round(clamped);
+  const leftTagName = leftSide.prefix;
+  const rightTagName = rightSide.prefix;
 
-    if (containerRef.current) {
-      containerRef.current.dataset.splitPct = String(rounded);
-    }
-    if (clipLayerRef.current) {
-      clipLayerRef.current.style.clipPath = `inset(0 ${100 - clamped}% 0 0)`;
-    }
-    if (dividerRef.current) {
-      dividerRef.current.style.left = `${clamped}%`;
-      dividerRef.current.setAttribute("aria-valuenow", String(rounded));
-      dividerRef.current.setAttribute(
-        "aria-valuetext",
-        `${rounded}% Màu A, ${100 - rounded}% Màu B`
-      );
-    }
-    const { showBeforeBadge, showAfterBadge } = computeCompareBadgeVisibility(clamped);
-    if (leftBadgeRef.current) {
-      leftBadgeRef.current.style.opacity = showBeforeBadge ? "1" : "0";
-    }
-    if (rightBadgeRef.current) {
-      rightBadgeRef.current.style.opacity = showAfterBadge ? "1" : "0";
-    }
-  }, []);
+  const applyVisualSplit = useCallback(
+    (pct: number) => {
+      const clamped = clampSplitPercent(pct);
+      liveSplitRef.current = clamped;
+      const rounded = Math.round(clamped);
+
+      if (containerRef.current) {
+        containerRef.current.dataset.splitPct = String(rounded);
+      }
+      if (clipLayerRef.current) {
+        clipLayerRef.current.style.clipPath = `inset(0 ${100 - clamped}% 0 0)`;
+      }
+      if (dividerRef.current) {
+        dividerRef.current.style.left = `${clamped}%`;
+        dividerRef.current.setAttribute("aria-valuenow", String(rounded));
+        dividerRef.current.setAttribute(
+          "aria-valuetext",
+          `${rounded}% ${leftTagName}, ${100 - rounded}% ${rightTagName}`
+        );
+      }
+      const { showBeforeBadge, showAfterBadge } = computeCompareBadgeVisibility(clamped);
+      if (leftBadgeRef.current) {
+        leftBadgeRef.current.style.opacity = showBeforeBadge ? "1" : "0";
+      }
+      if (rightBadgeRef.current) {
+        rightBadgeRef.current.style.opacity = showAfterBadge ? "1" : "0";
+      }
+    },
+    [leftTagName, rightTagName]
+  );
 
   useEffect(() => {
     if (!draggingRef.current) {
@@ -188,10 +208,60 @@ export const LipCompareSliderPortrait: React.FC<LipCompareSliderPortraitProps> =
     ? "transition-none"
     : "transition-[clip-path,left] duration-200 ease-out";
 
+  const renderCornerTag = (
+    side: SliderSideSpec,
+    positionClass: string,
+    visible: boolean,
+    refCb: (el: HTMLElement | null) => void
+  ) => {
+    const baseClasses = `absolute top-3.5 ${positionClass} z-20 max-w-[44%] min-h-[34px] px-3 py-1.5 rounded-full backdrop-blur-md border text-left inline-flex items-center gap-2 transition-all duration-150 ${
+      side.isSelected
+        ? "bg-white text-zinc-950 border-white shadow-[0_4px_14px_rgba(0,0,0,0.22)]"
+        : "bg-zinc-950/65 text-white border-white/15"
+    }`;
+
+    const content = (
+      <>
+        <span
+          className="w-3 h-3 rounded-full ring-1 ring-black/15 shrink-0"
+          style={{ backgroundColor: side.swatchHex }}
+          aria-hidden="true"
+        />
+        <span className="text-[11px] font-semibold truncate">
+          {side.label ? `${side.prefix} · ${side.label}` : side.prefix}
+        </span>
+      </>
+    );
+
+    if (side.onSelect) {
+      return (
+        <button
+          ref={refCb}
+          type="button"
+          onClick={side.onSelect}
+          style={{ opacity: visible ? 1 : 0 }}
+          className={`${baseClasses} cursor-pointer hover:brightness-105`}
+        >
+          {content}
+        </button>
+      );
+    }
+
+    return (
+      <div
+        ref={refCb}
+        style={{ opacity: visible ? 1 : 0 }}
+        className={`${baseClasses} pointer-events-none`}
+      >
+        {content}
+      </div>
+    );
+  };
+
   return (
     <div
       ref={containerRef}
-      data-testid="lip-compare-slider"
+      data-testid={testId}
       data-split-pct={roundedPct}
       data-dragging={isDragging ? "true" : "false"}
       onPointerDown={handlePointerDown}
@@ -199,23 +269,23 @@ export const LipCompareSliderPortrait: React.FC<LipCompareSliderPortraitProps> =
       onPointerUp={commitDragEnd}
       onPointerCancel={commitDragEnd}
       onDoubleClick={handleDoubleClick}
-      className="relative h-[365px] sm:h-[445px] lg:h-[495px] w-full rounded-3xl overflow-hidden border border-zinc-200/85 bg-zinc-950 select-none touch-pan-y cursor-ew-resize shadow-xs"
+      className="relative h-[375px] sm:h-[455px] lg:h-[510px] w-full rounded-3xl overflow-hidden border border-zinc-200/80 bg-zinc-950 select-none touch-pan-y cursor-ew-resize shadow-[0_8px_30px_rgba(0,0,0,0.06)]"
     >
-      {/* Right Base Layer: Màu B */}
+      {/* Right Base Layer */}
       <div className="absolute inset-0">
         <PortraitCanvas
           report={report}
           mode="corrected"
           showOverlay={false}
           box={box}
-          virtualMakeup={makeupB}
+          virtualMakeup={rightSide.makeup}
           zoomToLips={zoomToLips}
           fit="cover"
           containerClassName="h-full w-full bg-zinc-950"
         />
       </div>
 
-      {/* Left Clipped Layer: Màu A */}
+      {/* Left Clipped Layer */}
       <div
         ref={clipLayerRef}
         className={`absolute inset-0 will-change-[clip-path] ${motionTimingClass}`}
@@ -226,98 +296,61 @@ export const LipCompareSliderPortrait: React.FC<LipCompareSliderPortraitProps> =
           mode="corrected"
           showOverlay={false}
           box={box}
-          virtualMakeup={makeupA}
+          virtualMakeup={leftSide.makeup}
           zoomToLips={zoomToLips}
           fit="cover"
           containerClassName="h-full w-full bg-zinc-950"
         />
       </div>
 
-      {/* Top Interactive Shade Badges (Tap A or B to edit that slot) */}
-      <button
-        ref={leftBadgeRef}
-        type="button"
-        onClick={() => onActiveSlotChange("A")}
-        style={{ opacity: showBeforeBadge ? 1 : 0 }}
-        className={`absolute top-3 left-3 z-20 max-w-[44%] min-h-[34px] px-2.5 py-1 rounded-full backdrop-blur-md border text-left inline-flex items-center gap-1.5 transition-all duration-150 cursor-pointer ${
-          activeSlot === "A"
-            ? "bg-white text-zinc-900 border-white shadow-sm"
-            : "bg-black/60 text-white border-white/20 hover:bg-black/75"
-        }`}
-      >
-        <span
-          className="w-3 h-3 rounded-full ring-1 ring-black/15 shrink-0"
-          style={{ backgroundColor: swatchHexA }}
-          aria-hidden="true"
-        />
-        <span className="text-[11px] font-semibold truncate">
-          A · {productA.shade}
-        </span>
-      </button>
+      {/* Top Corner Labels */}
+      {renderCornerTag(leftSide, "left-3.5", showBeforeBadge, (el) => {
+        leftBadgeRef.current = el;
+      })}
+      {renderCornerTag(rightSide, "right-3.5", showAfterBadge, (el) => {
+        rightBadgeRef.current = el;
+      })}
 
-      <button
-        ref={rightBadgeRef}
-        type="button"
-        onClick={() => onActiveSlotChange("B")}
-        style={{ opacity: showAfterBadge ? 1 : 0 }}
-        className={`absolute top-3 right-3 z-20 max-w-[44%] min-h-[34px] px-2.5 py-1 rounded-full backdrop-blur-md border text-left inline-flex items-center gap-1.5 transition-all duration-150 cursor-pointer ${
-          activeSlot === "B"
-            ? "bg-white text-zinc-900 border-white shadow-sm"
-            : "bg-black/60 text-white border-white/20 hover:bg-black/75"
-        }`}
-      >
-        <span
-          className="w-3 h-3 rounded-full ring-1 ring-black/15 shrink-0"
-          style={{ backgroundColor: swatchHexB }}
-          aria-hidden="true"
-        />
-        <span className="text-[11px] font-semibold truncate">
-          B · {productB.shade}
-        </span>
-      </button>
-
-      {/* Vertical Split Divider & Tactile Drag Handle */}
+      {/* Hairline Vertical Split Divider & Sculpted Drag Handle */}
       <div
         ref={dividerRef}
         role="slider"
         tabIndex={0}
-        aria-label="Thanh trượt so sánh Màu A và Màu B trực tiếp trên môi"
+        aria-label={ariaLabel}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={roundedPct}
-        aria-valuetext={`${roundedPct}% Màu A, ${100 - roundedPct}% Màu B`}
+        aria-valuetext={`${roundedPct}% ${leftTagName}, ${100 - roundedPct}% ${rightTagName}`}
         onKeyDown={handleKeyDown}
         style={{ left: `${splitPct}%` }}
-        className={`absolute top-0 bottom-0 z-20 -translate-x-1/2 w-10 flex items-center justify-center focus:outline-none group ${motionTimingClass}`}
+        className={`absolute top-0 bottom-0 z-20 -translate-x-1/2 w-11 flex items-center justify-center focus:outline-none group ${motionTimingClass}`}
       >
         <div
-          className={`w-[2px] h-full transition-colors ${
+          className={`w-[1.5px] h-full transition-colors ${
             isDragging
-              ? "bg-white shadow-[0_0_12px_rgba(0,0,0,0.65)]"
-              : "bg-white/95 shadow-[0_0_8px_rgba(0,0,0,0.45)]"
+              ? "bg-white shadow-[0_0_12px_rgba(0,0,0,0.7)]"
+              : "bg-white/90 shadow-[0_0_8px_rgba(0,0,0,0.45)]"
           }`}
         />
 
         <div
-          className={`absolute top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white text-zinc-900 border border-zinc-200 flex items-center justify-center transition-transform duration-150 ${
+          className={`absolute top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/95 backdrop-blur-md text-zinc-900 border border-black/10 flex items-center justify-center transition-transform duration-150 ${
             isDragging
-              ? "scale-110 shadow-[0_6px_22px_rgba(0,0,0,0.4)] ring-4 ring-white/30"
-              : "shadow-[0_3px_14px_rgba(0,0,0,0.32)] group-hover:scale-105 group-focus-visible:ring-4 group-focus-visible:ring-rose-500/40"
+              ? "scale-110 shadow-[0_8px_24px_rgba(0,0,0,0.38)] ring-4 ring-white/30"
+              : "shadow-[0_4px_16px_rgba(0,0,0,0.28)] group-hover:scale-105 group-focus-visible:ring-4 group-focus-visible:ring-rose-500/35"
           }`}
         >
-          <MoveHorizontal className="w-4 h-4 stroke-[2.4]" />
+          <MoveHorizontal className="w-4 h-4 stroke-[2.2]" />
         </div>
       </div>
 
-      {/* Bottom Hint Scrim */}
-      <div className="absolute inset-x-0 bottom-0 z-10 pt-12 pb-3 px-4 bg-gradient-to-t from-black/80 via-black/35 to-transparent pointer-events-none flex items-end justify-between gap-2 text-[11px] text-white/90">
-        <span className="truncate">
-          <strong className="font-semibold text-white">A:</strong> {productA.brand}
+      {/* Measured Bottom Scrim */}
+      <div className="absolute inset-x-0 bottom-0 z-10 pt-14 pb-3.5 px-4 bg-gradient-to-t from-black/80 via-black/35 to-transparent pointer-events-none flex items-end justify-between gap-2 text-[11px] text-white/90">
+        <span className="truncate font-medium">{leftSide.footerCaption}</span>
+        <span className="hidden sm:inline text-white/70 shrink-0 text-[10px] tracking-wide">
+          {hintText}
         </span>
-        <span className="text-white/75 shrink-0">Kéo qua lại trên môi</span>
-        <span className="truncate text-right">
-          <strong className="font-semibold text-white">B:</strong> {productB.brand}
-        </span>
+        <span className="truncate text-right font-medium">{rightSide.footerCaption}</span>
       </div>
     </div>
   );
