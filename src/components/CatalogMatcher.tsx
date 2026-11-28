@@ -215,16 +215,16 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
       {/* Header + Search */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-3.5">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900">
+          <h1 className="text-2xl sm:text-[30px] font-bold tracking-[-0.03em] text-[#111111] leading-tight">
             Mỹ phẩm hợp da &amp; ví tiền
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
+          <p className="text-xs sm:text-sm text-[#666666] mt-0.5">
             Lọc theo ngân sách sinh viên, hợp mặt mộc đi học hoặc tìm mua nhanh trên Shopee
           </p>
         </div>
 
         <div className="relative w-full md:w-72 shrink-0">
-          <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Search className="w-4 h-4 text-[#737373] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="search"
             value={query}
@@ -234,7 +234,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
             }}
             placeholder="Tìm Romand, Black Rouge, Lemonade..."
             aria-label="Tìm tên son, hãng hoặc mã màu"
-            className="w-full min-h-[42px] md:min-h-[38px] pl-10 pr-3 py-2 text-sm md:text-xs bg-white border border-zinc-200 rounded-2xl md:rounded-xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900"
+            className="w-full min-h-[40px] md:min-h-[38px] pl-10 pr-3 py-2 text-sm md:text-xs bg-white border border-[#D4D4D4] rounded-[4px] text-[#111111] placeholder:text-[#8C8C8C] focus:outline-none focus:border-[#111111]"
           />
         </div>
       </div>
@@ -255,10 +255,10 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
                 setActiveType(tab.id);
                 setVisibleCount(12);
               }}
-              className={`min-h-[38px] sm:min-h-[34px] px-3.5 py-1.5 text-xs font-medium rounded-xl whitespace-nowrap shrink-0 snap-start border transition-colors cursor-pointer ${
+              className={`min-h-[36px] sm:min-h-[34px] px-3.5 py-1.5 text-xs font-medium rounded-[4px] whitespace-nowrap shrink-0 snap-start border transition-colors cursor-pointer ${
                 isActive
-                  ? "bg-zinc-900 text-white border-zinc-900"
-                  : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+                  ? "bg-[#111111] text-white border-[#111111]"
+                  : "bg-white text-[#525252] border-[#E5E5E5] hover:border-[#111111] hover:text-[#111111]"
               }`}
             >
               {label}
@@ -270,7 +270,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
       {/* Budget Tier & Vietnamese Student Needs Filter Bar (Clean Hairline Divided, Zero Nested Box Clutter) */}
       <div
         data-testid="budget-filter-bar"
-        className="py-2.5 border-y border-zinc-200/75 space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3"
+        className="py-2.5 border-y border-[#E5E5E5] space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3"
       >
         {/* Price Tier Segmented Buttons */}
         <div className="grid grid-cols-4 sm:flex sm:items-center gap-1.5">
@@ -286,10 +286,10 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
                   setBudgetTier(opt.id);
                   setVisibleCount(12);
                 }}
-                className={`min-h-[34px] px-1.5 sm:px-3 py-1 text-[11px] sm:text-xs font-medium rounded-lg whitespace-nowrap text-center border transition-colors cursor-pointer ${
+                className={`min-h-[34px] px-1.5 sm:px-3 py-1 text-[11px] sm:text-xs font-medium rounded-[4px] whitespace-nowrap text-center border transition-colors cursor-pointer ${
                   active
-                    ? "bg-rose-700 text-white border-rose-700"
-                    : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+                    ? "bg-[#DC2626] text-white border-[#DC2626]"
+                    : "bg-white text-[#525252] border-[#E5E5E5] hover:border-[#111111]"
                 }`}
               >
                 {opt.label}
@@ -308,10 +308,10 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
               setOnlyBareFace((v) => !v);
               setVisibleCount(12);
             }}
-            className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-lg whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
+            className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-[4px] whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
               onlyBareFace
-                ? "bg-zinc-900 text-white border-zinc-900"
-                : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+                ? "bg-[#111111] text-white border-[#111111]"
+                : "bg-white text-[#525252] border-[#E5E5E5] hover:border-[#111111]"
             }`}
           >
             Hợp mặt mộc đi học
@@ -324,10 +324,10 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
               setOnlyTeethBright((v) => !v);
               setVisibleCount(12);
             }}
-            className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-lg whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
+            className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-[4px] whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
               onlyTeethBright
-                ? "bg-zinc-900 text-white border-zinc-900"
-                : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+                ? "bg-[#111111] text-white border-[#111111]"
+                : "bg-white text-[#525252] border-[#E5E5E5] hover:border-[#111111]"
             }`}
           >
             Sáng răng · Không xỉn da
@@ -350,7 +350,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
               <article
                 key={item.id}
                 data-popular={item.isPopular ? "true" : "false"}
-                className="bg-white rounded-2xl border border-zinc-200/90 overflow-hidden flex flex-col justify-between transition-shadow hover:shadow-xs"
+                className="bg-white border border-[#E5E5E5] hover:border-[#111111] overflow-hidden flex flex-col justify-between transition-colors"
               >
                 <div>
                   {/* Swatch Visual Header */}
@@ -448,7 +448,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
                     <button
                       type="button"
                       onClick={() => onTryLipstick(item)}
-                      className="flex-1 min-h-[38px] sm:min-h-[34px] px-2.5 py-1.5 text-xs font-medium text-white bg-zinc-900 hover:bg-zinc-800 rounded-xl transition-colors whitespace-nowrap cursor-pointer"
+                      className="flex-1 min-h-[36px] sm:min-h-[34px] px-2.5 py-1.5 text-xs font-semibold text-white bg-[#111111] hover:bg-[#2B2B2B] rounded-[4px] transition-colors whitespace-nowrap cursor-pointer"
                     >
                       Thử môi
                     </button>
@@ -456,7 +456,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
                     <button
                       type="button"
                       onClick={() => onInspectProduct(item)}
-                      className="flex-1 min-h-[38px] sm:min-h-[34px] px-2.5 py-1.5 text-xs font-medium rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-800 transition-colors whitespace-nowrap cursor-pointer"
+                      className="flex-1 min-h-[36px] sm:min-h-[34px] px-2.5 py-1.5 text-xs font-semibold rounded-[4px] border border-[#D4D4D4] bg-white hover:border-[#111111] text-[#111111] transition-colors whitespace-nowrap cursor-pointer"
                     >
                       Chi tiết
                     </button>
@@ -467,7 +467,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={`Tìm mua ${item.brand} ${item.name} trên Shopee`}
-                    className="min-h-[38px] sm:min-h-[34px] px-2.5 py-1.5 text-xs font-medium rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors"
+                    className="min-h-[36px] sm:min-h-[34px] px-2.5 py-1.5 text-xs font-medium rounded-[4px] border border-[#E5E5E5] bg-white hover:border-[#111111] text-[#525252] hover:text-[#111111] inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Mua</span>
@@ -511,7 +511,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
           <button
             type="button"
             onClick={() => setVisibleCount((c) => c + 12)}
-            className="w-full sm:w-auto min-h-[42px] px-6 py-2 text-xs font-semibold text-zinc-800 bg-white border border-zinc-300 rounded-2xl hover:bg-zinc-50 transition-colors cursor-pointer"
+            className="w-full sm:w-auto min-h-[40px] px-6 py-2 text-xs font-semibold text-[#111111] bg-white border border-[#D4D4D4] hover:border-[#111111] rounded-[4px] transition-colors cursor-pointer"
           >
             Xem thêm ({enrichedAndFiltered.length - visibleCount} sản phẩm)
           </button>

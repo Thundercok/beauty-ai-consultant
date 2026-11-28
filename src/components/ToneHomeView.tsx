@@ -297,11 +297,12 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
       {/* Left Column: Sharp Architectural Portrait Mirror (Sticky on Tablet & Desktop) */}
       <div className="md:col-span-5 md:sticky md:top-20">
         <div className="bg-white border border-[#E5E5E5] overflow-hidden">
-          <div
-            ref={portraitFrameRef}
-            data-testid="hero-portrait-frame"
-            className="relative h-[390px] sm:h-[440px] md:h-[420px] lg:h-[510px] w-full overflow-hidden bg-[#111111]"
-          >
+          <div className="w-full bg-[#F5F5F5] sm:py-4 md:p-0 md:bg-[#111111]">
+            <div
+              ref={portraitFrameRef}
+              data-testid="hero-portrait-frame"
+              className="relative aspect-[4/5] w-full max-w-[440px] mx-auto md:max-w-none overflow-hidden bg-[#111111] sm:border sm:border-[#E5E5E5] md:border-0"
+            >
             {/* Clean Top Floating Toggle: Daylight | Original + Switch Demo */}
             <div className="absolute top-3 inset-x-3 z-20 flex items-center justify-between gap-2 pointer-events-none">
               <div className="pointer-events-auto inline-flex items-center p-0.5 rounded-[3px] bg-[#111111]/75 backdrop-blur-md border border-white/15">
@@ -418,11 +419,11 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="absolute inset-x-0 bottom-0 z-10 pt-20 pb-4 px-4 sm:px-5 bg-gradient-to-t from-black/85 via-black/45 to-transparent pointer-events-none">
+              <div className="absolute inset-x-0 bottom-0 z-10 pt-12 pb-3.5 px-4 sm:px-5 bg-gradient-to-t from-black/85 via-black/45 to-transparent pointer-events-none">
                 {isProcessing || !report || !plainGuide ? (
                   <div className="space-y-2">
                     <div className="h-3 w-36 rounded-full bg-white/25 animate-pulse" />
-                    <div className="h-6 w-52 rounded-md bg-white/30 animate-pulse" />
+                    <div className="h-6 w-52 rounded-[3px] bg-white/30 animate-pulse" />
                     <div className="h-3.5 w-44 rounded-full bg-white/20 animate-pulse" />
                   </div>
                 ) : (
@@ -436,7 +437,7 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                         style={{ backgroundColor: skinSwatchHex }}
                         aria-hidden="true"
                       />
-                      <h1 className="text-lg sm:text-[22px] font-bold text-white tracking-[-0.025em] leading-snug line-clamp-2">
+                      <h1 className="text-lg sm:text-[21px] font-bold text-white tracking-[-0.025em] leading-snug line-clamp-2">
                         {plainGuide.plainTitle}
                       </h1>
                     </div>
@@ -448,6 +449,7 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                 )}
               </div>
             )}
+            </div>
           </div>
 
           {/* Interactive Multi-Layer Makeup Blueprint & Step-by-Step Routine Controls */}
@@ -615,12 +617,12 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                   </div>
 
                   {/* Utility Strip: Crisp vs Natural Preview Mode + 1-Tap PNG Blueprint Save */}
-                  <div className="pt-2 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-2">
+                  <div className="pt-2 border-t border-[#E5E5E5] flex flex-wrap items-center justify-between gap-2">
                     <div
                       data-testid="guide-intensity-toggle"
                       role="group"
                       aria-label="Độ rõ nét sơ đồ trang điểm"
-                      className="inline-flex items-center p-0.5 rounded-lg bg-zinc-100 text-[11px]"
+                      className="inline-flex items-center p-0.5 rounded-[4px] bg-[#F5F5F5] text-[11px]"
                     >
                       {(
                         [
@@ -636,10 +638,10 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                             data-testid={`guide-intensity-${modeId}`}
                             aria-pressed={active}
                             onClick={() => setGuideIntensity(modeId)}
-                            className={`min-h-[28px] px-2.5 py-0.5 rounded-md whitespace-nowrap transition-colors cursor-pointer ${
+                            className={`min-h-[28px] px-2.5 py-0.5 rounded-[3px] whitespace-nowrap transition-colors cursor-pointer ${
                               active
-                                ? "bg-white text-zinc-900 font-semibold shadow-2xs"
-                                : "text-zinc-600 hover:text-zinc-900 font-medium"
+                                ? "bg-white text-[#111111] font-semibold shadow-2xs"
+                                : "text-[#666666] hover:text-[#111111] font-medium"
                             }`}
                           >
                             {label}

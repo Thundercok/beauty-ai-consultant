@@ -890,6 +890,7 @@ export default function App() {
             <ProInsightsView
               report={report}
               faceBox={faceBox}
+              skinSwatchHex={skinSwatchHex}
               onFaceBoxChange={setFaceBox}
               onResetFaceBox={handleResetFaceBox}
               landmarkStatus={landmarkStatus}
@@ -905,10 +906,14 @@ export default function App() {
               topLipstick={topMatches.lipsticks[0] ?? null}
               topBlush={topMatches.blushes[0] ?? null}
               topEyeshadow={topMatches.eyeshadows[0] ?? null}
+              recommendedLipsticks={topMatches.lipsticks.slice(0, 6)}
+              recommendedBlushes={topMatches.blushes.slice(0, 4)}
+              recommendedEyeshadows={topMatches.eyeshadows.slice(0, 4)}
               demoPresets={DEMO_PORTRAIT_PRESETS}
               activeDemoId={activeDemoId}
               onSelectDemo={loadDemoPreset}
               onOpenPhotoPicker={() => setPhotoSheetOpen(true)}
+              onNotify={(msg) => showToast(msg, "success")}
             />
           ))}
       </main>

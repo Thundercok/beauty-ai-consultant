@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Download, RotateCcw, Scale, ScanFace, SlidersHorizontal } from "lucide-react";
 import { AutoFaceShapeCard } from "./AutoFaceShapeCard";
+import { BeautyReportExportModal } from "./BeautyReportExportModal";
 import { HonestFaceAuditStudio } from "./HonestFaceAuditStudio";
 import type { DemoPortraitPreset } from "./PhotoPickerSheet";
 import { PortraitCanvas } from "./PortraitCanvas";
@@ -26,6 +27,7 @@ import type {
 interface ProInsightsViewProps {
   report: ConsultationReport;
   faceBox: FaceLandmarksBox;
+  skinSwatchHex: string;
   onFaceBoxChange: (updater: (prev: FaceLandmarksBox) => FaceLandmarksBox) => void;
   onResetFaceBox: () => void;
   landmarkStatus: "loading" | "neural" | "fallback";
@@ -41,10 +43,14 @@ interface ProInsightsViewProps {
   topLipstick: MatchedProduct | null;
   topBlush: MatchedProduct | null;
   topEyeshadow: MatchedProduct | null;
+  recommendedLipsticks: MatchedProduct[];
+  recommendedBlushes: MatchedProduct[];
+  recommendedEyeshadows: MatchedProduct[];
   demoPresets: DemoPortraitPreset[];
   activeDemoId: string | null;
   onSelectDemo: (preset: DemoPortraitPreset) => void;
   onOpenPhotoPicker: () => void;
+  onNotify?: (message: string) => void;
 }
 
 const ConfidenceRing: React.FC<{
@@ -105,6 +111,7 @@ const ConfidenceRing: React.FC<{
 export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
   report,
   faceBox,
+  skinSwatchHex,
   onFaceBoxChange,
   onResetFaceBox,
   landmarkStatus,
@@ -120,14 +127,19 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
   topLipstick,
   topBlush,
   topEyeshadow,
+  recommendedLipsticks,
+  recommendedBlushes,
+  recommendedEyeshadows,
   demoPresets,
   activeDemoId,
   onSelectDemo,
   onOpenPhotoPicker,
+  onNotify,
 }) => {
   const [subTab, setSubTab] = useState<
     "honest_audit" | "faceshape" | "lighting" | "skinmaps" | "metrics"
   >("honest_audit");
+  const [reportModalOpen, setReportModalOpen] = useState(false);
   const [showAllSeasons, setShowAllSeasons] = useState(false);
   const [showRoiTuning, setShowRoiTuning] = useState(landmarkStatus === "fallback");
   const [showRoiOverlay, setShowRoiOverlay] = useState(true);
@@ -169,11 +181,12 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
 
           <button
             type="button"
-            onClick={onExportJson}
-            className="min-h-[36px] px-3.5 py-1.5 text-xs font-semibold text-[#111111] bg-white hover:bg-[#111111] hover:text-white border border-[#D4D4D4] hover:border-[#111111] rounded-[4px] inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
+            data-testid="open-report-export-btn"
+            onClick={() => setReportModalOpen(true)}
+            className="min-h-[38px] px-4 py-1.5 text-xs font-semibold text-white bg-[#111111] hover:bg-[#2B2B2B] rounded-[4px] inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Xuất JSON</span>
+            <span>Tải báo cáo</span>
           </button>
         </div>
 
@@ -348,17 +361,17 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
 
           {/* Melanin & Hemoglobin Maps */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-            <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-zinc-100 flex items-center justify-between gap-2">
+            <div className="bg-white border border-[#E5E5E5] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#E5E5E5] flex items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-sm font-semibold text-zinc-900">Phân bố sắc tố nâu (Melanin)</h2>
-                  <p className="text-xs text-zinc-500">
+                  <h2 className="text-sm font-semibold text-[#111111]">Phân bố sắc tố nâu (Melanin)</h2>
+                  <p className="text-xs text-[#666666]">
                     Quan sát độ đều màu và vùng sạm nhẹ trên khuôn mặt
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 shrink-0">
+                <div className="flex items-center gap-1.5 text-[11px] text-[#666666] shrink-0">
                   <span>Ít</span>
-                  <span className="w-12 h-2 rounded-xs bg-gradient-to-r from-[#2d5091] via-[#c7995b] to-[#fa961e]" />
+                  <span className="w-12 h-2 bg-gradient-to-r from-[#2d5091] via-[#c7995b] to-[#fa961e]" />
                   <span>Nhiều</span>
                 </div>
               </div>
@@ -371,19 +384,19 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
               />
             </div>
 
-            <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-zinc-100 flex items-center justify-between gap-2">
+            <div className="bg-white border border-[#E5E5E5] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#E5E5E5] flex items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-sm font-semibold text-zinc-900">
+                  <h2 className="text-sm font-semibold text-[#111111]">
                     Phân bố độ ửng đỏ (Hemoglobin)
                   </h2>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-[#666666]">
                     Nhận diện vùng má hay ửng đỏ để chọn kem nền &amp; má hồng hài hòa
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 shrink-0">
+                <div className="flex items-center gap-1.5 text-[11px] text-[#666666] shrink-0">
                   <span>Ít</span>
-                  <span className="w-12 h-2 rounded-xs bg-gradient-to-r from-[#2896c8] via-[#a35a9c] to-[#fa2c37]" />
+                  <span className="w-12 h-2 bg-gradient-to-r from-[#2896c8] via-[#a35a9c] to-[#fa2c37]" />
                   <span>Nhiều</span>
                 </div>
               </div>
@@ -400,7 +413,7 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
       )}
 
       {subTab === "metrics" && (
-        <div className="bg-white border border-[#E5DFD7] rounded-2xl p-4 sm:p-6 space-y-6">
+        <div className="bg-white border border-[#E5E5E5] p-4 sm:p-6 space-y-6">
           {/* Moved from Tone Home: Analysis Confidence Ring + Factor Breakdown */}
           <div
             data-testid="skin-metrics-confidence-card"
@@ -494,7 +507,7 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
           <section
             data-testid="facial-symmetry-card"
             aria-label="Độ đối xứng khuôn mặt và gợi ý tạo khối"
-            className="rounded-2xl bg-zinc-50/75 border border-zinc-200/80 p-4 sm:p-5 space-y-4"
+            className="bg-[#FAFAFA] border border-[#E5E5E5] p-4 sm:p-5 space-y-4"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3.5 min-w-0">
@@ -570,9 +583,9 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
               </div>
 
               {symmetry.available && (
-                <div className="font-mono tabular-nums text-xs text-zinc-600 bg-white border border-zinc-200/80 rounded-xl px-3 py-1.5 self-start sm:self-center whitespace-nowrap shrink-0">
+                <div className="font-mono tabular-nums text-xs text-[#525252] bg-white border border-[#E5E5E5] rounded-[4px] px-3 py-1.5 self-start sm:self-center whitespace-nowrap shrink-0">
                   Tổng điểm:{" "}
-                  <strong className="font-bold text-zinc-900">
+                  <strong className="font-bold text-[#111111]">
                     {symmetry.overallScore.toFixed(1)}%
                   </strong>
                 </div>
@@ -628,10 +641,10 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
                     {symmetry.contouringInsights.map((insight) => (
                       <div
                         key={insight.zone}
-                        className="rounded-xl bg-white border border-zinc-200/75 px-3 py-2.5 space-y-0.5"
+                        className="bg-white border border-[#E5E5E5] px-3 py-2.5 space-y-0.5"
                       >
-                        <div className="text-xs font-semibold text-zinc-900">{insight.zone}</div>
-                        <p className="text-xs text-zinc-600 leading-relaxed">{insight.tipVi}</p>
+                        <div className="text-xs font-semibold text-[#111111]">{insight.zone}</div>
+                        <p className="text-xs text-[#525252] leading-relaxed">{insight.tipVi}</p>
                       </div>
                     ))}
                   </div>
@@ -696,7 +709,7 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
                   id="wb-method"
                   value={wbMethod}
                   onChange={(e) => onWbMethodChange(e.target.value as WhiteBalanceMethod)}
-                  className="w-full min-h-[42px] sm:min-h-[38px] text-sm sm:text-xs bg-white border border-zinc-300 rounded-xl px-3 py-2 text-zinc-900"
+                  className="w-full min-h-[42px] sm:min-h-[38px] text-sm sm:text-xs bg-white border border-[#D4D4D4] rounded-[4px] px-3 py-2 text-[#111111]"
                 >
                   <option value="planckian_grey_edge">Planckian Grey-Edge (Mặc định)</option>
                   <option value="planckian_sog">Shades-of-Gray</option>
@@ -705,14 +718,14 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
               </div>
 
               <div>
-                <label htmlFor="catalog-ill" className="block text-xs font-medium text-zinc-600 mb-1.5">
+                <label htmlFor="catalog-ill" className="block text-xs font-medium text-[#525252] mb-1.5">
                   Chuẩn ánh sáng bảng màu
                 </label>
                 <select
                   id="catalog-ill"
                   value={catalogIlluminant}
                   onChange={(e) => onCatalogIlluminantChange(e.target.value as IlluminantName)}
-                  className="w-full min-h-[42px] sm:min-h-[38px] text-sm sm:text-xs bg-white border border-zinc-300 rounded-xl px-3 py-2 text-zinc-900"
+                  className="w-full min-h-[42px] sm:min-h-[38px] text-sm sm:text-xs bg-white border border-[#D4D4D4] rounded-[4px] px-3 py-2 text-[#111111]"
                 >
                   <option value="D65">Chuẩn màn hình sRGB (D65)</option>
                   <option value="D50">Chuẩn phòng lab ICC (D50 → D65)</option>
@@ -804,6 +817,19 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
           </div>
         </div>
       )}
+
+      <BeautyReportExportModal
+        open={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        report={report}
+        faceBox={faceBox}
+        skinSwatchHex={skinSwatchHex}
+        recommendedLipsticks={recommendedLipsticks}
+        recommendedBlushes={recommendedBlushes}
+        recommendedEyeshadows={recommendedEyeshadows}
+        onExportJson={onExportJson}
+        onNotify={onNotify}
+      />
     </div>
   );
 };

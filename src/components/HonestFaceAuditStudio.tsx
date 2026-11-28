@@ -758,10 +758,11 @@ export const HonestFaceAuditStudio: React.FC<HonestFaceAuditStudioProps> = ({
               />
             </div>
           ) : (
-            <div
-              ref={portraitFrameRef}
-              className="relative h-[420px] sm:h-[470px] lg:h-[530px] w-full overflow-hidden bg-[#111111] select-none"
-            >
+            <div className="w-full bg-[#F5F5F5] sm:py-4 lg:p-0 lg:bg-[#111111]">
+              <div
+                ref={portraitFrameRef}
+                className="relative aspect-[4/5] w-full max-w-[460px] mx-auto lg:max-w-none overflow-hidden bg-[#111111] sm:border sm:border-[#E5E5E5] lg:border-0 select-none"
+              >
               <PortraitCanvas
                 report={report}
                 mode={photoLighting}
@@ -841,6 +842,7 @@ export const HonestFaceAuditStudio: React.FC<HonestFaceAuditStudioProps> = ({
                   </span>
                 </div>
               )}
+              </div>
             </div>
           )}
 

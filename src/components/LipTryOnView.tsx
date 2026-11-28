@@ -752,7 +752,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
         <div
           role="tablist"
           aria-label="Chế độ thử son"
-          className="grid grid-cols-3 sm:inline-flex items-center gap-1 p-1 bg-zinc-100/95 rounded-2xl w-full sm:w-auto"
+          className="grid grid-cols-3 sm:inline-flex items-center gap-1 p-0.5 bg-[#EFEFEF] rounded-[4px] w-full sm:w-auto"
         >
           <button
             type="button"
@@ -760,10 +760,10 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
             aria-selected={tryOnMode === "single"}
             data-testid="tryon-mode-single"
             onClick={() => handleSwitchMode("single")}
-            className={`min-h-[38px] px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
+            className={`min-h-[36px] px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-[3px] inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer ${
               tryOnMode === "single"
-                ? "bg-white text-zinc-950 shadow-xs font-semibold"
-                : "text-zinc-600 hover:text-zinc-900"
+                ? "bg-white text-[#111111] shadow-2xs font-semibold"
+                : "text-[#666666] hover:text-[#111111]"
             }`}
           >
             <Sparkles className="hidden sm:inline-block w-3.5 h-3.5 shrink-0" />
@@ -776,10 +776,10 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
             aria-selected={isBareVsLip}
             data-testid="makeup-compare-tab"
             onClick={() => handleSwitchMode("bare_vs_lip")}
-            className={`min-h-[38px] px-1.5 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
+            className={`min-h-[36px] px-1.5 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-[3px] inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer ${
               isBareVsLip
-                ? "bg-white text-zinc-950 shadow-xs font-semibold"
-                : "text-zinc-600 hover:text-zinc-900"
+                ? "bg-white text-[#111111] shadow-2xs font-semibold"
+                : "text-[#666666] hover:text-[#111111]"
             }`}
           >
             <SlidersHorizontal className="hidden sm:inline-block w-3.5 h-3.5 shrink-0" />
@@ -792,10 +792,10 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
             aria-selected={isCompareTwo}
             data-testid="compare-two-shades-tab"
             onClick={() => handleSwitchMode("compare_two")}
-            className={`min-h-[38px] px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
+            className={`min-h-[36px] px-2 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-[3px] inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer ${
               isCompareTwo
-                ? "bg-white text-zinc-950 shadow-xs font-semibold"
-                : "text-zinc-600 hover:text-zinc-900"
+                ? "bg-white text-[#111111] shadow-2xs font-semibold"
+                : "text-[#666666] hover:text-[#111111]"
             }`}
           >
             <Columns2 className="hidden sm:inline-block w-3.5 h-3.5 shrink-0" />
@@ -806,7 +806,7 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
         <button
           type="button"
           onClick={handleSaveLookPng}
-          className="hidden sm:inline-flex min-h-[38px] px-3.5 py-1.5 rounded-xl border border-zinc-200/90 bg-white hover:bg-zinc-50 text-xs font-semibold text-zinc-800 items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
+          className="hidden sm:inline-flex min-h-[36px] px-3.5 py-1.5 rounded-[4px] border border-[#D4D4D4] bg-white hover:border-[#111111] text-xs font-semibold text-[#111111] items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
         >
           <Download className="w-3.5 h-3.5" />
           <span>Lưu ảnh hỏi bạn</span>
@@ -1155,10 +1155,10 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
               {/* Dedicated 'So sánh Makeup' Studio Control Strip */}
               <div
                 data-testid="makeup-compare-controls"
-                className="bg-white rounded-2xl border border-zinc-200/85 overflow-hidden"
+                className="bg-white border border-[#E5E5E5] overflow-hidden"
               >
                 <div className="px-2 sm:px-3 py-2 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
-                  <div className="inline-grid grid-cols-3 gap-0.5 p-0.5 bg-zinc-100 rounded-xl shrink-0">
+                  <div className="inline-grid grid-cols-3 gap-0.5 p-0.5 bg-[#EFEFEF] rounded-[4px] shrink-0">
                     {[
                       { label: "Mặt mộc", pct: 100 },
                       { label: "50/50", pct: 50 },
@@ -1270,102 +1270,104 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
               </div>
             </>
           ) : (
-            <div
-              className="relative bg-zinc-950 rounded-3xl overflow-hidden border border-zinc-200/80 shadow-[0_8px_30px_rgba(0,0,0,0.06)] h-[380px] sm:h-[430px] md:h-[400px] lg:h-[510px] w-full select-none"
-              onPointerDown={(e) => {
-                if ((e.target as HTMLElement).closest("button")) return;
-                setHoldingBare(true);
-              }}
-              onPointerUp={() => setHoldingBare(false)}
-              onPointerLeave={() => setHoldingBare(false)}
-              onPointerCancel={() => setHoldingBare(false)}
-            >
-              {/* Top overlay controls */}
-              <div className="absolute top-3.5 inset-x-3.5 z-10 flex items-center justify-between gap-2 pointer-events-none">
-                <button
-                  type="button"
-                  aria-pressed={compareBare}
-                  onClick={() => setCompareBare((v) => !v)}
-                  className={`pointer-events-auto min-h-[36px] px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md border inline-flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer ${
-                    isBareSingleActive
-                      ? "bg-white text-zinc-950 border-white shadow-sm"
-                      : "bg-zinc-950/60 text-white border-white/15 hover:bg-zinc-950/75"
-                  }`}
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>{isBareSingleActive ? "Không son" : "Xem không son"}</span>
-                </button>
-
-                <div className="pointer-events-auto flex items-center gap-1.5">
+            <div className="w-full bg-[#F5F5F5] sm:py-4 md:p-0 md:bg-[#111111] border border-[#E5E5E5] overflow-hidden">
+              <div
+                className="relative bg-[#111111] overflow-hidden aspect-[4/5] w-full max-w-[460px] mx-auto md:max-w-none sm:border sm:border-[#E5E5E5] md:border-0 select-none"
+                onPointerDown={(e) => {
+                  if ((e.target as HTMLElement).closest("button")) return;
+                  setHoldingBare(true);
+                }}
+                onPointerUp={() => setHoldingBare(false)}
+                onPointerLeave={() => setHoldingBare(false)}
+                onPointerCancel={() => setHoldingBare(false)}
+              >
+                {/* Top overlay controls */}
+                <div className="absolute top-3 inset-x-3 z-10 flex items-center justify-between gap-2 pointer-events-none">
                   <button
                     type="button"
-                    aria-pressed={zoomToLips}
-                    aria-label={zoomToLips ? "Thu nhỏ toàn mặt" : "Phóng to vùng môi"}
-                    onClick={() => setZoomToLips((v) => !v)}
-                    className={`min-h-[36px] min-w-[36px] px-2.5 py-1.5 rounded-full text-xs font-medium backdrop-blur-md border inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors cursor-pointer ${
-                      zoomToLips
-                        ? "bg-white text-zinc-950 border-white shadow-sm"
-                        : "bg-zinc-950/60 text-white border-white/15 hover:bg-zinc-950/75"
+                    aria-pressed={compareBare}
+                    onClick={() => setCompareBare((v) => !v)}
+                    className={`pointer-events-auto min-h-[32px] px-3 py-1 rounded-[3px] text-[11px] font-semibold backdrop-blur-md border inline-flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer ${
+                      isBareSingleActive
+                        ? "bg-white text-[#111111] border-white shadow-sm"
+                        : "bg-[#111111]/75 text-white border-white/15 hover:bg-[#111111]"
                     }`}
                   >
-                    {zoomToLips ? <ZoomOut className="w-4 h-4" /> : <ZoomIn className="w-4 h-4" />}
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>{isBareSingleActive ? "Không son" : "Xem không son"}</span>
                   </button>
 
-                  <button
-                    type="button"
-                    aria-pressed={blushEnabled}
-                    onClick={() => onBlushEnabledChange(!blushEnabled)}
-                    className={`min-h-[36px] px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md border whitespace-nowrap transition-colors cursor-pointer ${
-                      blushEnabled
-                        ? "bg-rose-600 text-white border-rose-500"
-                        : "bg-zinc-950/60 text-white border-white/15 hover:bg-zinc-950/75"
-                    }`}
-                  >
-                    {blushEnabled ? "Má hồng: Bật" : "+ Má hồng"}
-                  </button>
-                </div>
-              </div>
-
-              <PortraitCanvas
-                report={report}
-                mode="corrected"
-                showOverlay={false}
-                box={faceBox}
-                virtualMakeup={virtualMakeupA}
-                zoomToLips={zoomToLips}
-                fit="cover"
-                containerClassName="h-full w-full bg-zinc-950"
-              />
-
-              {/* Compact bottom active-shade strip */}
-              {productA && (
-                <div className="absolute inset-x-0 bottom-0 pt-14 pb-3.5 px-4 bg-gradient-to-t from-black/85 via-black/45 to-transparent pointer-events-none">
-                  <div className="flex items-end justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-[11px] text-white/80 truncate">
-                        {productA.brand} · {priceA?.priceRangeLabel}
-                        <span className="hidden lg:inline"> · Nhấn giữ ảnh xem không son</span>
-                      </div>
-                      <div className="text-sm font-bold text-white leading-snug line-clamp-2">
-                        {productA.name} — {productA.shade}
-                      </div>
-                    </div>
-                    <span
-                      className={`text-xs font-semibold tabular-nums shrink-0 ${
-                        isBareSingleActive ? "text-white/85" : scrimScoreToneClass(auditA.overallScore)
+                  <div className="pointer-events-auto flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      aria-pressed={zoomToLips}
+                      aria-label={zoomToLips ? "Thu nhỏ toàn mặt" : "Phóng to vùng môi"}
+                      onClick={() => setZoomToLips((v) => !v)}
+                      className={`min-h-[32px] min-w-[32px] px-2 py-1 rounded-[3px] text-[11px] font-medium backdrop-blur-md border inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors cursor-pointer ${
+                        zoomToLips
+                          ? "bg-white text-[#111111] border-white shadow-sm"
+                          : "bg-[#111111]/75 text-white border-white/15 hover:bg-[#111111]"
                       }`}
                     >
-                      {isBareSingleActive ? "Mặt mộc" : `${auditA.overallScore}/100 · ${auditA.verdictTagVi}`}
-                    </span>
+                      {zoomToLips ? <ZoomOut className="w-3.5 h-3.5" /> : <ZoomIn className="w-3.5 h-3.5" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-pressed={blushEnabled}
+                      onClick={() => onBlushEnabledChange(!blushEnabled)}
+                      className={`min-h-[32px] px-3 py-1 rounded-[3px] text-[11px] font-semibold backdrop-blur-md border whitespace-nowrap transition-colors cursor-pointer ${
+                        blushEnabled
+                          ? "bg-[#DC2626] text-white border-[#DC2626]"
+                          : "bg-[#111111]/75 text-white border-white/15 hover:bg-[#111111]"
+                      }`}
+                    >
+                      {blushEnabled ? "Má hồng: Bật" : "+ Má hồng"}
+                    </button>
                   </div>
                 </div>
-              )}
+
+                <PortraitCanvas
+                  report={report}
+                  mode="corrected"
+                  showOverlay={false}
+                  box={faceBox}
+                  virtualMakeup={virtualMakeupA}
+                  zoomToLips={zoomToLips}
+                  fit="cover"
+                  containerClassName="h-full w-full bg-[#111111]"
+                />
+
+                {/* Compact bottom active-shade strip */}
+                {productA && (
+                  <div className="absolute inset-x-0 bottom-0 pt-12 pb-3.5 px-4 bg-gradient-to-t from-black/85 via-black/45 to-transparent pointer-events-none">
+                    <div className="flex items-end justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-[11px] text-white/80 truncate">
+                          {productA.brand} · {priceA?.priceRangeLabel}
+                          <span className="hidden lg:inline"> · Nhấn giữ ảnh xem không son</span>
+                        </div>
+                        <div className="text-sm font-bold text-white leading-snug line-clamp-2">
+                          {productA.name} — {productA.shade}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-xs font-semibold tabular-nums shrink-0 ${
+                          isBareSingleActive ? "text-white/85" : scrimScoreToneClass(auditA.overallScore)
+                        }`}
+                      >
+                        {isBareSingleActive ? "Mặt mộc" : `${auditA.overallScore}/100 · ${auditA.verdictTagVi}`}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {/* Inline Blush Shade Switcher when Blush overlay is active */}
           {blushEnabled && availableBlushes.length > 0 && (
-            <div className="bg-white rounded-2xl border border-zinc-200/85 px-4 py-3 flex items-center justify-between gap-3">
+            <div className="bg-white border border-[#E5E5E5] px-4 py-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-xs font-semibold text-zinc-900 truncate">
                   Má hồng: {activeBlush?.brand}

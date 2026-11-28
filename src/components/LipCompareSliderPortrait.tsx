@@ -216,10 +216,10 @@ export const LipCompareSliderPortrait: React.FC<LipCompareSliderPortraitProps> =
     visible: boolean,
     refCb: (el: HTMLElement | null) => void
   ) => {
-    const baseClasses = `absolute top-3.5 ${positionClass} z-20 max-w-[44%] min-h-[32px] px-2.5 py-1 rounded-lg backdrop-blur-md border text-left inline-flex items-center gap-2 transition-all duration-150 ${
+    const baseClasses = `absolute top-3.5 ${positionClass} z-20 max-w-[44%] min-h-[32px] px-2.5 py-1 rounded-[3px] backdrop-blur-md border text-left inline-flex items-center gap-2 transition-all duration-150 ${
       side.isSelected
-        ? "bg-white/95 text-[#171513] border-white shadow-[0_4px_14px_rgba(0,0,0,0.22)]"
-        : "bg-[#171513]/72 text-white border-white/15"
+        ? "bg-white/95 text-[#111111] border-white shadow-[0_4px_14px_rgba(0,0,0,0.22)]"
+        : "bg-[#111111]/78 text-white border-white/15"
     }`;
 
     const content = (
@@ -261,18 +261,19 @@ export const LipCompareSliderPortrait: React.FC<LipCompareSliderPortraitProps> =
   };
 
   return (
-    <div
-      ref={containerRef}
-      data-testid={testId}
-      data-split-pct={roundedPct}
-      data-dragging={isDragging ? "true" : "false"}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={commitDragEnd}
-      onPointerCancel={commitDragEnd}
-      onDoubleClick={handleDoubleClick}
-      className="relative h-[410px] sm:h-[460px] lg:h-[520px] w-full rounded-2xl overflow-hidden border border-[#DED7CD] bg-[#171513] select-none touch-pan-y cursor-ew-resize"
-    >
+    <div className="w-full bg-[#F5F5F5] sm:py-4 md:p-0 md:bg-[#111111] border border-[#E5E5E5] overflow-hidden">
+      <div
+        ref={containerRef}
+        data-testid={testId}
+        data-split-pct={roundedPct}
+        data-dragging={isDragging ? "true" : "false"}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={commitDragEnd}
+        onPointerCancel={commitDragEnd}
+        onDoubleClick={handleDoubleClick}
+        className="relative aspect-[4/5] w-full max-w-[460px] mx-auto md:max-w-none overflow-hidden bg-[#111111] sm:border sm:border-[#E5E5E5] md:border-0 select-none touch-pan-y cursor-ew-resize"
+      >
       {/* Right Base Layer */}
       <div className="absolute inset-0">
         <PortraitCanvas
@@ -353,6 +354,7 @@ export const LipCompareSliderPortrait: React.FC<LipCompareSliderPortraitProps> =
           {hintText}
         </span>
         <span className="truncate text-right font-medium">{rightSide.footerCaption}</span>
+      </div>
       </div>
     </div>
   );
