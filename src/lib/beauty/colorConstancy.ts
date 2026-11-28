@@ -115,6 +115,22 @@ export function projectToPlanckianLocus(
  * Estimate raw linear-RGB illuminant from non-skin pixels (outside excludeMask).
  * Supports Shades-of-Gray (p=6) and 1st-order Sobel Grey-Edge.
  */
+/** One-pixel erosion with an 8-connected (3x3) neighbourhood; image borders count as invalid. */
+function erodeMask(mask: Uint8Array, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(mask.length);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      let keep = 1;
+      for (let dy = -width; dy <= width && keep; dy += width) {
+        keep = mask[i + dy - 1] & mask[i + dy] & mask[i + dy + 1];
+      }
+      out[i] = keep;
+    }
+  }
+  return out;
+}
+
 export function estimateNonskinIlluminant(
   rgba: Uint8ClampedArray,
   width: number,
@@ -224,19 +240,15 @@ export function estimateNonskinIlluminant(
   let sumEdgeB = 0;
   let edgeCount = 0;
 
+  // The 3x3 blur followed by the 3x3 Sobel reads pixels up to 2px away, so a gradient is only
+  // clean when the whole 5x5 window is valid. Otherwise the warm skin/background boundary of
+  // the excluded face leaks into the estimate and every photo reads as lit by a warmer lamp.
+  const interior = erodeMask(erodeMask(activeValid, width, height), width, height);
+
   for (let y = 2; y < height - 2; y++) {
     for (let x = 2; x < width - 2; x++) {
       const idx = y * width + x;
-      // Check 2px eroded interior
-      if (
-        !activeValid[idx] ||
-        !activeValid[idx - 1] ||
-        !activeValid[idx + 1] ||
-        !activeValid[idx - width] ||
-        !activeValid[idx + width]
-      ) {
-        continue;
-      }
+      if (!interior[idx]) continue;
       const sobelMag = (arr: Float32Array): number => {
         const tl = arr[(y - 1) * width + (x - 1)];
         const tc = arr[(y - 1) * width + x];

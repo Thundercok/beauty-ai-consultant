@@ -325,12 +325,67 @@ function buildFallbackBoxMasks(width: number, height: number, box: FaceLandmarks
   };
 }
 
+/** 8-bit value at or above which a camera channel is treated as clipped. */
+const CLIPPED_CHANNEL = 250;
+
+/** Margin around the face hull, as a share of its width, kept out of illuminant estimation. */
+const ILLUMINANT_EXCLUSION_MARGIN = 0.15;
+
+function maskBoundsWidth(mask: Uint8Array, width: number): number {
+  let minX = width;
+  let maxX = -1;
+  for (let i = 0; i < mask.length; i++) {
+    if (!mask[i]) continue;
+    const x = i % width;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+  }
+  return maxX >= minX ? maxX - minX + 1 : 0;
+}
+
+/** Marks every pixel within `radius` of the mask along a row (one pass of a square dilation). */
+function dilateRows(mask: Uint8Array, width: number, height: number, radius: number): Uint8Array {
+  const out = new Uint8Array(mask.length);
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    let last = -Infinity;
+    for (let x = 0; x < width; x++) {
+      if (mask[row + x]) last = x;
+      if (x - last <= radius) out[row + x] = 1;
+    }
+    last = Infinity;
+    for (let x = width - 1; x >= 0; x--) {
+      if (mask[row + x]) last = x;
+      if (last - x <= radius) out[row + x] = 1;
+    }
+  }
+  return out;
+}
+
+function transposeMask(mask: Uint8Array, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(mask.length);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) out[x * height + y] = mask[y * width + x];
+  }
+  return out;
+}
+
+/** Square dilation by `radius` pixels, done as a row pass and a column pass. */
+function dilateMask(mask: Uint8Array, width: number, height: number, radius: number): Uint8Array {
+  if (radius <= 0) return mask;
+  const rows = dilateRows(mask, width, height, radius);
+  const cols = dilateRows(transposeMask(rows, width, height), height, width, radius);
+  return transposeMask(cols, height, width);
+}
+
 function sampleSkinFromImage(
   rgba: Uint8ClampedArray,
   width: number,
   height: number,
   faceHullMask: Uint8Array,
-  featureExclusionMask: Uint8Array
+  featureExclusionMask: Uint8Array,
+  /** Uncorrected camera pixels, used only to skip channels the camera clipped */
+  sourceRgba: Uint8ClampedArray = rgba
 ) {
   const n = width * height;
   const skinMask = new Uint8Array(n);
@@ -344,6 +399,14 @@ function sampleSkinFromImage(
   for (let i = 0; i < n; i++) {
     if (!faceHullMask[i] || featureExclusionMask[i]) continue;
     const idx = i * 4;
+    // A clipped channel has lost its true value; white balance cannot bring the hue back.
+    if (
+      sourceRgba[idx] >= CLIPPED_CHANNEL ||
+      sourceRgba[idx + 1] >= CLIPPED_CHANNEL ||
+      sourceRgba[idx + 2] >= CLIPPED_CHANNEL
+    ) {
+      continue;
+    }
     const r = rgba[idx];
     const g = rgba[idx + 1];
     const b = rgba[idx + 2];
@@ -445,10 +508,17 @@ export function runPortraitAnalysisPipeline(
   const { faceHullMask, featureExclusionMask, innerLipMask, outerLipMask, ratios } = masks;
 
   let wbDiagnostics: WhiteBalanceDiagnostics;
+  // Two corrected images with different jobs:
+  // - correctedRgba is for DISPLAY: incomplete adaptation, exposure lift, shadow fill and an
+  //   S-curve make it look natural, but every one of those steps shifts measured CIELAB.
+  // - colorimetricRgba is for MEASUREMENT: a full Bradford adaptation to D65 and nothing else,
+  //   so skin and lip colour stay the same whatever room light the photo was taken under.
   let correctedRgba: Uint8ClampedArray;
+  let colorimetricRgba: Uint8ClampedArray;
 
   if (options.wbMethod === "none") {
     correctedRgba = new Uint8ClampedArray(originalRgba);
+    colorimetricRgba = correctedRgba;
     wbDiagnostics = {
       method: "none",
       estimatedCctK: null,
@@ -457,7 +527,11 @@ export function runPortraitAnalysisPipeline(
     };
   } else {
     const rawMethod = options.wbMethod === "planckian_grey_edge" ? "grey_edge" : "sog";
-    const rawIll = estimateNonskinIlluminant(originalRgba, width, height, faceHullMask, rawMethod, 3.5);
+    // Ears, neck and the jaw edge sit just outside the face hull. They are skin, not a neutral
+    // reference, and left in they pull the estimate warm (6500K light read as ~5900K).
+    const margin = Math.round(ILLUMINANT_EXCLUSION_MARGIN * maskBoundsWidth(faceHullMask, width));
+    const illuminantExcludeMask = dilateMask(faceHullMask, width, height, margin);
+    const rawIll = estimateNonskinIlluminant(originalRgba, width, height, illuminantExcludeMask, rawMethod, 3.5);
     const proj = projectToPlanckianLocus(rawIll);
     correctedRgba = applyNaturalDaylightRelighting(originalRgba, width, height, {
       planckianIlluminant: proj.illuminantLinear,
@@ -465,6 +539,7 @@ export function runPortraitAnalysisPipeline(
       cctKelvin: proj.cctKelvin,
       faceHullMask,
     });
+    colorimetricRgba = applyBradfordWhiteBalance(originalRgba, proj.illuminantLinear);
     wbDiagnostics = {
       method: options.wbMethod,
       estimatedCctK: Number(proj.cctKelvin.toFixed(1)),
@@ -474,11 +549,12 @@ export function runPortraitAnalysisPipeline(
   }
 
   const skinSample = sampleSkinFromImage(
-    correctedRgba,
+    colorimetricRgba,
     width,
     height,
     faceHullMask,
-    featureExclusionMask
+    featureExclusionMask,
+    originalRgba
   );
 
   const skinMetrics = buildSkinMetrics(
@@ -506,9 +582,9 @@ export function runPortraitAnalysisPipeline(
   for (let i = 0; i < n; i++) {
     if (innerLipMask[i]) {
       const idx = i * 4;
-      const r = correctedRgba[idx];
-      const g = correctedRgba[idx + 1];
-      const b = correctedRgba[idx + 2];
+      const r = colorimetricRgba[idx];
+      const g = colorimetricRgba[idx + 1];
+      const b = colorimetricRgba[idx + 2];
       const [l, a, bVal] = rgbToLab([r, g, b]);
       innerL.push(l);
       innerA.push(a);
@@ -519,7 +595,7 @@ export function runPortraitAnalysisPipeline(
       lipCount++;
     } else if (outerLipMask[i]) {
       const idx = i * 4;
-      const [l] = rgbToLab([correctedRgba[idx], correctedRgba[idx + 1], correctedRgba[idx + 2]]);
+      const [l] = rgbToLab([colorimetricRgba[idx], colorimetricRgba[idx + 1], colorimetricRgba[idx + 2]]);
       outerL.push(l);
     }
   }
@@ -584,7 +660,12 @@ export function runPortraitAnalysisPipeline(
   );
 
   const faceShape = classifyFaceShapeFromRatios(ratios.r1, ratios.r2, ratios.r3);
-  const season = classifySeason(skinSample.skinL, skinSample.skinA, skinSample.skinB);
+  const season = classifySeason(
+    skinSample.skinL,
+    skinSample.skinA,
+    skinSample.skinB,
+    wbDiagnostics.estimatedCctK
+  );
   const blendedTargets = blendTargetColorsLab(season.probabilities);
   const advice = resolveGlowupProfile(
     faceShape.primary,

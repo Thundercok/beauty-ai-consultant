@@ -97,10 +97,52 @@ export function classifyItaCategory(lStar: number, bStar: number): { itaDeg: num
   return { itaDeg, category };
 }
 
-export function classifySeason(lStar: number, aStar: number, bStar: number): SeasonClassification {
+/**
+ * How far the measured skin colour can be off, per feature [L*, hue°, chroma], once the photo
+ * has been white-balanced. Fitted on the 5 bundled portraits re-lit from 2700K to 6500K
+ * (camera exposure metered on the face, both RGB and cone-space casts): the RMS error grows
+ * roughly linearly with the light's distance from daylight in mireds.
+ * - floor: residual error of the illuminant estimate in near-daylight photos
+ * - per100Mired: extra error for every 100 mired away from D65 (2700K is ~217 mired)
+ */
+export const SKIN_MEASUREMENT_UNCERTAINTY = {
+  floor: [1.5, 2.0, 1.0] as [number, number, number],
+  per100Mired: [4.5, 4.5, 4.2] as [number, number, number],
+  maxMiredShift: 250,
+};
+
+/**
+ * Spread of each season's likelihood, widened by the measurement uncertainty for this photo's
+ * light. Adding the variances is the Gaussian integral over a measurement that is itself only
+ * known to within that error, so posteriors stay honest instead of jumping between seasons when
+ * a warm lamp shifts the measured hue by a few degrees.
+ */
+export function seasonSigmaForLight(illuminantCctK: number | null | undefined): [number, number, number] {
+  const { floor, per100Mired, maxMiredShift } = SKIN_MEASUREMENT_UNCERTAINTY;
+  const miredShift =
+    illuminantCctK && illuminantCctK > 0
+      ? Math.min(maxMiredShift, Math.abs(1e6 / illuminantCctK - 1e6 / 6504))
+      : 0;
+  return SEASON_SIGMA.map((classSigma, k) =>
+    Math.hypot(classSigma, floor[k] + (per100Mired[k] * miredShift) / 100)
+  ) as [number, number, number];
+}
+
+/**
+ * @param illuminantCctK colour temperature of the light the photo was taken under, as estimated
+ *   before white balance. The further it is from daylight, the less the measured colour is
+ *   trusted. Leave it out for colours that were not measured from a photo.
+ */
+export function classifySeason(
+  lStar: number,
+  aStar: number,
+  bStar: number,
+  illuminantCctK?: number | null
+): SeasonClassification {
   const hueDeg = (Math.atan2(bStar, Math.max(aStar, 1e-5)) * 180) / Math.PI;
   const chroma = Math.hypot(aStar, bStar);
   const features: [number, number, number] = [lStar, hueDeg, chroma];
+  const sigma = illuminantCctK === undefined ? SEASON_SIGMA : seasonSigmaForLight(illuminantCctK);
 
   const logScores = {} as Record<SeasonName, number>;
   let maxLog = -Infinity;
@@ -108,9 +150,9 @@ export function classifySeason(lStar: number, aStar: number, bStar: number): Sea
     const proto = SEASON_GAUSSIAN_PROTOTYPES[name];
     const logVal =
       -0.5 *
-      (((features[0] - proto[0]) / SEASON_SIGMA[0]) ** 2 +
-        ((features[1] - proto[1]) / SEASON_SIGMA[1]) ** 2 +
-        ((features[2] - proto[2]) / SEASON_SIGMA[2]) ** 2);
+      (((features[0] - proto[0]) / sigma[0]) ** 2 +
+        ((features[1] - proto[1]) / sigma[1]) ** 2 +
+        ((features[2] - proto[2]) / sigma[2]) ** 2);
     logScores[name] = logVal;
     if (logVal > maxLog) maxLog = logVal;
   });
