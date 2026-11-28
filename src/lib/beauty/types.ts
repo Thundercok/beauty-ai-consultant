@@ -49,6 +49,10 @@ export interface MatchedProduct {
   similarityBasis?: "ciede2000_d65_kubelka_munk_lip" | "ciede2000_d65_swatch" | "catalog_browse_only";
   /** Optional catalog warnings for missing non-HEX attributes (e.g. UNKNOWN_UNDERTONE) */
   missingMetadataFields?: string[];
+  /** Heuristic ranking points (0–100), never a probability of real-world suitability. */
+  recommendationScore?: number;
+  /** Human-readable metadata signals used by the optional contextual lipstick ranking. */
+  recommendationReasons?: string[];
   undertone: string;
   bestSeasons: string;
 }
