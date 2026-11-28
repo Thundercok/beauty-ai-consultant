@@ -3,6 +3,9 @@ import { Camera, Droplets, ScanFace, ShoppingBag, SlidersHorizontal } from "luci
 import selfieCafeWarmUrl from "./assets/images/selfie_cafe_warm_1795755930772.jpg";
 import selfieOfficeCoolUrl from "./assets/images/selfie_office_cool_1795755934169.jpg";
 import selfieTanOutdoorUrl from "./assets/images/selfie_tan_outdoor_1795755933086.jpg";
+import productCatalogCsv from "../data/product_database.csv?raw";
+import sampleFaceUrl from "../data/sample_face.jpg";
+import { parseProductCatalogCsv } from "./lib/beauty/productCatalog";
 import {
   CameraCaptureModal,
   type CapturedCameraFrame,
@@ -462,7 +465,7 @@ export default function App() {
         img.src = url;
       };
 
-      loadFromUrl(preset.url, preset.label, "/api/sample-face");
+      loadFromUrl(preset.url, preset.label, sampleFaceUrl);
     },
     [beginProgress, finishProgress, processLoadedBuffer]
   );
@@ -474,17 +477,12 @@ export default function App() {
   }, [activeDemoId, loadDemoPreset]);
 
   useEffect(() => {
-    fetch("/api/products")
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((data: { products: CatalogProduct[] }) => {
-        setProducts(data.products ?? []);
-      })
-      .catch((err) => {
-        setCatalogError(err instanceof Error ? err.message : "Không tải được danh sách mỹ phẩm.");
-      });
+    // The catalog is bundled into the build so the app also runs from static hosting.
+    try {
+      setProducts(parseProductCatalogCsv(productCatalogCsv));
+    } catch (err) {
+      setCatalogError(err instanceof Error ? err.message : "Không tải được danh sách mỹ phẩm.");
+    }
 
     loadDemoPreset(DEMO_PORTRAIT_PRESETS[0]);
   }, [loadDemoPreset]);

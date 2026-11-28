@@ -59,10 +59,10 @@ async function getFaceLandmarker(): Promise<FaceLandmarker> {
     ensureTfliteInfoConsoleFilter();
     landmarkerPromise = withTimeout(
       (async () => {
-        const vision = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
+        const vision = await FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}mediapipe/wasm`);
         return FaceLandmarker.createFromOptions(vision, {
           baseOptions: {
-            modelAssetPath: "/mediapipe/face_landmarker.task",
+            modelAssetPath: `${import.meta.env.BASE_URL}mediapipe/face_landmarker.task`,
             delegate: "CPU",
           },
           runningMode: "IMAGE",
