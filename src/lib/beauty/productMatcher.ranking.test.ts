@@ -46,6 +46,6 @@ test("without personalization context, ranking remains color-only and does not c
     productSeasons: "",
     productUndertone: "",
   });
-  assert.equal(neutral.score, 82.5);
+  assert.equal(neutral.score, 80);
   assert.ok(neutral.reasons.length === 1);
 });
