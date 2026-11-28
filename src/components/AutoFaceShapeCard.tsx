@@ -72,7 +72,7 @@ const FaceShapeSilhouette: React.FC<{ shape: FaceShapeName }> = ({ shape }) => {
 
   return (
     <div
-      className="w-14 h-16 rounded-2xl bg-zinc-100/90 border border-zinc-200/80 flex items-center justify-center shrink-0"
+      className="w-14 h-16 bg-[#FAFAFA] border border-[#E5E5E5] flex items-center justify-center shrink-0"
       aria-hidden="true"
     >
       <svg viewBox="0 0 48 58" className="w-10 h-12">
@@ -144,124 +144,111 @@ export const AutoFaceShapeCard: React.FC<AutoFaceShapeCardProps> = ({
       data-testid="auto-face-shape-card"
       data-shape={analysis.result.primary}
       data-source={analysis.source}
-      aria-label="Phân tích dáng mặt tự động và 3 gợi ý trang điểm contour highlight cho sinh viên"
-      className="bg-white border border-[#E5E5E5] p-5 sm:p-7 space-y-5"
+      aria-label="Phân tích dáng mặt tự động và 3 gợi ý tạo khối bắt sáng"
+      className="bg-white border border-[#E5E5E5] flex flex-col divide-y divide-[#E5E5E5] h-full"
     >
-      {/* Top Row: Auto-detected Face Shape Verdict + Contour/Highlight Silhouette + Confidence */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#EAEAEA]">
-        <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+      {/* Top Row: Face Shape Verdict + Display-Sans Confidence */}
+      <div className="p-5 sm:p-6 flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3.5 min-w-0">
           <FaceShapeSilhouette shape={analysis.result.primary} />
-          <div className="min-w-0 space-y-0.5">
-            <div className="text-[11px] font-medium text-[#737373]">
-              {analysis.sourceLabelVi}
-            </div>
-            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-              <h2
-                data-testid="auto-face-shape-title"
-                className="text-lg sm:text-xl font-bold tracking-[-0.025em] text-[#111111]"
-              >
-                {analysis.shapeLabelVi}
-              </h2>
-              <span className="text-xs font-semibold text-[#DC2626]">
-                Độ khớp{" "}
-                <span className="font-mono tabular-nums">{analysis.confidencePct}%</span>
-              </span>
-            </div>
+          <div className="min-w-0 space-y-1">
+            <div className="metric-label">Dáng khuôn mặt · {analysis.sourceLabelVi}</div>
+            <h2
+              data-testid="auto-face-shape-title"
+              className="metric-display-sm text-2xl sm:text-[28px] font-bold text-[#0A0A0A]"
+            >
+              {analysis.shapeLabelVi}
+            </h2>
             <p className="text-xs text-[#525252] leading-relaxed">
               {analysis.proportionSummaryVi}
             </p>
-            <div className="flex items-center gap-3 pt-1 text-[11px] text-[#737373]">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-2.5 h-1 bg-[#9A725E]/85" aria-hidden="true" />
-                Vùng tạo khối
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-2.5 h-1 bg-amber-400/90" aria-hidden="true" />
-                Vùng bắt sáng
-              </span>
-            </div>
           </div>
         </div>
 
-        <div className="text-xs text-[#737373] sm:text-right shrink-0">
-          <div>Nét phụ gần nhất</div>
-          <div className="font-semibold text-[#111111] mt-0.5">{analysis.secondaryLabelVi}</div>
+        <div className="text-right shrink-0">
+          <div className="metric-label">Độ khớp</div>
+          <div className="metric-display text-[28px] sm:text-[32px] font-bold text-[#DC2626] mt-0.5">
+            {analysis.confidencePct}
+            <span className="text-sm font-medium text-[#737373] ml-0.5">%</span>
+          </div>
+          <div className="text-[11px] text-[#737373] mt-1">
+            Phụ: <span className="font-semibold text-[#0A0A0A]">{analysis.secondaryLabelVi}</span>
+          </div>
         </div>
       </div>
 
-      {/* Middle Row: 2-Column Geometry Ratios + 6-Shape Probabilities */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 pb-5 border-b border-zinc-100">
-        <div className="lg:col-span-5 space-y-2.5">
-          <div className="text-xs font-semibold text-zinc-900">
-            Tỷ lệ hình học khuôn mặt
+      {/* Consistent 3-Column Display-Sans Geometry Ratio Strip */}
+      <div className="grid grid-cols-3 divide-x divide-[#E5E5E5] bg-[#FAFAFA]">
+        {[
+          { code: "R1", label: "Dài / Rộng", value: ratios.r1 },
+          { code: "R2", label: "Hàm / Gò má", value: ratios.r2 },
+          { code: "R3", label: "Trán / Hàm", value: ratios.r3 },
+        ].map((m) => (
+          <div key={m.code} className="px-4 sm:px-5 py-3.5 space-y-1">
+            <div className="metric-label truncate">{m.label}</div>
+            <div className="metric-display-sm text-xl sm:text-2xl font-bold text-[#0A0A0A]">
+              {m.value.toFixed(2)}
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { code: "R1", label: "Dài / Rộng", value: ratios.r1 },
-              { code: "R2", label: "Hàm / Gò má", value: ratios.r2 },
-              { code: "R3", label: "Trán / Hàm", value: ratios.r3 },
-            ].map((m) => (
-              <div
-                key={m.code}
-                className="rounded-xl bg-zinc-50 border border-zinc-200/75 px-2.5 py-2.5 space-y-0.5"
-              >
-                <div className="text-[11px] text-zinc-500 truncate">{m.label}</div>
-                <div className="font-mono tabular-nums text-sm font-bold text-zinc-900">
-                  {m.value.toFixed(2)}
-                </div>
-              </div>
-            ))}
+        ))}
+      </div>
+
+      {/* Compact 6-Shape Probability Distribution */}
+      <div className="px-5 sm:px-6 py-4 space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="metric-label">Phân bố 6 dáng mặt</span>
+          <div className="flex items-center gap-3 text-[11px] text-[#737373]">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-2.5 h-1 bg-[#9A725E]" aria-hidden="true" />
+              Tạo khối
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-2.5 h-1 bg-amber-400" aria-hidden="true" />
+              Bắt sáng
+            </span>
           </div>
         </div>
-
-        <div className="lg:col-span-7 space-y-2">
-          <div className="text-xs font-semibold text-zinc-900">
-            Xác suất 6 dáng mặt
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2">
-            {rankedShapes.map((item, idx) => {
-              const pct = Math.round(item.prob * 100);
-              return (
-                <div key={item.name} className="flex items-center gap-2 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-2">
+          {rankedShapes.map((item, idx) => {
+            const pct = Math.round(item.prob * 100);
+            return (
+              <div key={item.name} className="space-y-1">
+                <div className="flex items-baseline justify-between gap-1 text-xs">
                   <span
-                    className={`w-24 truncate ${
-                      idx === 0 ? "font-semibold text-zinc-900" : "text-zinc-600"
+                    className={`truncate ${
+                      idx === 0 ? "font-semibold text-[#0A0A0A]" : "text-[#666666]"
                     }`}
                   >
                     {SHAPE_VI_LABELS[item.name]}
                   </span>
-                  <div className="flex-1 h-1.5 rounded-full bg-zinc-100 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${
-                        idx === 0 ? "bg-zinc-900" : "bg-zinc-300"
-                      }`}
-                      style={{ width: `${Math.max(4, pct)}%` }}
-                    />
-                  </div>
-                  <span className="w-8 text-right font-mono tabular-nums text-[11px] text-zinc-600">
+                  <span className="font-display tabular-nums text-xs font-bold text-[#0A0A0A]">
                     {pct}%
                   </span>
                 </div>
-              );
-            })}
-          </div>
+                <div className="h-1 bg-[#EFEFEF] overflow-hidden">
+                  <div
+                    className={`h-full ${idx === 0 ? "bg-[#0A0A0A]" : "bg-[#D4D4D4]"}`}
+                    style={{ width: `${Math.max(4, pct)}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Bottom Row: 3 Concrete Contour & Highlight Student Makeup Tips (Hairline Divided) */}
-      <div className="space-y-2.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-bold text-zinc-900">
-            3 gợi ý tạo khối &amp; bắt sáng cho {analysis.shapeLabelVi.toLowerCase()}
+      {/* 3 Concrete Contour & Highlight Makeup Tips */}
+      <div className="p-5 sm:p-6 space-y-3 flex-1">
+        <div className="space-y-0.5">
+          <div className="metric-label">Gợi ý trang điểm theo dáng mặt</div>
+          <h3 className="text-sm sm:text-[15px] font-bold text-[#0A0A0A]">
+            3 bước tạo khối &amp; bắt sáng cho {analysis.shapeLabelVi.toLowerCase()}
           </h3>
-          <span className="text-[11px] text-zinc-500">
-            Việt hóa tự nhiên · Hợp đi học &amp; đi chơi hằng ngày
-          </span>
         </div>
 
         <ol
           data-testid="auto-face-shape-tips"
-          className="divide-y divide-zinc-100"
+          className="divide-y divide-[#EFEFEF]"
         >
           {analysis.tips.map((tip, idx) => (
             <li
@@ -269,17 +256,15 @@ export const AutoFaceShapeCard: React.FC<AutoFaceShapeCardProps> = ({
               data-testid={`face-shape-tip-${idx + 1}`}
               className="py-3 first:pt-1 last:pb-0 flex items-start gap-3"
             >
-              <span className="font-mono tabular-nums text-xs font-bold text-rose-700 pt-0.5 shrink-0">
+              <span className="font-display tabular-nums text-sm font-bold text-[#DC2626] pt-0.5 shrink-0">
                 0{idx + 1}
               </span>
               <div className="min-w-0 space-y-0.5">
-                <div className="text-[11px] font-medium text-zinc-500">
-                  {tip.focusLabelVi}
-                </div>
-                <div className="text-xs sm:text-sm font-semibold text-zinc-900 leading-snug">
+                <div className="metric-label">{tip.focusLabelVi}</div>
+                <div className="text-xs sm:text-[13px] font-semibold text-[#0A0A0A] leading-snug">
                   {tip.headlineVi}
                 </div>
-                <p className="text-xs text-zinc-600 leading-relaxed">{tip.detailVi}</p>
+                <p className="text-xs text-[#525252] leading-relaxed">{tip.detailVi}</p>
               </div>
             </li>
           ))}

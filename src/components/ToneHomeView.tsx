@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import {
+  Bookmark,
   Camera,
   Check,
   ChevronLeft,
@@ -11,6 +12,7 @@ import {
   Play,
   RefreshCw,
   Sparkles,
+  X,
 } from "lucide-react";
 import { PortraitSkeleton, ResultsSkeleton } from "./AnalysisSkeleton";
 import { FaceShapeStyleGuide } from "./FaceShapeStyleGuide";
@@ -81,6 +83,7 @@ interface ToneHomeViewProps {
   onApplyHarmonyPalette: (palette: ColorHarmonyPalette) => void;
   onOpenShopCategory: (category: "lipstick" | "blush" | "eyeshadow" | "all") => void;
   onOpenInsights: () => void;
+  onSavePalette?: () => void;
 }
 
 const OCCASION_OPTIONS: Array<{ id: OccasionType; label: string }> = [
@@ -127,6 +130,7 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
   onApplyHarmonyPalette,
   onOpenShopCategory,
   onOpenInsights,
+  onSavePalette,
 }) => {
   const quickPicks = [topLipstick, topBlush, topEyeshadow].filter(
     (item): item is MatchedProduct => item !== null
@@ -293,7 +297,38 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-12 gap-5 lg:gap-8 items-start">
+    <div className="space-y-4">
+      {isDemoPortrait && (
+        <div
+          data-testid="demo-mode-banner"
+          role="status"
+          className="bg-[#FFFBEB] border border-[#FDE68A] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+        >
+          <div className="text-xs text-[#92400E] leading-relaxed">
+            <strong className="font-semibold text-[#78350F]">Đang xem ảnh mẫu</strong> — kết quả bên dưới chỉ để tham khảo.
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onPickGallery}
+              className="min-h-[34px] px-3 py-1 rounded-[4px] bg-[#111111] hover:bg-[#2B2B2B] text-white text-xs font-semibold whitespace-nowrap cursor-pointer"
+            >
+              Dùng ảnh của bạn
+            </button>
+            <button
+              type="button"
+              data-testid="exit-demo-btn"
+              onClick={onClearPortrait}
+              className="min-h-[34px] px-2.5 py-1 rounded-[4px] border border-[#D4D4D4] bg-white hover:border-[#111111] text-[#111111] text-xs font-medium inline-flex items-center gap-1 whitespace-nowrap cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Đóng</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 lg:gap-8 items-start">
       {/* Left Column: Sharp Architectural Portrait Mirror (Sticky on Tablet & Desktop) */}
       <div className="md:col-span-5 md:sticky md:top-20">
         <div className="bg-white border border-[#E5E5E5] overflow-hidden">
@@ -750,7 +785,7 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h2 className="text-lg sm:text-[22px] font-bold tracking-[-0.025em] text-[#111111]">
-                      Kết luận tông da của bạn
+                      Tông da của bạn
                     </h2>
                     <span className="text-xs font-semibold text-[#DC2626]">
                       Nhóm {plainGuide.shortTag}
@@ -858,7 +893,7 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                       onClick={onOpenInsights}
                       className="min-h-[40px] sm:min-h-[38px] px-4 py-2 rounded-[4px] border border-[#DC2626] bg-white hover:bg-[#DC2626] text-[#DC2626] hover:text-white text-xs font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors cursor-pointer"
                     >
-                      <span>Chẩn đoán lệch &amp; Dấu đỏ</span>
+                      <span>Xem điểm lệch &amp; cách chỉnh</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
 
@@ -867,9 +902,21 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                       onClick={() => onOpenShopCategory("all")}
                       className="min-h-[40px] sm:min-h-[38px] px-4 py-2 rounded-[4px] border border-[#D4D4D4] bg-white hover:border-[#111111] text-[#111111] text-xs font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors cursor-pointer"
                     >
-                      <span>Mỹ phẩm theo ngân sách</span>
+                      <span>Mỹ phẩm hợp túi tiền</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
+
+                    {onSavePalette && (
+                      <button
+                        type="button"
+                        data-testid="save-palette-btn"
+                        onClick={onSavePalette}
+                        className="min-h-[40px] sm:min-h-[38px] px-3.5 py-2 rounded-[4px] border border-[#D4D4D4] bg-white hover:border-[#111111] text-[#111111] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer"
+                      >
+                        <Bookmark className="w-3.5 h-3.5" />
+                        <span>Lưu bảng màu</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1045,6 +1092,7 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
             />
           </>
         )}
+      </div>
       </div>
     </div>
   );

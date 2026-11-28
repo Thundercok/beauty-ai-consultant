@@ -1,7 +1,7 @@
-# beauty-ai-consultant
+# Beauty AI Consultant
 
 <p align="center">
-  <strong>A browser-based computer-vision and color-science app for personalized K-beauty consultation, skin-tone analysis, and cosmetic color matching.</strong>
+  <strong>A zero-cost, static-first, privacy-preserving web app for browser-local skin-tone analysis, virtual lipstick/blush try-on, and K-beauty product discovery.</strong>
 </p>
 
 <p align="center">
@@ -13,141 +13,135 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Thundercok/beauty-ai-consultant"><img src="https://img.shields.io/badge/Computer%20Vision-MediaPipe%20Face%20Landmarker-5C6BC0?style=flat-square" alt="Computer Vision" /></a>
-  <a href="https://github.com/Thundercok/beauty-ai-consultant"><img src="https://img.shields.io/badge/Color%20Science-CIEDE2000%20%7C%20Kubelka--Munk-00897B?style=flat-square" alt="Color Science" /></a>
-  <a href="https://github.com/Thundercok/beauty-ai-consultant"><img src="https://img.shields.io/badge/Domain-K--Beauty%20%7C%20Cosmetics-EC407A?style=flat-square" alt="K-Beauty and Cosmetics" /></a>
+  <img src="https://img.shields.io/badge/Hosting-Static%20GitHub%20Pages-111111?style=flat-square" alt="Static GitHub Pages" />
+  <img src="https://img.shields.io/badge/Computer%20Vision-MediaPipe%20WASM-5C6BC0?style=flat-square" alt="Computer Vision" />
+  <img src="https://img.shields.io/badge/Color%20Science-CIEDE2000%20%7C%20Kubelka--Munk-00897B?style=flat-square" alt="Color Science" />
+  <img src="https://img.shields.io/badge/PWA-Installable%20%26%20Offline%20Ready-DC2626?style=flat-square" alt="PWA" />
 </p>
 
 ---
 
-## 1. Overview
+## 1. Overview & Architecture
 
-**Beauty AI Consultant** is a web app for image-based beauty analysis and cosmetic color recommendation. It started from a very practical everyday problem: trying to buy the right makeup shades (lipstick, blush, cushion foundation) for my girlfriend without guessing blindly under warm store or bedroom lighting, where a swatch on screen can look completely different on actual skin and pigmented lips.
+**Beauty AI Consultant** is a guest-first, local-first beauty analysis and cosmetic color matching app built to run **100% statically in the browser** with **zero backend requirement in production**, **zero login/account wall**, and **zero paid external services**.
 
-All image processing runs on-device in the browser. A selfie never leaves the machine; the Express server only serves the app, the product catalogue, and the MediaPipe model files.
+- **Privacy by Architecture:** All face detection (MediaPipe 478-point Face Landmarker WASM), lighting correction (Planckian Grey-Edge + Bradford chromatic adaptation), CIELAB skin/lip sampling, chromophore decomposition, and Kubelka–Munk virtual makeup run strictly on-device. User portraits never leave the browser.
+- **Guest-First, No Forced Demo:** On first visit, the app opens with a skippable 3-step onboarding & privacy guide and a clean empty state (no preloaded demo portrait pretending to be the user's face). Users can immediately upload a photo, open the live camera with real-time lighting feedback, browse all 217 catalog products in guest mode, or explicitly opt into clearly labeled **Demo Mode** sample portraits.
+- **Local-First Personalization (IndexedDB):** Analysis summaries (compact colorimetry metrics only — never raw portrait images), saved palettes, saved products, and preferences are stored locally in browser IndexedDB (`beauty_ai_local_profile`) with `localStorage`/memory fallbacks, individual deletion, and two-step confirmed "Clear all data". Local data stays on the current browser and does not sync across devices.
+- **Installable PWA & Offline Support:** Configured with `vite-plugin-pwa`, Web App Manifest (with `BASE_PATH`-safe paths for GitHub Pages), app icons (`192`, `512`, `maskable`, `180` Apple touch icon), in-app install button + iOS Safari Add-to-Home-Screen guide, offline banner, and on-demand caching of MediaPipe assets.
 
-Photos come from an upload, one of the bundled sample selfies (warm café, cool office, sunlit balcony), or the in-app camera. The camera view shows a face-alignment oval and reads the light level (from the `AmbientLightSensor` where the browser has it, otherwise from the frame itself) so the user can fix poor lighting before taking the shot.
+### Five Product Areas (Vietnamese UI)
 
-The app has four views (the UI is in Vietnamese):
+1. **Tông da (Home / Tone):** Clean empty state on startup; after uploading/capturing a portrait (or opting into Demo Mode), removes room color cast, measures CIELAB skin/lip color, estimates ITA° and 12-season palette, displays interactive face-zone makeup guides (exportable as PNG), eyewear suggestions, and allows saving palettes to the local profile.
+2. **Thử son (Virtual Try-On):** Finite-layer Kubelka–Munk lipstick and blush rendering over the user's measured lip color, with single try-on, before/after makeup comparison slider, 2-shade comparison slider, and honest CIEDE2000 shade-fit scoring.
+3. **Mỹ phẩm (Product Discovery):** Always browsable — including before uploading a photo in guest mode — with search, category tabs, brand dropdown, undertone filter, estimated Vietnam budget tiers, saved favorites, product detail sheet, Shopee/TikTok Shop search links, and explicit estimated-price disclaimers.
+4. **Chuyên sâu (Beauty Insights):** Lazy-loaded deep diagnostics including analysis quality/reliability indicator, interactive Recharts CIELAB skin tone variance chart (`L*`, `a*`, `b*`), auto face-shape geometry, facial symmetry & contouring advice, brutally honest landmark audit markers on the photo, relighting lab (2700K–6500K), chromophore maps, and A4 PDF / HD PNG / JSON report export.
+5. **Hồ sơ (My Beauty Profile):** Lazy-loaded local-first profile showing analysis history (up to 25 summaries), saved color palettes (up to 30), saved products, local default preferences, PWA installation & offline behavior guide, and individual/clear-all data controls.
 
-- **Tone (Tông da):** removes the room's color cast, measures skin and lip color, estimates ITA° and a 12-season palette, and suggests the best-matching products. It also gives makeup guides for the detected face shape, drawn as an interactive overlay on the portrait in routine order (eyes, nose contour, blush and jaw, lips, hair framing) and exportable as a PNG, plus eyewear frame shape and color suggestions.
-- **Try-on (Thử son):** renders lipstick and blush onto the portrait with a finite-layer Kubelka–Munk model, so a shade is shown as pigment over the person's own lip color rather than a flat overlay. A slider compares two shades, or either shade against bare lips. A verdict card scores the shade honestly: CIEDE2000 distance to the target becomes a 0–100 fit score with no artificial floor, so a real clash can score below 40.
-- **Shop (Mỹ phẩm):** CIEDE2000 matching against a curated K-beauty catalogue, with filters, popularity scoring, saved items, an estimated Vietnam retail price tier for budget filtering, and search links to Shopee and Hasaki.
-- **Insights (Chuyên sâu):** an analysis confidence score, automatic face-shape geometry, facial symmetry with contouring advice, a face audit that marks issue zones on the photo with short fixes, white-balance diagnostics, a relighting experiment (2700K to 6500K), and melanin / hemoglobin chromophore heatmaps.
+> **Honest Scope:** Outputs are decision support for cosmetic exploration. They are not dermatological or medical diagnoses, and displayed Vietnam prices are reference estimates rather than verified live store prices or stock.
 
-Outputs are decision support for product exploration. They are not dermatological assessments or guaranteed product matches.
+---
 
 ## 2. Repository Structure
 
 ```text
 beauty-ai-consultant/
-├── .github/workflows/ci.yml      # bun install, typecheck, unit tests, production build
-├── server.ts                     # Express + Vite middleware; /api/products, /api/health, MediaPipe assets
-├── index.html
-├── package.json / bun.lock
-├── src/
-│   ├── App.tsx                   # Tab shell, upload / camera flow, analysis state
-│   ├── main.tsx                  # Entry point with root error boundary
-│   ├── components/               # ToneHomeView, LipTryOnView, CatalogMatcher, ProInsightsView,
-│   │                             # CameraCaptureModal, HonestFaceAuditStudio, InteractiveFaceGuideOverlay, ...
-│   └── lib/beauty/
-│       ├── portraitPipeline.ts   # End-to-end analysis: landmarks → WB → skin/lip ROI → report
-│       ├── neuralLandmarks.ts    # MediaPipe Face Landmarker (WASM) and ROI polygon masks
-│       ├── faceMeshOverlay.ts    # 478-point mesh contours and landmark → anatomical zone mapping
-│       ├── analysisConfidence.ts # 0–100% reliability from lighting, landmarks, skin pixels, season margin
-│       ├── cameraAssistant.ts    # Live camera lighting level and face-alignment checks
-│       ├── autoFaceShapeAnalyzer.ts # Face-shape ratios from landmarks (face-box fallback)
-│       ├── facialSymmetry.ts     # Roll-invariant left/right symmetry and contouring advice
-│       ├── vnFeatureAnalysis.ts  # Nose, eyelid, cheek and jaw concerns for East-Asian makeup
-│       ├── honestLandmarkAudit.ts # Per-zone face audit with on-photo markers and fixes
-│       ├── honestMakeupAudit.ts  # Un-floored CIEDE2000 shade fit score and verdict
-│       ├── faceGuideMap.ts       # Makeup guide zones, strokes and routine order
-│       ├── faceGuideExport.ts    # Renders portrait + guide layers to a PNG
-│       ├── faceShapeStyleGuide.ts # Eyewear silhouettes and frame colors per face shape
-│       ├── vnBeautyGuide.ts      # Vietnam price tiers and Shopee / Hasaki search links
-│       ├── lipCompareState.ts    # Shade A / shade B / bare-lips compare slider state
-│       ├── haptics.ts            # Vibration API with an iOS Safari switch-haptic fallback
-│       ├── colorConstancy.ts     # Planckian / daylight-locus constrained illuminant estimation
-│       ├── bradfordCat.ts        # sRGB ↔ XYZ ↔ CIELAB and Bradford chromatic adaptation
-│       ├── chromophores.ts       # Linear-RGB Beer–Lambert melanin / hemoglobin decomposition
-│       ├── faceAnalysis.ts       # Facial ratios, face shape, ITA°, 12-season classification
-│       ├── productMatcher.ts     # CIEDE2000, soft CIELAB target blending, popularity ranking
-│       ├── kubelkaMunk.ts        # Finite-layer RGB Kubelka–Munk lip blend
-│       ├── virtualMakeup.ts      # Lip / blush alpha masks and compositing
-│       ├── colorHarmony.ts       # Eye-cheek-lip harmony sets and indoor-light simulation
-│       ├── imageEnhancement.ts   # Bilateral denoise, low-light contrast, luma unsharp mask
-│       ├── adviceEngine.ts       # Face-shape × season K-beauty rules
-│       ├── viLabels.ts           # Vietnamese UI labels
-│       └── *.test.ts             # node:test unit tests
+├── .github/workflows/
+│   ├── ci.yml                     # Typecheck, node:test unit suite, Vite build
+│   └── pages.yml                  # Static GitHub Pages deploy (BASE_PATH=/<repo>/)
+├── public/
+│   ├── icon.svg                   # Vector brand mark
+│   ├── pwa-192x192.png            # PWA icon (192x192)
+│   ├── pwa-512x512.png            # PWA icon (512x512)
+│   ├── pwa-maskable-512x512.png   # Maskable PWA icon with safe-zone padding
+│   ├── apple-touch-icon.png       # iOS Safari home screen icon (180x180)
+│   └── mediapipe/                 # face_landmarker.task (+ WASM copied at build time)
 ├── data/
-│   ├── product_database.csv      # 217 curated K-beauty and eyewear SKUs
+│   ├── product_database.csv       # 217 curated K-beauty and eyewear SKUs (bundled statically)
 │   └── sample_face.jpg
-├── public/mediapipe/             # face_landmarker.task and the vision WASM runtime
-└── docs/
-    ├── RESEARCH_PLAN.md          # Hypotheses, verified failure modes, experimental roadmap
-    └── *_report.{tex,pdf}        # Technical reports
+├── src/
+│   ├── App.tsx                    # 5-tab shell, guest-first flow, IndexedDB wiring, lazy tabs
+│   ├── main.tsx                   # Entry point with root error boundary
+│   ├── hooks/
+│   │   ├── usePWAInstall.ts       # beforeinstallprompt + iOS Safari install detection
+│   │   └── useOnlineStatus.ts     # Reactive navigator.onLine hook
+│   ├── components/                # GettingStartedEmptyState, OnboardingModal, ToneHomeView,
+│   │                              # LipTryOnView, CatalogMatcher, ProductDetailSheet,
+│   │                              # ProInsightsView, ProfileView, SkinToneLabChart,
+│   │                              # BeautyReportExportModal, PWAInstallButton, OfflineIndicator
+│   └── lib/beauty/                # Pure TS vision/colorimetry modules + node:test suites
+│       ├── localProfileStore.ts   # Versioned IndexedDB repository + fallbacks + tests
+│       ├── analysisValidity.ts    # Strict portrait/skin rejection gates
+│       ├── analysisConfidence.ts  # 0–100% analysis quality/reliability indicator
+│       ├── portraitPipeline.ts    # End-to-end local CV + colorimetry pipeline
+│       ├── neuralLandmarks.ts     # MediaPipe Face Landmarker WASM (BASE_URL-aware)
+│       ├── colorConstancy.ts      # Planckian / daylight-locus illuminant estimation
+│       ├── bradfordCat.ts         # sRGB ↔ XYZ ↔ CIELAB & Bradford adaptation
+│       ├── highlightRecovery.ts   # Specular highlight exclusion & recovery
+│       ├── chromophores.ts        # Linear-RGB Beer–Lambert melanin/hemoglobin maps
+│       ├── kubelkaMunk.ts         # Finite-layer Kubelka–Munk lip blending
+│       ├── productMatcher.ts      # CIEDE2000 & soft CIELAB target matching
+│       ├── skinLabVariance.ts     # Regional CIELAB L*/a*/b* distribution + tests
+│       ├── reportExport.ts        # Native PDF 1.4 A4 & PNG HD report generator + tests
+│       └── *.test.ts              # 94 deterministic node:test unit tests
+├── vite.config.ts                 # Static build, MediaPipe WASM copy plugin, VitePWA
+└── server.ts                      # Local dev / optional Node preview server (not required in production)
 ```
 
-## 3. Quick Start
+---
 
-Requires [bun](https://bun.sh/) and Node.js 20+.
+## 3. Local Development & Static Production Builds
+
+Requires Node.js 20+ (works with `npm` or `bun`).
 
 ```bash
-bun install
+npm install
+npm run dev
 ```
+
+Open <http://localhost:3000>.
+
+### Quality & Verification Commands
 
 ```bash
-bun run dev
+# TypeScript type-check
+npm run lint
+
+# Deterministic unit tests (94 tests via node:test)
+npm run test
+
+# Standard static production build (root base path '/')
+npm run build
+
+# GitHub Pages subpath static production build
+BASE_PATH=/beauty-ai-consultant/ npm run build
+cp dist/index.html dist/404.html
+
+# Preview static production bundle locally (no Express backend)
+npm run preview
 ```
 
-Then open <http://localhost:3000>. The app loads a sample portrait so every view works before you upload a photo.
+### How MediaPipe Static Assets Work in Production
 
-### Quality checks
+`vite.config.ts` includes a build plugin (`copyMediaPipeWasmPlugin`) that automatically copies the MediaPipe Vision WASM binaries (`vision_wasm_internal.wasm`, `vision_wasm_module_internal.wasm`, and their `.js` loaders) from `node_modules/@mediapipe/tasks-vision/wasm/` into `dist/mediapipe/wasm/` during `vite build`. Together with `public/mediapipe/face_landmarker.task` and `import.meta.env.BASE_URL`, face detection works on any static host (including GitHub Pages subpaths) with zero server-side routes.
 
-```bash
-bun run lint
-```
+---
 
-```bash
-bun run test
-```
+## 4. Scientific Pipeline & Limitations
 
-```bash
-bun run build
-```
+1. **Landmarks:** MediaPipe Face Landmarker locates 478 facial points after optional low-light contrast enhancement.
+2. **Illuminant Estimation & White Balance:** Non-skin pixels estimate scene illuminant projected onto the CIE daylight / Planckian locus (2500K–9000K), adapted to D65 via Bradford CAT.
+3. **Skin & Lip Sampling:** Landmark polygons + HSV/YCbCr gating + specular highlight rejection isolate valid skin/lip pixels. Strict validity gates reject photos with no face or insufficient valid skin pixels instead of fabricating a palette.
+4. **Classification & Matching:** ITA° + CIELAB feed a 12-season Gaussian classifier; CIEDE2000 matches products against blended targets; Kubelka–Munk blends lipstick pigment over the user's measured lip substrate.
+5. **Reliability Indicator:** Lighting quality, landmark source, valid skin pixel count, and season margin produce an **analysis quality / reliability indicator** (capped at 30% when skin evidence is insufficient) — not a statistical probability of correctness.
 
-### Production
+**Limitations:**
+- Rule-based heuristics (face shape, 12-season labels, facial audit notes, and Vietnam price tiers) are practical baselines, not clinical or retail ground truth.
+- Phone camera auto-beautification, harsh backlighting, and screen calibration can still shift apparent color.
+- Offline mode caches the app shell, catalog, and previously downloaded MediaPipe assets; opening external Shopee/TikTok Shop links requires an internet connection.
 
-```bash
-bun run build && bun run start
-```
+---
 
-`start` serves the built `dist/` with `NODE_ENV=production`. Set `PORT` to change the port and `DISABLE_HMR=true` to turn off hot reload in dev.
-
-## 4. Analysis Pipeline
-
-1. **Landmarks.** MediaPipe Face Landmarker locates the face; low-light frames are denoised and contrast-boosted first so detection holds up indoors.
-2. **Illuminant estimation.** The room light is estimated from non-skin pixels and projected onto the CIE daylight / Planckian locus (2500K–9000K), so a warm bulb is corrected without pushing skin toward gray.
-3. **White balance.** Bradford chromatic adaptation maps the estimated illuminant to D65.
-4. **Skin and lip sampling.** Landmark polygons give the skin and inner / outer lip regions; skin pixels are further gated by HSV and YCbCr skin-color ranges.
-5. **Classification.** ITA° and CIELAB values feed a Gaussian-prototype 12-season classifier; facial ratios give the face shape.
-6. **Matching.** Target colors are softly blended in CIELAB and ranked against the catalogue with CIEDE2000, then re-scored for popularity and brand diversity.
-7. **Confidence.** Lighting quality (color temperature and off-locus cast, the heaviest weight), landmark coverage, skin pixel count, and season margin combine into a reliability score. The UI shows a caveat when it is low.
-
-## 5. Research Status & Limitations
-
-- **Deterministic components:** illuminant estimation, Bradford adaptation, chromophore decomposition, Kubelka–Munk blending, and CIEDE2000 matching are implemented and unit-tested.
-- **Heuristic components:** face-shape classification, 12-season mapping, facial feature concerns, the face audit, and Vietnam price tiers are rule-based baselines, not validated expert classifications or live prices.
-- **Catalogue dependency:** recommendations are limited by the coverage and measurement quality of the product database. Hex swatches are treated as D65 sRGB.
-- **Image sensitivity:** camera processing, exposure, and compression still shift measured colors. A photo cannot guarantee an exact real-world match.
-- **Not a medical tool:** skin analysis is for cosmetic exploration only.
-
-The research questions behind the pipeline (illumination-invariant chromophore maps, constrained illuminant estimation, recommendation stability across lighting) are written up in [docs/RESEARCH_PLAN.md](docs/RESEARCH_PLAN.md). The original Python toolkit and its benchmarks (`exp01`–`exp05`) were replaced by this TypeScript port; they remain in git history up to commit `7b509a9`.
-
-## 6. Continuous Integration
-
-GitHub Actions runs on pushes and pull requests to `main`: `bun install --frozen-lockfile`, `tsc --noEmit`, the `node:test` suite, and `vite build`.
-
-## 7. License
+## 5. License
 
 Released under the [MIT License](LICENSE).

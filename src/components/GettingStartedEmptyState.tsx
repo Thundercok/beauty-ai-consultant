@@ -4,9 +4,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Droplets,
+  HelpCircle,
   ImagePlus,
   Lamp,
   ScanFace,
+  ShieldCheck,
   ShoppingBag,
   Sparkles,
   Sun,
@@ -21,64 +23,43 @@ interface GettingStartedEmptyStateProps {
   onPickGallery: () => void;
   onPickCamera: () => void;
   onSelectDemo: (preset: DemoPortraitPreset) => void;
+  onOpenOnboarding?: () => void;
+  onBrowseCatalog?: () => void;
 }
 
 const TAB_COPY: Record<
   EmptyStateTab,
   {
-    eyebrow: string;
     title: string;
     description: string;
     icon: React.ComponentType<{ className?: string }>;
   }
 > = {
   tone: {
-    eyebrow: "Bắt đầu phân tích tông da",
-    title: "Tải ảnh chân dung để đo tông màu cá nhân",
+    title: "Xem tông da & chọn màu hợp mặt",
     description:
-      "Beauty AI tự động khử ánh đèn vàng hoặc đèn lạnh trong phòng, đo sắc da chuẩn CIELAB và gợi ý bảng phối màu mắt · má · son hợp da bạn nhất.",
+      "Chọn ảnh rõ mặt hoặc chụp trực tiếp. Ảnh xử lý ngay trên máy, không tải lên máy chủ.",
     icon: ScanFace,
   },
   tryon: {
-    eyebrow: "Chưa có ảnh chân dung",
-    title: "Tải ảnh lên để thử màu son trực tiếp lên môi bạn",
+    title: "Thử son trên màu môi thật của bạn",
     description:
-      "Hệ thống cần đo sắc môi tự nhiên và nhận diện dáng môi từ ảnh chân dung của bạn trước khi mô phỏng màu son và má hồng chân thực.",
+      "Tải một bức ảnh chính diện để xem màu son và má hồng lên da bạn trông ra sao.",
     icon: Droplets,
   },
   shop: {
-    eyebrow: "Chưa có hồ sơ tông da",
-    title: "Phân tích ảnh chân dung để nhận gợi ý mỹ phẩm khớp da",
+    title: "Xếp hạng mỹ phẩm theo tông da của bạn",
     description:
-      "Sau khi tải ảnh, Beauty AI sẽ lọc hơn 180 mã son, má hồng và phấn mắt theo đúng sắc da và nền môi của bạn để tránh mua nhầm tông.",
+      "Tải ảnh chân dung để sắp xếp 217 mã son, má hồng và phấn mắt theo độ hợp với màu da và môi thật.",
     icon: ShoppingBag,
   },
   insights: {
-    eyebrow: "Chưa có dữ liệu phân tích",
-    title: "Tải ảnh chân dung để mở bản đồ sắc tố & ánh đèn phòng",
+    title: "Xem bản đồ độ lệch, dáng mặt & sắc da",
     description:
-      "Tải lên một ảnh mặt mộc hoặc selfie bất kỳ để xem mô phỏng ánh sáng 3200K–6500K, phân bố Melanin/Hemoglobin và các chỉ số màu học chi tiết.",
+      "Tải ảnh chính diện để xem các vùng lệch trên mặt, gợi ý chỉnh đường nét và thử ánh đèn phòng.",
     icon: Sparkles,
   },
 };
-
-const STEPS = [
-  {
-    num: "01",
-    title: "Chọn ảnh chân dung",
-    detail: "Tải ảnh từ thư viện hoặc chụp selfie chính diện, vén gọn tóc mái.",
-  },
-  {
-    num: "02",
-    title: "Tự động khử ánh đèn",
-    detail: "Cân bằng đèn phòng về ánh sáng chuẩn và xác định 12 nhóm mùa màu.",
-  },
-  {
-    num: "03",
-    title: "Thử son & chọn mỹ phẩm",
-    detail: "Xem màu son lên đúng sắc môi thật và lưu các sản phẩm hợp da nhất.",
-  },
-];
 
 const LIGHTING_TIPS: Array<{
   id: string;
@@ -86,43 +67,38 @@ const LIGHTING_TIPS: Array<{
   title: string;
   detail: string;
   icon: React.ComponentType<{ className?: string }>;
-  accentClass: string;
 }> = [
   {
     id: "daylight",
-    tag: "Ánh sáng lý tưởng",
-    title: "Đứng gần cửa sổ có ánh sáng tự nhiên ban ngày",
+    tag: "Ánh sáng",
+    title: "Đứng gần cửa sổ ban ngày",
     detail:
-      "Quay mặt về phía nguồn sáng dịu (tránh nắng gắt chiếu thẳng) giúp hệ thống đọc sắc tố nền da chính xác nhất.",
+      "Quay mặt về phía ánh sáng dịu và tránh nắng chiếu gắt để màu da hiện đúng nhất.",
     icon: Sun,
-    accentClass: "bg-amber-50 text-amber-700",
   },
   {
     id: "avoid-mixed",
-    tag: "Tránh lệch màu",
-    title: "Hạn chế đèn vàng quá tối hoặc đèn LED đổi màu",
+    tag: "Đèn phòng",
+    title: "Tránh ngược sáng hoặc đèn màu",
     detail:
-      "Beauty AI vẫn khử được ánh đèn phòng, nhưng tránh góc ngược sáng hoặc đèn neon giúp kết quả phân loại mùa màu ổn định hơn.",
+      "Đèn vàng tối hoặc đèn LED đổi màu dễ làm lệch sắc da khi chụp trong phòng.",
     icon: Lamp,
-    accentClass: "bg-orange-50 text-orange-700",
   },
   {
     id: "bare-skin",
-    tag: "Giữ màu da thật",
-    title: "Chụp mặt mộc và tắt bộ lọc chỉnh màu",
+    tag: "Mặt mộc",
+    title: "Tắt filter chỉnh màu khi chụp",
     detail:
-      "Tắt filter làm trắng, làm mịn hay son đậm để đo đúng sắc môi gốc và tìm tông son không bị xỉn khi thoa thật.",
+      "Giữ ảnh gốc không làm trắng hay tô son đậm giúp chọn màu son sát với ngoài đời hơn.",
     icon: Sparkles,
-    accentClass: "bg-rose-50 text-rose-700",
   },
   {
     id: "framing",
-    tag: "Góc chụp rõ nét",
-    title: "Giữ camera ngang tầm mắt, vén gọn tóc mái",
+    tag: "Góc mặt",
+    title: "Nhìn thẳng máy ảnh, vén gọn tóc mái",
     detail:
-      "Để lộ rõ vùng trán, hai bên má và viền môi giúp nhận diện đầy đủ 478 điểm khuôn mặt và dáng mặt.",
+      "Để lộ rõ trán, hai má và đường hàm giúp đo dáng mặt và độ cân đối chính xác hơn.",
     icon: ScanFace,
-    accentClass: "bg-zinc-100 text-zinc-700",
   },
 ];
 
@@ -132,6 +108,8 @@ export const GettingStartedEmptyState: React.FC<GettingStartedEmptyStateProps> =
   onPickGallery,
   onPickCamera,
   onSelectDemo,
+  onOpenOnboarding,
+  onBrowseCatalog,
 }) => {
   const [tipIndex, setTipIndex] = useState(0);
   const copy = TAB_COPY[tab];
@@ -147,46 +125,72 @@ export const GettingStartedEmptyState: React.FC<GettingStartedEmptyStateProps> =
     <section
       data-testid={`getting-started-${tab}`}
       aria-label="Hướng dẫn bắt đầu phân tích chân dung"
-      className="max-w-3xl mx-auto bg-white rounded-3xl border border-zinc-200/85 p-5 sm:p-8 shadow-[0_2px_20px_rgba(0,0,0,0.03)] space-y-6"
+      className="max-w-4xl mx-auto bg-white border border-[#E5E5E5] p-5 sm:p-8 space-y-6"
     >
-      {/* Header & Value Explanation */}
-      <div className="flex flex-col items-center text-center space-y-3 max-w-xl mx-auto">
-        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-700 flex items-center justify-center">
-          <Icon className="w-6 h-6" />
+      {/* Hero / Entry Actions */}
+      <div className="flex flex-col items-center text-center space-y-4 max-w-xl mx-auto">
+        <div className="w-10 h-10 rounded-[4px] bg-[#111111] text-white flex items-center justify-center">
+          <Icon className="w-5 h-5" />
         </div>
-        <div className="space-y-1.5">
-          <div className="text-xs font-semibold text-rose-700">{copy.eyebrow}</div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 text-balance">
+        <div className="space-y-2">
+          <h1 className="text-xl sm:text-[28px] font-bold tracking-[-0.03em] text-[#111111] leading-tight text-balance">
             {copy.title}
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-600 leading-relaxed text-pretty">
+          <p className="text-xs sm:text-sm text-[#525252] leading-relaxed text-pretty">
             {copy.description}
           </p>
         </div>
 
-        {/* Primary & Secondary Upload Actions */}
-        <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 pt-2">
+        {/* Primary & Secondary Capture Actions */}
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 pt-1">
           <button
             type="button"
+            data-testid="empty-upload-btn"
             onClick={onPickGallery}
-            className="min-h-[44px] px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer whitespace-nowrap"
+            className="min-h-[44px] px-5 py-2.5 rounded-[4px] bg-[#111111] hover:bg-[#2B2B2B] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer whitespace-nowrap"
           >
             <ImagePlus className="w-4 h-4" />
-            <span>Tải ảnh chân dung</span>
+            <span>Chọn ảnh từ máy</span>
           </button>
 
           <button
             type="button"
+            data-testid="empty-camera-btn"
             onClick={onPickCamera}
-            className="min-h-[44px] px-5 py-2.5 rounded-xl bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-300 text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer whitespace-nowrap"
+            className="min-h-[44px] px-5 py-2.5 rounded-[4px] bg-white hover:bg-[#F5F5F5] text-[#111111] border border-[#D4D4D4] hover:border-[#111111] text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer whitespace-nowrap"
           >
             <Camera className="w-4 h-4" />
-            <span>Chụp selfie ngay</span>
+            <span>Chụp selfie</span>
           </button>
         </div>
 
-        <p className="text-[11px] text-zinc-500">
-          Ảnh được xử lý trực tiếp trên thiết bị của bạn, không tải lên máy chủ.
+        {/* Secondary Guest Links: Browse Catalog + Onboarding/Privacy */}
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 pt-0.5 text-xs">
+          {onBrowseCatalog && tab === "tone" && (
+            <button
+              type="button"
+              onClick={onBrowseCatalog}
+              className="font-semibold text-[#111111] hover:text-[#DC2626] underline underline-offset-4 cursor-pointer"
+            >
+              Xem trước 217 sản phẩm
+            </button>
+          )}
+          {onOpenOnboarding && (
+            <button
+              type="button"
+              data-testid="empty-open-onboarding-btn"
+              onClick={onOpenOnboarding}
+              className="inline-flex items-center gap-1 text-[#525252] hover:text-[#111111] cursor-pointer"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Lưu ý chụp ảnh &amp; riêng tư</span>
+            </button>
+          )}
+        </div>
+
+        <p className="inline-flex items-center gap-1.5 text-[11px] text-[#737373]">
+          <ShieldCheck className="w-3.5 h-3.5 text-[#525252] shrink-0" />
+          <span>Xử lý trực tiếp trên máy · Không cần đăng nhập</span>
         </p>
       </div>
 
@@ -194,22 +198,22 @@ export const GettingStartedEmptyState: React.FC<GettingStartedEmptyStateProps> =
       {tab === "tone" && (
         <div
           data-testid="tone-tips-carousel"
-          aria-label="Mẹo ánh sáng chụp ảnh phân tích chuẩn"
-          className="pt-5 border-t border-zinc-100 space-y-3"
+          aria-label="Mẹo chụp ảnh rõ màu da"
+          className="pt-5 border-t border-[#EFEFEF] space-y-3"
         >
           <div className="flex items-center justify-between gap-2">
-            <div className="text-xs font-semibold text-zinc-900">
-              Mẹo ánh sáng để đo tông da chuẩn nhất
+            <div className="text-xs font-semibold text-[#111111]">
+              Chụp sao cho chuẩn màu da
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-mono tabular-nums text-zinc-400 mr-1">
+              <span className="text-[11px] font-mono tabular-nums text-[#737373] mr-1">
                 {tipIndex + 1}/{LIGHTING_TIPS.length}
               </span>
               <button
                 type="button"
                 onClick={handlePrevTip}
                 aria-label="Mẹo trước"
-                className="w-8 h-8 rounded-full border border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50 flex items-center justify-center text-zinc-600 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-[4px] border border-[#E5E5E5] hover:border-[#111111] flex items-center justify-center text-[#525252] transition-colors cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -217,7 +221,7 @@ export const GettingStartedEmptyState: React.FC<GettingStartedEmptyStateProps> =
                 type="button"
                 onClick={handleNextTip}
                 aria-label="Mẹo tiếp theo"
-                className="w-8 h-8 rounded-full border border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50 flex items-center justify-center text-zinc-600 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-[4px] border border-[#E5E5E5] hover:border-[#111111] flex items-center justify-center text-[#525252] transition-colors cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -226,62 +230,37 @@ export const GettingStartedEmptyState: React.FC<GettingStartedEmptyStateProps> =
 
           <div
             key={activeTip.id}
-            className="animate-view-enter rounded-2xl bg-[#FAF9F8] border border-zinc-200/80 p-3.5 sm:p-4 flex items-start gap-3.5"
+            className="animate-view-enter bg-[#FAFAFA] border border-[#E5E5E5] p-3.5 sm:p-4 flex items-start gap-3.5"
           >
-            <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${activeTip.accentClass}`}
-            >
-              <TipIcon className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-[4px] bg-white border border-[#E5E5E5] text-[#111111] flex items-center justify-center shrink-0">
+              <TipIcon className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex-1 space-y-1">
-              <div className="text-[11px] font-semibold text-zinc-500">{activeTip.tag}</div>
-              <div className="text-sm font-semibold text-zinc-900 leading-snug">
+              <div className="text-[11px] font-mono uppercase tracking-[0.04em] font-semibold text-[#666666]">
+                {activeTip.tag}
+              </div>
+              <div className="text-sm font-semibold text-[#111111] leading-snug">
                 {activeTip.title}
               </div>
-              <p className="text-xs text-zinc-600 leading-relaxed">{activeTip.detail}</p>
+              <p className="text-xs text-[#525252] leading-relaxed">{activeTip.detail}</p>
             </div>
-          </div>
-
-          <div className="flex items-center justify-center gap-1.5" role="tablist" aria-label="Chọn mẹo ánh sáng">
-            {LIGHTING_TIPS.map((tip, idx) => {
-              const active = idx === tipIndex;
-              return (
-                <button
-                  key={tip.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  aria-label={`Mẹo ${idx + 1}: ${tip.title}`}
-                  onClick={() => setTipIndex(idx)}
-                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                    active ? "w-5 bg-zinc-900" : "w-1.5 bg-zinc-300 hover:bg-zinc-400"
-                  }`}
-                />
-              );
-            })}
           </div>
         </div>
       )}
 
-      {/* 3-Step Getting Started Guide */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-5 border-t border-zinc-100">
-        {STEPS.map((step) => (
-          <div key={step.num} className="space-y-1 px-1">
-            <div className="text-[11px] font-mono font-semibold text-rose-700">{step.num}</div>
-            <div className="text-xs font-semibold text-zinc-900">{step.title}</div>
-            <p className="text-xs text-zinc-600 leading-relaxed">{step.detail}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Quick Demo Presets Strip */}
+      {/* Explicit Optional Demo Mode */}
       {demoPresets.length > 0 && (
-        <div className="pt-5 border-t border-zinc-100 space-y-3">
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-xs font-semibold text-zinc-900">
-              Hoặc trải nghiệm ngay với ảnh mẫu
+        <div
+          data-testid="empty-demo-section"
+          className="pt-5 border-t border-[#EFEFEF] space-y-3"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+            <span className="text-xs font-bold text-[#111111]">
+              Hoặc dùng thử với ảnh mẫu
             </span>
-            <span className="text-[11px] text-zinc-500">Chạm để phân tích ngay</span>
+            <span className="text-[11px] text-[#666666]">
+              Kết quả minh họa, không phải sắc da của bạn
+            </span>
           </div>
 
           <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
@@ -289,20 +268,26 @@ export const GettingStartedEmptyState: React.FC<GettingStartedEmptyStateProps> =
               <button
                 key={preset.id}
                 type="button"
+                data-testid={`demo-preset-${preset.id}`}
                 onClick={() => onSelectDemo(preset)}
-                className="group text-left rounded-2xl overflow-hidden border border-zinc-200 hover:border-zinc-400 transition-colors bg-white cursor-pointer"
+                className="group text-left overflow-hidden border border-[#E5E5E5] hover:border-[#111111] transition-colors bg-white cursor-pointer"
               >
-                <div className="aspect-[4/4] sm:aspect-[4/3] w-full bg-zinc-100 overflow-hidden">
+                <div className="aspect-[4/4] sm:aspect-[4/3] w-full bg-[#F5F5F5] overflow-hidden relative">
                   <img
                     src={preset.url}
-                    alt={preset.label}
+                    alt={`Ảnh mẫu: ${preset.label}`}
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover object-[50%_22%] group-hover:scale-[1.03] transition-transform duration-200"
                   />
+                  <span className="absolute top-1.5 left-1.5 bg-black/70 text-white text-[10px] font-mono px-1.5 py-0.5 rounded-[2px]">
+                    DEMO
+                  </span>
                 </div>
                 <div className="px-2.5 py-2">
-                  <div className="text-xs font-semibold text-zinc-900 truncate">{preset.label}</div>
-                  <div className="text-[11px] text-zinc-500 truncate">{preset.subtitle}</div>
+                  <div className="text-xs font-semibold text-[#111111] truncate">
+                    {preset.label}
+                  </div>
+                  <div className="text-[11px] text-[#666666] truncate">{preset.subtitle}</div>
                 </div>
               </button>
             ))}

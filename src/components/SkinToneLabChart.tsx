@@ -253,30 +253,28 @@ export const SkinToneLabChart: React.FC<SkinToneLabChartProps> = ({ report, face
   return (
     <section
       data-testid="skin-lab-variance-chart"
-      aria-label="Biểu đồ phân bố sắc da CIELAB trên khuôn mặt"
-      className="bg-[#FAFAFA] border border-[#E5E5E5] p-4 sm:p-5 space-y-4"
+      aria-label="Biểu đồ phân bố sắc da L*, a*, b* trên khuôn mặt"
+      className="bg-white border border-[#E5E5E5] flex flex-col divide-y divide-[#E5E5E5] h-full"
     >
       {/* Header & Mode Switcher */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3.5 border-b border-[#E5E5E5]">
-        <div className="min-w-0 space-y-0.5">
-          <h2 className="text-sm sm:text-base font-bold text-[#111111] tracking-[-0.01em]">
-            Phân bố biến thiên sắc da toàn mặt (L*, a*, b*)
+      <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <div className="metric-label">Biến thiên sắc da (L* · a* · b*)</div>
+          <h2 className="text-lg sm:text-xl font-bold text-[#0A0A0A] tracking-[-0.025em] leading-tight">
+            Vùng sáng &amp; bóng tự nhiên trên mặt
           </h2>
-          <p className="text-xs text-[#666666]">
-            Trực quan hóa vùng bắt sáng tự nhiên (Highlight) và vùng đổ bóng (Shadow) trên 8 vùng mặt so với mốc màu trung tính lý tưởng
-          </p>
         </div>
 
         <div
           role="tablist"
-          aria-label="Chọn góc nhìn biểu đồ CIELAB"
-          className="grid grid-cols-3 sm:inline-flex items-center gap-1 p-0.5 bg-[#EFEFEF] rounded-[4px] shrink-0"
+          aria-label="Chọn góc nhìn biểu đồ sắc da"
+          className="grid grid-cols-3 sm:inline-flex items-center gap-0.5 p-0.5 bg-[#EFEFEF] rounded-[4px] shrink-0"
         >
           {(
             [
-              ["luminance", "Sáng / Tối (L*)"],
-              ["channels", "Lệch L* · a* · b*"],
-              ["scatter", "Bản đồ a* – b*"],
+              ["luminance", "Sáng / Tối"],
+              ["channels", "Đỏ & Vàng"],
+              ["scatter", "Phân bố a–b"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -286,10 +284,10 @@ export const SkinToneLabChart: React.FC<SkinToneLabChartProps> = ({ report, face
               aria-selected={mode === id}
               data-testid={`lab-chart-mode-${id}`}
               onClick={() => setMode(id)}
-              className={`min-w-0 min-h-[32px] px-2 sm:px-3 py-1 text-[11px] sm:text-xs rounded-[3px] truncate transition-colors cursor-pointer ${
+              className={`min-w-0 min-h-[32px] px-2.5 py-1 text-[11px] rounded-[3px] whitespace-nowrap transition-colors cursor-pointer ${
                 mode === id
-                  ? "bg-white text-[#111111] font-semibold shadow-2xs"
-                  : "text-[#666666] hover:text-[#111111] font-medium"
+                  ? "bg-white text-[#0A0A0A] font-semibold shadow-2xs"
+                  : "text-[#666666] hover:text-[#0A0A0A] font-medium"
               }`}
             >
               {label}
@@ -298,15 +296,37 @@ export const SkinToneLabChart: React.FC<SkinToneLabChartProps> = ({ report, face
         </div>
       </div>
 
-      {/* Main Recharts Canvas */}
-      <div className="bg-white border border-[#E5E5E5] p-3 sm:p-4 space-y-3">
+      {/* Consistent 3-Column Display-Sans KPI Strip */}
+      <div className="grid grid-cols-3 divide-x divide-[#E5E5E5] bg-[#FAFAFA]">
+        <div className="px-4 sm:px-5 py-3.5 space-y-1">
+          <div className="metric-label truncate">Chuẩn trung tính L*</div>
+          <div className="metric-display-sm text-xl sm:text-2xl font-bold text-[#0A0A0A]">
+            {idealNeutral.L.toFixed(1)}
+          </div>
+        </div>
+        <div className="px-4 sm:px-5 py-3.5 space-y-1">
+          <div className="metric-label truncate">Biên độ sáng ΔL*</div>
+          <div className="metric-display-sm text-xl sm:text-2xl font-bold text-[#0A0A0A]">
+            {luminanceSpread.toFixed(1)}
+          </div>
+        </div>
+        <div className="px-4 sm:px-5 py-3.5 space-y-1">
+          <div className="metric-label truncate">Lệch màu ΔE TB</div>
+          <div className="metric-display-sm text-xl sm:text-2xl font-bold text-[#DC2626]">
+            {meanDeltaE.toFixed(1)}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Recharts Canvas (Zero Nested Card Border) */}
+      <div className="p-4 sm:p-5 space-y-3 flex-1">
         <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#525252]">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {mode === "luminance" && (
               <>
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-3 h-2.5 rounded-[2px] border border-[#111111]/40 bg-[#D7A994]" />
-                  <span>Độ sáng L* (màu da thật từng vùng)</span>
+                  <span>Độ sáng L*</span>
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-4 border-t-2 border-dashed border-[#111111]" />
@@ -356,13 +376,13 @@ export const SkinToneLabChart: React.FC<SkinToneLabChartProps> = ({ report, face
             )}
           </div>
 
-          <span className="font-mono tabular-nums text-[11px] text-[#737373]">
-            {mode === "luminance"
-              ? `Biên độ sáng ΔL* ${luminanceSpread.toFixed(1)} · ΔE TB ${meanDeltaE.toFixed(1)}`
-              : mode === "channels"
+          {mode !== "luminance" && (
+            <span className="font-mono tabular-nums text-[11px] text-[#737373]">
+              {mode === "channels"
                 ? "Mốc 0 = Màu trung tính lý tưởng"
-                : `Trục a* (Hồng/Đỏ) × b* (Vàng/Ấm)`}
-          </span>
+                : "Trục a* (Hồng/Đỏ) × b* (Vàng/Ấm)"}
+            </span>
+          )}
         </div>
 
         <div className="h-[290px] sm:h-[320px] w-full" data-testid={`lab-chart-canvas-${mode}`}>
@@ -607,86 +627,77 @@ export const SkinToneLabChart: React.FC<SkinToneLabChartProps> = ({ report, face
       </div>
 
       {/* Bottom 3-Column Comparison Strip: Brightest Highlight vs Ideal Neutral vs Deepest Shadow */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#E5E5E5] bg-[#FAFAFA]">
         {brightestZone && (
-          <div className="bg-white border border-[#E5E5E5] p-3 space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold text-amber-700">
-                Highlight tự nhiên sáng nhất
-              </span>
-              <span className="font-mono tabular-nums text-[11px] font-semibold text-[#111111]">
+          <div className="px-4 py-3.5 space-y-1.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="metric-label">Sáng nhất</span>
+              <span className="font-display tabular-nums text-sm font-bold text-[#B45309]">
                 {formatSigned(brightestZone.deltaL)} L*
               </span>
             </div>
             <div className="flex items-center gap-2.5">
               <span
-                className="w-7 h-7 rounded-[3px] border border-black/15 shrink-0"
+                className="w-6 h-6 border border-black/15 shrink-0"
                 style={{ backgroundColor: brightestZone.hex }}
                 aria-hidden="true"
               />
               <div className="min-w-0">
-                <div className="text-xs font-bold text-[#111111] truncate">
+                <div className="text-xs font-bold text-[#0A0A0A] truncate">
                   {brightestZone.labelVi}
                 </div>
-                <div className="font-mono tabular-nums text-[11px] text-[#666666]">
-                  L* {brightestZone.L.toFixed(1)} · a* {brightestZone.a.toFixed(1)} · b*{" "}
-                  {brightestZone.b.toFixed(1)}
+                <div className="font-mono tabular-nums text-[10px] text-[#737373]">
+                  L* {brightestZone.L.toFixed(1)} · a* {brightestZone.a.toFixed(1)}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        <div className="bg-white border border-[#111111] p-3 space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold text-[#111111]">
-              Chuẩn trung tính lý tưởng
-            </span>
-            <span className="font-mono tabular-nums text-[11px] text-[#666666]">
-              Hue {idealNeutral.hueDeg}°
+        <div className="px-4 py-3.5 space-y-1.5 bg-white">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="metric-label">Mốc trung tính</span>
+            <span className="font-display tabular-nums text-sm font-bold text-[#0A0A0A]">
+              {idealNeutral.hueDeg}°
             </span>
           </div>
           <div className="flex items-center gap-2.5">
             <span
-              className="w-7 h-7 rounded-[3px] border border-black/15 shrink-0"
+              className="w-6 h-6 border border-black/15 shrink-0"
               style={{ backgroundColor: idealNeutral.hex }}
               aria-hidden="true"
             />
             <div className="min-w-0">
-              <div className="text-xs font-bold text-[#111111] font-mono tabular-nums">
-                {idealNeutral.hex}
+              <div className="text-xs font-bold text-[#0A0A0A] truncate">
+                Sắc da cân bằng
               </div>
-              <div className="font-mono tabular-nums text-[11px] text-[#666666]">
-                L* {idealNeutral.L.toFixed(1)} · a* {idealNeutral.a.toFixed(1)} · b*{" "}
-                {idealNeutral.b.toFixed(1)}
+              <div className="font-mono tabular-nums text-[10px] text-[#737373]">
+                L* {idealNeutral.L.toFixed(1)} · b* {idealNeutral.b.toFixed(1)}
               </div>
             </div>
           </div>
         </div>
 
         {darkestZone && (
-          <div className="bg-white border border-[#E5E5E5] p-3 space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold text-[#525252]">
-                Shadow tự nhiên tối nhất
-              </span>
-              <span className="font-mono tabular-nums text-[11px] font-semibold text-[#111111]">
+          <div className="px-4 py-3.5 space-y-1.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="metric-label">Tối nhất</span>
+              <span className="font-display tabular-nums text-sm font-bold text-[#0A0A0A]">
                 {formatSigned(darkestZone.deltaL)} L*
               </span>
             </div>
             <div className="flex items-center gap-2.5">
               <span
-                className="w-7 h-7 rounded-[3px] border border-black/15 shrink-0"
+                className="w-6 h-6 border border-black/15 shrink-0"
                 style={{ backgroundColor: darkestZone.hex }}
                 aria-hidden="true"
               />
               <div className="min-w-0">
-                <div className="text-xs font-bold text-[#111111] truncate">
+                <div className="text-xs font-bold text-[#0A0A0A] truncate">
                   {darkestZone.labelVi}
                 </div>
-                <div className="font-mono tabular-nums text-[11px] text-[#666666]">
-                  L* {darkestZone.L.toFixed(1)} · a* {darkestZone.a.toFixed(1)} · b*{" "}
-                  {darkestZone.b.toFixed(1)}
+                <div className="font-mono tabular-nums text-[10px] text-[#737373]">
+                  L* {darkestZone.L.toFixed(1)} · a* {darkestZone.a.toFixed(1)}
                 </div>
               </div>
             </div>

@@ -17,7 +17,17 @@ export const INNER_LIP_INDICES = [13, 14, 78, 308, 82, 312];
 export const OUTER_LIP_INDICES = [61, 291, 0, 17, 37, 267, 84, 314];
 
 let landmarkerPromise: Promise<FaceLandmarker> | null = null;
+let landmarkerReady = false;
 let tfliteConsoleFilterInstalled = false;
+
+export function isFaceLandmarkerReady(): boolean {
+  return landmarkerReady;
+}
+
+export function resetFaceLandmarkerCache(): void {
+  landmarkerPromise = null;
+  landmarkerReady = false;
+}
 
 function ensureTfliteInfoConsoleFilter(): void {
   if (tfliteConsoleFilterInstalled || typeof console === "undefined") return;
@@ -57,12 +67,13 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
 async function getFaceLandmarker(): Promise<FaceLandmarker> {
   if (!landmarkerPromise) {
     ensureTfliteInfoConsoleFilter();
+    const base = import.meta.env.BASE_URL || "/";
     landmarkerPromise = withTimeout(
       (async () => {
-        const vision = await FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}mediapipe/wasm`);
-        return FaceLandmarker.createFromOptions(vision, {
+        const vision = await FilesetResolver.forVisionTasks(`${base}mediapipe/wasm`);
+        const instance = await FaceLandmarker.createFromOptions(vision, {
           baseOptions: {
-            modelAssetPath: `${import.meta.env.BASE_URL}mediapipe/face_landmarker.task`,
+            modelAssetPath: `${base}mediapipe/face_landmarker.task`,
             delegate: "CPU",
           },
           runningMode: "IMAGE",
@@ -70,11 +81,14 @@ async function getFaceLandmarker(): Promise<FaceLandmarker> {
           minFaceDetectionConfidence: 0.45,
           minFacePresenceConfidence: 0.45,
         });
+        landmarkerReady = true;
+        return instance;
       })(),
-      12000,
+      15000,
       "MediaPipe FaceLandmarker init"
     ).catch((err) => {
       landmarkerPromise = null;
+      landmarkerReady = false;
       throw err;
     });
   }

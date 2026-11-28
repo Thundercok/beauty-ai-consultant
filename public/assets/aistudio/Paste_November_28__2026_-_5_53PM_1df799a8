@@ -1,0 +1,1432 @@
+# MASTER EXECUTION PROMPT
+# BEAUTY AI CONSULTANT — FROM EXISTING REPOSITORY TO A REAL, PRODUCTION-READY PRODUCT
+
+You are an autonomous senior engineering team consisting of:
+
+- Senior Software Architect
+- Senior React / TypeScript Engineer
+- Computer Vision Engineer
+- Color Science Engineer
+- Product Designer
+- UX Researcher
+- QA / Test Automation Engineer
+- DevOps / Deployment Engineer
+- Application Security Engineer
+
+Your mission is to transform the existing Beauty AI Consultant repository into a polished, reliable, production-ready beauty application that real users can use repeatedly on mobile and desktop.
+
+You are not building a new project from scratch.
+
+You are improving an existing application that already contains substantial computer vision, color science, virtual makeup, product matching, and static deployment functionality.
+
+You must inspect, understand, preserve, improve, test, and deploy the existing application.
+
+Do not stop after producing a plan. Execute the work.
+
+---
+
+# 0. PROJECT IDENTITY AND CURRENT BASELINE
+
+Repository:
+
+https://github.com/Thundercok/beauty-ai-consultant
+
+Primary branch: `main`
+
+Latest repository state at the beginning of this task:
+
+`340bb72966e94630d7625c1395d9c490f082c5e2`
+
+The repository currently includes:
+
+- React 19
+- TypeScript
+- Vite 6
+- Tailwind CSS 4
+- MediaPipe Tasks Vision
+- Face Landmarker
+- CIEDE2000 color difference calculations
+- CIELAB color processing
+- Bradford chromatic adaptation
+- Planckian illuminant estimation
+- Skin and lip color analysis
+- Kubelka–Munk lipstick rendering
+- Virtual blush rendering
+- Product matching
+- A curated catalogue of approximately 217 SKUs
+- Face-shape and facial analysis
+- Makeup guidance
+- Camera capture
+- Image upload
+- Vietnamese user interface
+- Existing unit tests
+- GitHub Actions CI
+- GitHub Pages static deployment
+
+The most recent GitHub Actions runs at the time of this prompt show:
+
+- TypeScript validation: passed.
+- Unit tests: passed.
+- Production build: passed.
+- GitHub Pages build: passed.
+- GitHub Pages deployment job: passed.
+
+These are the baseline results, not proof that every user workflow works correctly.
+
+Verify the repository again before implementation. Do not assume the repository has remained unchanged.
+
+## Existing important files
+
+Inspect at minimum:
+
+- `package.json`
+- `bun.lock`
+- `vite.config.ts`
+- `index.html`
+- `src/App.tsx`
+- `src/main.tsx`
+- `server.ts`
+- `src/components/`
+- `src/lib/beauty/`
+- `data/product_database.csv`
+- `public/mediapipe/`
+- `.github/workflows/ci.yml`
+- `.github/workflows/pages.yml`
+- `README.md`
+- `docs/RESEARCH_PLAN.md`
+
+---
+
+# 1. NON-NEGOTIABLE REQUIREMENTS
+
+## 1.1 Zero-cost hosting
+
+The product must remain usable without requiring paid infrastructure.
+
+The owner explicitly requires a zero-VND hosting approach.
+
+Use the existing GitHub Pages deployment as the first production hosting solution.
+
+The current project already has a successful static deployment workflow. Preserve and improve it.
+
+Do not migrate to Cloudflare, Render, Railway, Vercel, Netlify, or another hosting provider merely because it is familiar.
+
+A migration is permitted only if you establish a concrete technical limitation that cannot reasonably be solved with the existing GitHub Pages deployment.
+
+Do not introduce:
+
+- Paid VPS hosting.
+- Paid domains.
+- Paid databases.
+- Paid image-processing APIs.
+- Paid AI inference APIs.
+- Paid authentication services.
+- Paid analytics.
+- Subscription services.
+- Unnecessary backend infrastructure.
+
+Do not activate a paid plan or automatic paid upgrade.
+
+If a required capability cannot be implemented within the free infrastructure constraints, document the limitation and propose an alternative.
+
+Never silently introduce a billable dependency.
+
+## 1.2 No continuously running personal computer
+
+The owner must not need to keep a MacBook, NUC, NAS, Raspberry Pi, or another personal device running.
+
+The deployed application must be served by managed hosting.
+
+Local computers are only development environments.
+
+Once deployment succeeds, the owner must be able to shut down all personal computers while friends continue accessing the public application.
+
+## 1.3 Guest-first, local-first
+
+Users must be able to use the primary features without creating an account.
+
+Do not introduce mandatory registration or login.
+
+Default behavior:
+
+- Face analysis runs in the browser.
+- Color analysis runs in the browser.
+- Virtual try-on runs in the browser.
+- Personal preferences remain local.
+- Analysis history remains local.
+- Saved products remain local.
+- No automatic cloud synchronization.
+- No automatic selfie upload.
+
+Clearly explain that locally stored data belongs to the current browser/device and does not automatically synchronize between devices.
+
+Provide data deletion controls.
+
+## 1.4 Product quality over feature count
+
+The objective is not to maximize the number of features.
+
+The objective is to make existing features reliable, understandable, useful, and pleasant to use.
+
+Do not add speculative AI functionality just to make the application appear more advanced.
+
+---
+
+# 2. REPOSITORY AUDIT — BEFORE MODIFYING CODE
+
+First inspect the current repository and produce an architecture map.
+
+Determine:
+
+1. Existing application entry points.
+2. Existing component hierarchy.
+3. Existing state management.
+4. Existing image-processing workflow.
+5. Existing MediaPipe initialization.
+6. Existing product catalogue flow.
+7. Existing color science pipeline.
+8. Existing virtual try-on pipeline.
+9. Existing storage behavior.
+10. Existing API endpoints.
+11. Existing deployment architecture.
+12. Existing tests.
+13. Existing accessibility and responsive behavior.
+14. Existing technical debt.
+
+Classify every major feature as:
+
+- Working and should be preserved.
+- Working but needs refinement.
+- Partially implemented.
+- Broken.
+- Not implemented.
+- Not verified.
+
+Inspect the actual code rather than relying on README descriptions.
+
+Create `IMPLEMENTATION_STATUS.md` before major changes.
+
+It must include:
+
+- Repository commit SHA.
+- Current architecture.
+- Confirmed working features.
+- Confirmed defects.
+- Test baseline.
+- Deployment baseline.
+- Planned implementation phases.
+- Current progress.
+- Remaining blockers.
+
+Update this file throughout the project.
+
+Do not perform a wholesale rewrite.
+
+---
+
+# 3. ARCHITECTURE DECISION — STATIC-FIRST
+
+This is one of the most important decisions in the project.
+
+The current application already has a static-hosting architecture.
+
+Confirmed implementation:
+
+- The product catalogue is imported into the frontend through `data/product_database.csv?raw`.
+- The sample portrait is bundled with the frontend.
+- MediaPipe model assets are stored in `public/mediapipe/`.
+- MediaPipe WASM assets are stored in `public/mediapipe/wasm/`.
+- Face analysis runs in the browser.
+- Color science runs in the browser.
+- Virtual makeup runs in the browser.
+- GitHub Pages builds and deploys the static application.
+
+Therefore:
+
+**Prefer GitHub Pages static hosting with no production backend.**
+
+Do not migrate Express to Cloudflare Workers automatically.
+
+Do not create a Worker just because the old application has `server.ts`.
+
+## 3.1 Review the Express server
+
+Inspect `server.ts` and identify every endpoint.
+
+Known endpoints include:
+
+- `/api/health`
+- `/api/products`
+- `/api/sample-face`
+- `/mediapipe/wasm`
+- `/mediapipe/face_landmarker.task`
+
+For every endpoint, determine:
+
+- Is it used by the production frontend?
+- Is it still necessary?
+- Can it be replaced by a static asset?
+- Is it only necessary for local development?
+- Does it contain business logic worth preserving?
+
+The latest static deployment already bundles the product catalogue and sample portrait and uses relative MediaPipe asset paths.
+
+Preserve this architecture.
+
+If Express is only needed for local development, retain a suitable development workflow but remove any unnecessary production-server dependency.
+
+Do not introduce backend infrastructure unless a concrete production requirement exists.
+
+## 3.2 Production build
+
+Review `package.json`.
+
+The current scripts include:
+
+- `dev`: `tsx server.ts`
+- `build`: `vite build`
+- `start`: `NODE_ENV=production tsx server.ts`
+- `test`: `tsx --test src/lib/beauty/*.test.ts`
+- `lint`: `tsc --noEmit`
+
+The production `start` script depends on `tsx`, which is in `devDependencies`.
+
+Determine whether this production server is still necessary.
+
+If the production application is static-only:
+
+- Remove obsolete production-server assumptions.
+- Preserve a working local development workflow.
+- Do not break the existing CI commands.
+- Do not move dependencies unnecessarily.
+- Document the correct production architecture.
+
+## 3.3 GitHub Pages deployment
+
+Preserve:
+
+- `.github/workflows/ci.yml`
+- `.github/workflows/pages.yml`
+
+Avoid duplicate workflows.
+
+The Pages workflow currently builds with:
+
+`BASE_PATH: /${{ github.event.repository.name }}/`
+
+It also copies `dist/index.html` to `dist/404.html` for SPA fallback.
+
+Verify:
+
+- Build output.
+- Base path.
+- SPA fallback.
+- Static asset paths.
+- MediaPipe model paths.
+- WASM paths.
+- Production loading.
+- Direct URL access.
+- Browser refresh behavior.
+- Deployment after a push to `main`.
+
+Do not disable the current deployment workflow until a replacement has actually been verified.
+
+Do not maintain competing production deployments unnecessarily.
+
+---
+
+# 4. PRESERVE THE EXISTING SCIENTIFIC IMPLEMENTATION
+
+The existing domain logic is valuable.
+
+Do not casually rewrite, simplify, or replace the following modules:
+
+- `src/lib/beauty/colorConstancy.ts`
+- `src/lib/beauty/bradfordCat.ts`
+- `src/lib/beauty/highlightRecovery.ts`
+- `src/lib/beauty/chromophores.ts`
+- `src/lib/beauty/portraitPipeline.ts`
+- `src/lib/beauty/neuralLandmarks.ts`
+- `src/lib/beauty/analysisValidity.ts`
+- `src/lib/beauty/analysisConfidence.ts`
+- `src/lib/beauty/productMatcher.ts`
+- `src/lib/beauty/kubelkaMunk.ts`
+- `src/lib/beauty/virtualMakeup.ts`
+
+Preserve the scientific intent of:
+
+- CIELAB measurements.
+- CIEDE2000 matching.
+- Bradford chromatic adaptation.
+- Planckian illuminant estimation.
+- Skin and lip ROI extraction.
+- Highlight recovery.
+- Skin evidence validation.
+- Kubelka–Munk pigment blending.
+- Face landmark mapping.
+- Product color matching.
+
+The repository contains recent fixes for:
+
+- Skin-color drift under warm and cool room lighting.
+- Clipped skin highlights.
+- False-positive skin detection.
+- Invalid-image rejection.
+- Confidence-score caps when skin evidence is missing.
+
+These fixes must not be removed casually.
+
+Any change to the underlying color pipeline must include:
+
+1. Technical justification.
+2. Regression tests.
+3. Comparison with previous behavior.
+4. Documentation of limitations.
+
+Do not replace the pipeline with generic RGB sampling or a third-party AI API.
+
+---
+
+# 5. CRITICAL PRODUCT FIX: REMOVE AUTOMATIC DEMO ANALYSIS
+
+Current confirmed behavior:
+
+In `src/App.tsx`:
+
+- `activeDemoId` initializes to `DEMO_PORTRAIT_PRESETS[0].id`.
+- A mount effect calls `loadDemoPreset(DEMO_PORTRAIT_PRESETS[0])`.
+
+This means a new user can open the application and see an automatically loaded sample portrait and its analysis.
+
+This must change.
+
+Production behavior:
+
+- Start with no portrait.
+- Start with no analysis result.
+- Display a proper getting-started state.
+- Let users choose camera, gallery, or optional demo mode.
+- Make demo content clearly identifiable.
+- Never present a sample result as the user's personal analysis.
+- Clearing the current portrait must not silently load another sample.
+- Preserve the ability to explore sample portraits manually.
+
+Review all components that depend on:
+
+- `activeDemoId`
+- `loadDemoPreset`
+- `DEMO_PORTRAIT_PRESETS`
+- `isDemoPortrait`
+
+Make sure the revised behavior works across every tab.
+
+Add tests for the initial empty state and demo selection behavior where feasible.
+
+---
+
+# 6. PRODUCT EXPERIENCE AND DESIGN
+
+The product should feel like a premium beauty technology application.
+
+It must not look like a student dashboard or an experimental developer tool.
+
+Positioning:
+
+**Beauty AI Consultant — Understand your colors, explore your look, and discover beauty products that suit you.**
+
+Design principles:
+
+- Premium.
+- Clean.
+- Modern.
+- Calm.
+- Elegant.
+- Trustworthy.
+- Responsive.
+- Accessible.
+- Easy to understand.
+
+Avoid:
+
+- Excessive gradients.
+- Generic AI-themed visuals.
+- Too many cards.
+- Unnecessary animations.
+- Dense technical dashboards.
+- Fake testimonials.
+- Fake statistics.
+- Placeholder production content.
+- Excessive rounded containers.
+- Decorative elements that reduce readability.
+
+Create a consistent design system:
+
+- Typography.
+- Color tokens.
+- Spacing.
+- Buttons.
+- Inputs.
+- Navigation.
+- Cards.
+- Modals.
+- Drawers.
+- Loading states.
+- Error states.
+- Focus states.
+- Responsive breakpoints.
+- Reduced-motion support.
+
+Use the current Tailwind CSS implementation where appropriate.
+
+Do not add a large UI library without a concrete reason.
+
+## 6.1 Application information architecture
+
+Improve the existing navigation without unnecessarily discarding working functionality.
+
+The intended product areas are:
+
+1. Home / Tone
+2. Virtual Try-On
+3. Product Discovery
+4. Beauty Insights
+5. My Beauty Profile
+
+Advanced technical analysis should not dominate the primary experience.
+
+The application should guide users through:
+
+**Discover → Capture → Analyze → Explore → Save**
+
+## 6.2 Home
+
+Create a meaningful first screen.
+
+Include:
+
+- Product introduction.
+- Main feature entry points.
+- Clear photo-upload action.
+- Camera action.
+- Optional demo mode.
+- Short explanation of the analysis.
+- Privacy explanation.
+- Useful empty state.
+
+Do not automatically load a demo portrait.
+
+## 6.3 Onboarding
+
+Implement concise onboarding.
+
+Explain:
+
+- What the application can do.
+- What type of photo works best.
+- Why lighting matters.
+- How image processing works.
+- Where user data is stored.
+- What results mean.
+- What the application cannot guarantee.
+
+Allow users to skip onboarding.
+
+Do not require registration.
+
+## 6.4 Tone Analysis
+
+Preserve and improve the current pipeline.
+
+Where supported, show:
+
+- Skin color estimate.
+- Undertone estimate.
+- ITA°.
+- Seasonal color classification.
+- Personal color palette.
+- Skin and lip measurements.
+- Lighting diagnostics.
+- Suitable product colors.
+- Result explanation.
+- Image-quality feedback.
+
+Validate the image before presenting results.
+
+Reject or warn about unsuitable photos.
+
+Do not invent measurements.
+
+Do not present heuristic results as scientific certainty.
+
+## 6.5 Virtual Try-On
+
+Improve existing lipstick and blush functionality.
+
+Requirements:
+
+- Accurate facial landmark alignment.
+- Natural-looking blending.
+- Appropriate opacity.
+- Product selection.
+- Shade selection.
+- Before/after comparison.
+- Original-image toggle.
+- Touch-friendly controls.
+- Responsive preview.
+- Useful loading and error states.
+
+Preserve Kubelka–Munk rendering where appropriate.
+
+Do not claim photorealistic rendering unless it is genuinely achieved.
+
+Label experimental functionality honestly.
+
+## 6.6 Product Discovery
+
+Use the existing curated catalogue.
+
+Improve:
+
+- Search.
+- Filtering.
+- Category selection.
+- Color filtering.
+- Brand filtering where available.
+- Product detail views.
+- Product matching explanations.
+- Saved products.
+- Empty states.
+
+Do not fabricate:
+
+- Current prices.
+- Inventory.
+- Product reviews.
+- Ratings.
+- Popularity statistics.
+- Purchase availability.
+
+The README currently describes estimated Vietnam retail price tiers.
+
+Make it clear that these are estimates, not verified live prices.
+
+Keep the catalogue easy to update.
+
+## 6.7 Beauty Insights
+
+Preserve existing useful functionality where reliable:
+
+- Face-shape analysis.
+- Facial symmetry.
+- Makeup audit.
+- Relighting.
+- Chromophore maps.
+- White-balance diagnostics.
+- Face geometry.
+- Makeup guidance.
+
+Do not present subjective aesthetic judgments as objective attractiveness scores.
+
+Use supportive, practical language.
+
+Clearly label experimental or uncertain measurements.
+
+---
+
+# 7. ANALYSIS VALIDITY AND CONFIDENCE
+
+This section is especially important.
+
+The existing application has a validation layer in:
+
+`src/lib/beauty/analysisValidity.ts`
+
+It considers:
+
+- Face detection.
+- Verified skin pixels.
+- Skin-region evidence.
+- Fallback behavior.
+
+Preserve the rejection policy.
+
+Do not weaken validation merely to show more results.
+
+The current confidence implementation in:
+
+`src/lib/beauty/analysisConfidence.ts`
+
+uses heuristic factors involving:
+
+- Lighting quality.
+- Landmark quality.
+- Skin sample area.
+- Seasonal classification clarity.
+
+It is not a calibrated statistical probability.
+
+Therefore:
+
+- Do not call it the probability that an analysis is correct.
+- Do not claim a 90% chance of correctness.
+- Prefer "analysis quality" or "reliability indicator".
+- Explain the contributing factors.
+- Preserve the existing cap when skin evidence is absent.
+- Never show a confident seasonal recommendation when the underlying image is invalid.
+
+Add tests for any modified validation behavior.
+
+---
+
+# 8. MEDIAPIPE AND IMAGE PROCESSING
+
+The repository contains:
+
+`public/mediapipe/face_landmarker.task`
+
+The model is approximately 3.76 MB.
+
+The WASM directory currently contains two JS and two WASM variants, with individual WASM files approximately 14.7 MB each.
+
+Do not assume all variants are downloaded during every analysis.
+
+Inspect the actual MediaPipe asset resolution behavior.
+
+Verify:
+
+- `import.meta.env.BASE_URL`.
+- `FilesetResolver.forVisionTasks`.
+- Model asset path.
+- WASM paths.
+- MIME types.
+- Production asset copying.
+- Browser caching.
+- Correct variant selection.
+- Initialization retry.
+- Timeout behavior.
+- Failure handling.
+- Repeated analysis behavior.
+
+Inspect:
+
+`src/lib/beauty/neuralLandmarks.ts`
+
+It currently uses a singleton `landmarkerPromise` and a timeout around initialization.
+
+Review whether failed initialization can be retried safely.
+
+Avoid initializing MediaPipe repeatedly.
+
+Lazy-load the detector where appropriate.
+
+Do not block the entire interface while the model loads.
+
+Provide useful fallback behavior when:
+
+- Model loading fails.
+- WASM is unavailable.
+- The browser is offline.
+- The device has limited memory.
+- Face detection fails.
+
+Keep colorimetric processing separate from image enhancement used only for landmark inference.
+
+Do not allow image enhancement to silently change the measured skin color.
+
+---
+
+# 9. LOCAL-FIRST PERSONALIZATION
+
+Current confirmed behavior includes saving product IDs through localStorage.
+
+This is not yet a complete personal profile.
+
+Implement a proper local persistence layer.
+
+Use IndexedDB for structured and larger data.
+
+Potential stored information:
+
+- Analysis history.
+- Analysis summaries.
+- Saved palettes.
+- Saved product IDs.
+- User preferences.
+- Optional user-selected profile information.
+
+Requirements:
+
+- Typed repository functions.
+- Versioned schema.
+- Migration strategy.
+- Safe error handling.
+- Corrupted-record handling.
+- Storage quota handling.
+- Individual record deletion.
+- Clear-all functionality.
+- No mandatory cloud account.
+- No automatic synchronization.
+
+Avoid storing original selfies unless necessary.
+
+Prefer storing compact analysis summaries.
+
+If images are stored:
+
+- Explain why.
+- Make storage optional where possible.
+- Allow deletion.
+- Do not upload them automatically.
+
+If IndexedDB is unavailable, provide a degraded but usable experience.
+
+Ensure saved data persists across browser refreshes and restarts.
+
+Clearly explain that local data does not automatically transfer between devices.
+
+---
+
+# 10. MOBILE-FIRST ENGINEERING
+
+Mobile support is a first-class requirement.
+
+The application must work on:
+
+- iPhone Safari.
+- Android Chrome.
+- Desktop Chrome.
+- Desktop Safari.
+- Other modern browsers where supported.
+
+Test:
+
+- Small screens.
+- Large phones.
+- Tablets.
+- Desktop layouts.
+- Portrait orientation.
+- Landscape orientation.
+
+Verify:
+
+- No horizontal overflow.
+- Navigation is usable.
+- Buttons have appropriate touch targets.
+- Text remains readable.
+- Modals fit the viewport.
+- Safe-area insets work.
+- Upload controls work.
+- Camera capture works.
+- Image previews scale correctly.
+- Try-on controls are touch-friendly.
+- Results remain readable.
+
+## 10.1 Camera workflow
+
+The current code already has a camera component:
+
+`src/components/CameraCaptureModal.tsx`
+
+It uses `getUserMedia` and includes fallback paths.
+
+Preserve and improve it.
+
+Test:
+
+- HTTPS camera access.
+- Permission granted.
+- Permission denied.
+- Camera unavailable.
+- Camera stream cleanup.
+- Front camera.
+- Rear camera where supported.
+- Native camera fallback.
+- Gallery fallback.
+- Device rotation.
+- Reopening the camera.
+- Switching between photo sources.
+
+If camera access fails, users must still be able to upload an image.
+
+Do not assume a camera component is working merely because it compiles.
+
+If real device testing is unavailable, clearly mark it as not verified.
+
+---
+
+# 11. PWA AND OFFLINE EXPERIENCE
+
+Inspect the current repository before adding PWA dependencies.
+
+Implement PWA support where appropriate.
+
+Potential additions:
+
+- Web app manifest.
+- Application icons.
+- Theme colors.
+- Service worker.
+- App-shell caching.
+- Static asset caching.
+- Offline fallback.
+- Cache versioning.
+- Installation guidance.
+
+Use a conservative caching strategy.
+
+Do not cache sensitive photos or private analysis data indiscriminately.
+
+Document:
+
+- What works offline.
+- What requires an internet connection.
+- Whether MediaPipe assets are cached.
+- What happens when a model has not been downloaded yet.
+
+For iOS, document the manual Add to Home Screen workflow.
+
+Do not implement fake install prompts.
+
+---
+
+# 12. PERFORMANCE
+
+Optimize for average mobile devices.
+
+Investigate:
+
+- Bundle size.
+- JavaScript startup.
+- MediaPipe loading.
+- Model initialization.
+- WASM loading.
+- Image decoding.
+- Canvas processing.
+- Typed-array allocations.
+- Repeated computations.
+- Memory usage.
+- Component rendering.
+- IndexedDB operations.
+
+Load heavy features only when required.
+
+Avoid loading all advanced functionality on the home screen.
+
+Use code splitting and lazy loading where beneficial.
+
+Suggested performance goals, to be measured rather than claimed:
+
+- LCP ≤ 2.5 seconds.
+- INP ≤ 200 milliseconds.
+- CLS ≤ 0.1.
+
+Do not sacrifice scientific correctness for speed.
+
+Do not add unnecessary dependencies.
+
+---
+
+# 13. PRIVACY AND SECURITY
+
+Audit the actual code and network behavior.
+
+Verify:
+
+- Selfies are not transmitted unexpectedly.
+- No exposed API keys exist.
+- No unnecessary third-party API calls exist.
+- No secrets are bundled into the frontend.
+- No unnecessary permissions are requested.
+- No unsafe file handling exists.
+- No sensitive photos are logged.
+- Local data can be deleted.
+- Error messages do not expose private information.
+
+Review the README privacy claims.
+
+The README currently states that image processing runs on-device and selfies do not leave the machine.
+
+Ensure that this statement remains true in production.
+
+If any network transmission is introduced, document it clearly and request appropriate consent.
+
+Google Fonts are currently loaded externally through `index.html`.
+
+Review the trade-off between external font loading, performance, privacy, and offline behavior.
+
+Use a sensible fallback or self-host fonts if appropriate and licensing permits.
+
+Do not introduce analytics or tracking without a concrete requirement and clear disclosure.
+
+---
+
+# 14. TESTING AND QUALITY ASSURANCE
+
+The current CI already runs:
+
+- `bun install --frozen-lockfile`
+- `bun run lint`
+- `bun run test`
+- `bun run build`
+
+Preserve the existing test infrastructure.
+
+Do not remove tests just to make CI green.
+
+Add regression tests for important changes.
+
+At minimum, test:
+
+## Analysis
+
+- Valid face image.
+- No face.
+- Black image.
+- White image.
+- Sky or non-skin image.
+- Low-light image.
+- Insufficient skin pixels.
+- Detector unavailable.
+- Weak skin evidence.
+
+## Color science
+
+- CIEDE2000.
+- Bradford adaptation.
+- Color matching.
+- Highlight recovery.
+- Skin measurement.
+- Lip color measurement.
+- Confidence behavior.
+
+## Virtual try-on
+
+- Lip mask behavior.
+- Blush mask behavior.
+- Product switching.
+- Before/after state.
+- Unsupported input.
+
+## Persistence
+
+- Save.
+- Read.
+- Update.
+- Delete.
+- Clear all.
+- Refresh persistence.
+- Corrupted data.
+- Storage unavailable.
+
+## UI
+
+- First-time empty state.
+- Demo selection.
+- Gallery upload.
+- Camera fallback.
+- Loading.
+- Error states.
+- Product search.
+- Product filtering.
+- Saved items.
+
+## Production
+
+- Build.
+- Static asset resolution.
+- MediaPipe model loading.
+- WASM loading.
+- SPA fallback.
+- Direct URL access.
+- Browser refresh.
+- Production deployment.
+
+---
+
+# 15. END-TO-END USER JOURNEYS
+
+A successful build is not sufficient.
+
+Verify the following workflows.
+
+## Journey A — First-time user
+
+1. Open the public application.
+2. Understand what the product does.
+3. See an empty state rather than a preloaded demo result.
+4. Complete or skip onboarding.
+5. Choose camera or gallery.
+6. Upload a portrait.
+7. Receive an analysis or a meaningful rejection message.
+8. Understand the result.
+
+## Journey B — Returning user
+
+1. Reopen the application.
+2. Access locally saved information.
+3. Review previous analysis.
+4. Save a palette.
+5. Save a product.
+6. Refresh the browser.
+7. Confirm persistence.
+
+## Journey C — Virtual try-on
+
+1. Open Try-On.
+2. Load a suitable portrait.
+3. Select a lipstick.
+4. Compare shades.
+5. Toggle original image.
+6. Test blush.
+7. Verify mobile interaction.
+
+## Journey D — Product discovery
+
+1. Open catalogue.
+2. Search for a product.
+3. Apply filters.
+4. Open product details.
+5. Save a product.
+6. Reopen the application.
+7. Verify the saved item remains available.
+
+## Journey E — Privacy
+
+1. Open privacy information.
+2. Understand local storage behavior.
+3. Clear personal data.
+4. Confirm deletion.
+5. Verify that the application remains usable.
+
+---
+
+# 16. DESIGN AND PRODUCT ACCEPTANCE CRITERIA
+
+The product must be understandable to a friend who has never seen the repository.
+
+The user should not need developer assistance.
+
+The application should communicate:
+
+- What to do first.
+- Why a photo is required.
+- How to take a suitable photo.
+- What the results mean.
+- Why an analysis may fail.
+- What can be saved.
+- Where saved data lives.
+- How to delete data.
+
+Use Vietnamese as the primary interface language.
+
+Keep technical terminology understandable.
+
+Do not remove useful technical detail from advanced insights, but do not force casual users to understand color science to use the main product.
+
+---
+
+# 17. EXECUTION PHASES
+
+Execute the work in this order.
+
+## Phase 0 — Audit and baseline
+
+- Inspect repository.
+- Record current SHA.
+- Inspect git status.
+- Inspect current workflows.
+- Run baseline tests.
+- Build architecture map.
+- Create `IMPLEMENTATION_STATUS.md`.
+- Record known issues.
+
+## Phase 1 — Production readiness
+
+- Verify static architecture.
+- Review Express usage.
+- Remove unnecessary production server dependencies.
+- Verify Vite base path.
+- Verify GitHub Pages configuration.
+- Verify MediaPipe assets.
+- Verify static catalogue.
+- Verify SPA fallback.
+
+## Phase 2 — Core UX corrections
+
+- Remove automatic demo portrait.
+- Implement correct empty state.
+- Improve first-time onboarding.
+- Improve photo guidance.
+- Improve privacy explanations.
+- Improve loading and error states.
+
+## Phase 3 — Design system and responsive UX
+
+- Establish design tokens.
+- Refine typography.
+- Improve navigation.
+- Improve responsive layout.
+- Improve mobile interactions.
+- Improve desktop layout.
+- Support reduced motion.
+
+## Phase 4 — Analysis quality
+
+- Review validity gates.
+- Improve error explanations.
+- Improve confidence communication.
+- Preserve color science.
+- Add regression tests.
+- Improve result presentation.
+
+## Phase 5 — Virtual try-on and catalogue
+
+- Improve lipstick experience.
+- Improve blush experience.
+- Improve comparison.
+- Improve catalogue search.
+- Improve filtering.
+- Improve product detail.
+- Improve matching explanations.
+
+## Phase 6 — Local personalization
+
+- Implement IndexedDB.
+- Implement profile.
+- Implement history.
+- Implement saved palettes.
+- Implement favorites.
+- Implement deletion.
+- Handle storage failure.
+
+## Phase 7 — Performance and PWA
+
+- Optimize MediaPipe loading.
+- Optimize bundle.
+- Improve caching.
+- Add PWA if appropriate.
+- Verify offline behavior.
+- Improve mobile performance.
+
+## Phase 8 — QA
+
+- Run typecheck.
+- Run tests.
+- Run production build.
+- Run browser tests.
+- Test mobile.
+- Test desktop.
+- Test core journeys.
+- Fix regressions.
+
+## Phase 9 — Deployment
+
+- Preserve GitHub Pages.
+- Deploy through the existing workflow.
+- Verify the latest deployment.
+- Verify public access.
+- Verify production assets.
+- Verify refresh and direct navigation.
+
+## Phase 10 — Documentation
+
+Update:
+
+- README.
+- Deployment instructions.
+- Local development instructions.
+- Privacy documentation.
+- Known limitations.
+- Architecture documentation.
+- `IMPLEMENTATION_STATUS.md`.
+
+---
+
+# 18. GIT AND CHANGE MANAGEMENT
+
+Before making changes:
+
+- Check current branch.
+- Check git status.
+- Check uncommitted changes.
+- Do not overwrite user changes.
+- Do not force-push.
+- Do not delete existing work without justification.
+
+Prefer a dedicated implementation branch.
+
+Use focused commits.
+
+Suggested commit groups:
+
+- Production architecture.
+- Empty-state and onboarding.
+- Design system.
+- Analysis reliability.
+- Try-on and catalogue.
+- Local persistence.
+- PWA and performance.
+- QA and documentation.
+
+Run tests before committing.
+
+Do not push directly to `main` unless explicitly authorized.
+
+Prefer a pull request with a clear summary and test results.
+
+Do not commit secrets, temporary files, generated caches, or unnecessary binaries.
+
+---
+
+# 19. DEFINITION OF DONE
+
+The project is complete only when the following are verified.
+
+## Product
+
+- [ ] First-time users see an empty state.
+- [ ] Demo mode is explicit.
+- [ ] Onboarding is understandable.
+- [ ] Core features work without login.
+- [ ] Tone analysis handles invalid photos correctly.
+- [ ] Results explain their limitations.
+- [ ] Virtual try-on works for supported use cases.
+- [ ] Product discovery uses real catalogue entries.
+- [ ] Users can save useful information.
+- [ ] Local data persists.
+- [ ] Users can delete their data.
+
+## User experience
+
+- [ ] Mobile layout works.
+- [ ] Desktop layout works.
+- [ ] No major horizontal overflow.
+- [ ] Camera fallback works.
+- [ ] Upload fallback works.
+- [ ] Loading states are clear.
+- [ ] Error states are actionable.
+- [ ] Navigation is understandable.
+
+## Technical
+
+- [ ] TypeScript passes.
+- [ ] Unit tests pass.
+- [ ] Production build passes.
+- [ ] No unnecessary production Express server is required.
+- [ ] No hardcoded localhost dependency remains.
+- [ ] MediaPipe assets load correctly.
+- [ ] No major runtime errors remain.
+- [ ] No important scientific regression exists.
+
+## Deployment
+
+- [ ] GitHub Pages deployment succeeds.
+- [ ] Public URL is accessible.
+- [ ] Static assets load.
+- [ ] Direct URL access works.
+- [ ] Browser refresh works.
+- [ ] Mobile and desktop access work.
+- [ ] No personal computer needs to run continuously.
+- [ ] No paid service is required.
+- [ ] No paid plan or automatic upgrade is enabled.
+
+## Documentation
+
+- [ ] README is accurate.
+- [ ] Local setup is documented.
+- [ ] Deployment is documented.
+- [ ] Privacy is documented.
+- [ ] Known limitations are documented.
+- [ ] `IMPLEMENTATION_STATUS.md` is current.
+
+---
+
+# 20. FINAL REPORT
+
+At the end, produce a factual report containing:
+
+1. Repository SHA before and after implementation.
+2. Architecture decisions.
+3. Features preserved.
+4. Features improved.
+5. Features newly implemented.
+6. Files changed.
+7. Files removed and justification.
+8. Tests executed.
+9. Actual test results.
+10. Production build result.
+11. GitHub Actions result.
+12. Deployment result.
+13. Public URL, if verified.
+14. Mobile testing status.
+15. Desktop testing status.
+16. Privacy behavior.
+17. Hosting cost and service dependencies.
+18. Remaining limitations.
+19. Remaining blockers.
+20. Recommended next priorities.
+
+Use these status labels:
+
+- Completed and verified.
+- Completed but not verified.
+- Partially completed.
+- Not implemented.
+- Blocked.
+
+Never claim that something works without evidence.
+
+If you cannot access a physical iPhone or Android device, state that mobile hardware testing remains unverified.
+
+If deployment requires the owner's GitHub permission or manual configuration, provide the exact remaining action.
+
+Do not claim the public URL works merely because the build passed.
+
+---
+
+# 21. FINAL OPERATING PRINCIPLES
+
+Think like the engineering team responsible for a real consumer product.
+
+Preserve good existing work.
+
+Avoid unnecessary rewrites.
+
+Do not overengineer.
+
+Do not add infrastructure without a concrete need.
+
+Do not add login merely because production applications often have login.
+
+Do not add paid AI APIs.
+
+Do not weaken scientific validation to make the interface appear more impressive.
+
+Do not confuse a successful build with a successful product.
+
+Optimize for:
+
+- Reliability.
+- User experience.
+- Scientific honesty.
+- Privacy.
+- Maintainability.
+- Mobile usability.
+- Repeat usage.
+- Free managed hosting.
+
+The most important outcome:
+
+**Deliver a real Beauty AI Consultant application that friends can open from a public URL on their phones or computers, understand without assistance, use repeatedly, and trust with their photos — without the owner keeping a computer running or paying for hosting.**
+
+Start with the repository audit.
+
+Then execute the phases systematically.
+
+Do not stop after writing a plan.
+
+Do not stop after fixing the first issue.
+
+Continue until the definition of done is satisfied or a genuine external blocker prevents further progress.
+
+If the execution environment has a context or time limit, update `IMPLEMENTATION_STATUS.md` with exact progress, completed changes, test results, and next actions before stopping.

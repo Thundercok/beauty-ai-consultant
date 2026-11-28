@@ -243,7 +243,7 @@ const RelightingSmoothSlider: React.FC<{
 
 export const RelightingLab: React.FC<RelightingLabProps> = ({ report }) => {
   const [simulatedCct, setSimulatedCct] = useState<number>(2800);
-  const [compareLayout, setCompareLayout] = useState<"slider" | "side_by_side">("slider");
+  const [compareLayout, setCompareLayout] = useState<"side_by_side" | "slider">("side_by_side");
 
   const experiment = useMemo(
     () => runRelightingExperiment(report, simulatedCct),
@@ -255,83 +255,89 @@ export const RelightingLab: React.FC<RelightingLabProps> = ({ report }) => {
   const rawMethod = experiment.methods[0];
 
   return (
-    <div className="space-y-4 sm:space-y-5">
-      <div className="bg-white border border-zinc-200 rounded-2xl md:rounded-xl p-4 sm:p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-zinc-900">
-              Chọn ánh sáng phòng để kiểm tra độ ổn định màu da
-            </h3>
-            <p className="text-xs text-zinc-600 mt-0.5">
-              Đèn vàng hoặc đèn huỳnh quang dễ làm app thông thường đoán sai tông da. Kéo thanh
-              trượt trên ảnh để thấy cách Beauty AI khử ánh đèn về ánh sáng chuẩn ban ngày.
+    <section
+      data-testid="relighting-lab-section"
+      aria-label="Kiểm tra màu da dưới các loại ánh đèn"
+      className="bg-white border border-[#E5E5E5] divide-y divide-[#E5E5E5]"
+    >
+      {/* Top Bar: 1-Tap Lighting Presets + Display-Sans Kelvin Readout (Zero Sliders Needed) */}
+      <div className="p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div className="space-y-1">
+            <div className="metric-label">Thử ánh đèn phòng</div>
+            <h2 className="text-lg sm:text-xl font-bold text-[#0A0A0A] tracking-[-0.025em]">
+              Chọn loại đèn để xem độ ổn định màu da
+            </h2>
+            <p className="text-xs text-[#666666]">
+              Chạm nhanh một nguồn sáng bên dưới để đối chiếu ngay ảnh trước và sau khi khử ám đèn.
             </p>
           </div>
-          <span className="text-xs text-zinc-500 shrink-0">
-            {simulatedCct}K · {describeCctVi(simulatedCct)}
-          </span>
+          <div className="sm:text-right shrink-0">
+            <div className="metric-label">Nhiệt độ màu đang thử</div>
+            <div className="metric-display text-[28px] sm:text-[34px] font-bold text-[#0A0A0A] mt-0.5">
+              {simulatedCct}
+              <span className="text-sm font-medium text-[#737373] ml-0.5">K</span>
+            </div>
+            <div className="text-[11px] text-[#737373]">{describeCctVi(simulatedCct)}</div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
-          {LAMP_PRESETS.map((preset) => (
-            <button
-              key={preset.cct}
-              type="button"
-              onClick={() => setSimulatedCct(preset.cct)}
-              className={`min-h-[44px] md:min-h-[36px] px-3 py-2 text-xs font-medium rounded-xl md:rounded-md border text-left sm:text-center transition-colors cursor-pointer ${
-                simulatedCct === preset.cct
-                  ? "bg-zinc-900 text-white border-zinc-900"
-                  : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-
-        <div>
-          <div className="py-1.5">
-            <input
-              aria-label="Nhiệt độ màu ánh đèn mô phỏng"
-              type="range"
-              min={2600}
-              max={8500}
-              step={100}
-              value={simulatedCct}
-              onChange={(e) => setSimulatedCct(Number(e.target.value))}
-              className="w-full h-2 accent-zinc-900 cursor-pointer"
-            />
-          </div>
-          <div className="flex justify-between text-[11px] text-zinc-500">
-            <span>Đèn vàng ấm</span>
-            <span>Trong nhà</span>
-            <span>Ban ngày</span>
-            <span>Trời râm</span>
-          </div>
+        {/* 4 Equal 1-Tap Lighting Buttons */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          {LAMP_PRESETS.map((preset) => {
+            const active = simulatedCct === preset.cct;
+            return (
+              <button
+                key={preset.cct}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setSimulatedCct(preset.cct)}
+                className={`min-h-[44px] px-3.5 py-2.5 text-left border transition-colors cursor-pointer ${
+                  active
+                    ? "bg-[#111111] text-white border-[#111111]"
+                    : "bg-[#FAFAFA] text-[#111111] border-[#E5E5E5] hover:border-[#111111]"
+                }`}
+              >
+                <div
+                  className={`font-display tabular-nums text-base font-bold leading-none ${
+                    active ? "text-white" : "text-[#0A0A0A]"
+                  }`}
+                >
+                  {preset.cct}K
+                </div>
+                <div
+                  className={`text-[11px] mt-1 truncate ${
+                    active ? "text-white/80" : "text-[#666666]"
+                  }`}
+                >
+                  {preset.label.replace(/\s*\([^)]*\)/, "")}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-        <div className="lg:col-span-7 space-y-2.5">
+      {/* Consistent 12-Column Split: Side-by-Side Comparison (Default) + Method Benchmark */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 lg:divide-x divide-[#E5E5E5] items-stretch">
+        <div className="lg:col-span-7 p-5 sm:p-6 space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-zinc-700">
-              So sánh khử ánh sáng đèn {simulatedCct}K
-            </span>
-            <div className="inline-flex items-center p-0.5 rounded-lg bg-zinc-100 border border-zinc-200">
+            <span className="metric-label">So sánh trực tiếp · Đèn {simulatedCct}K</span>
+            <div className="inline-flex items-center p-0.5 bg-[#EFEFEF] rounded-[4px]">
               {(
                 [
-                  ["slider", "Trượt so sánh"],
                   ["side_by_side", "Song song"],
+                  ["slider", "Kéo so sánh"],
                 ] as const
               ).map(([id, label]) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => setCompareLayout(id)}
-                  className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors cursor-pointer ${
+                  className={`min-h-[28px] px-2.5 text-[11px] rounded-[3px] whitespace-nowrap transition-colors cursor-pointer ${
                     compareLayout === id
-                      ? "bg-white text-zinc-900 font-semibold shadow-2xs"
-                      : "text-zinc-600 hover:text-zinc-900"
+                      ? "bg-white text-[#0A0A0A] font-semibold shadow-2xs"
+                      : "text-[#666666] hover:text-[#0A0A0A] font-medium"
                   }`}
                 >
                   {label}
@@ -349,13 +355,13 @@ export const RelightingLab: React.FC<RelightingLabProps> = ({ report }) => {
               simulatedCct={simulatedCct}
             />
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <div className="bg-white border border-zinc-200 rounded-2xl md:rounded-xl overflow-hidden">
-                <div className="px-3 sm:px-4 py-2.5 border-b border-zinc-200 bg-zinc-50">
-                  <div className="text-xs font-semibold text-zinc-900 truncate">
+            <div className="grid grid-cols-2 border border-[#E5E5E5] divide-x divide-[#E5E5E5]">
+              <div>
+                <div className="px-3.5 py-2.5 border-b border-[#E5E5E5] bg-[#FAFAFA]">
+                  <div className="metric-label">Trước khi khử</div>
+                  <div className="text-xs font-bold text-[#0A0A0A] truncate mt-0.5">
                     Dưới đèn {simulatedCct}K
                   </div>
-                  <div className="text-[11px] text-zinc-500 truncate">Chưa khử màu đèn</div>
                 </div>
                 <BufferCanvas
                   rgba={experiment.relitRgba}
@@ -365,10 +371,12 @@ export const RelightingLab: React.FC<RelightingLabProps> = ({ report }) => {
                 />
               </div>
 
-              <div className="bg-white border border-zinc-900 rounded-2xl md:rounded-xl overflow-hidden">
-                <div className="px-3 sm:px-4 py-2.5 border-b border-zinc-200 bg-zinc-50">
-                  <div className="text-xs font-semibold text-zinc-900 truncate">Sau khi khử đèn</div>
-                  <div className="text-[11px] text-zinc-700 truncate">Màu da tự nhiên</div>
+              <div>
+                <div className="px-3.5 py-2.5 border-b border-[#E5E5E5] bg-[#FAFAFA]">
+                  <div className="metric-label">Sau khi khử đèn</div>
+                  <div className="text-xs font-bold text-[#0A0A0A] truncate mt-0.5">
+                    Ánh sáng ban ngày
+                  </div>
                 </div>
                 <BufferCanvas
                   rgba={experiment.recoveredRgba}
@@ -381,73 +389,82 @@ export const RelightingLab: React.FC<RelightingLabProps> = ({ report }) => {
           )}
         </div>
 
-        <div className="lg:col-span-5 bg-white border border-zinc-200 rounded-2xl md:rounded-xl p-4 sm:p-5 flex flex-col justify-between gap-4 text-xs">
-          <div className="space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <h3 className="text-sm font-semibold text-zinc-900">Đối chiếu 3 phương pháp</h3>
-              <span className="text-[11px] text-zinc-500">
-                Chuẩn: {SEASON_VI_LABELS[experiment.baselineSeason].title.replace(/\s*\([^)]*\)/, "")}
-              </span>
-            </div>
+        <div className="lg:col-span-5 flex flex-col divide-y divide-[#E5E5E5]">
+          <div className="px-5 sm:px-6 py-4 flex items-baseline justify-between gap-2 bg-[#FAFAFA]">
+            <span className="metric-label">Đối chiếu 3 phương pháp</span>
+            <span className="text-xs font-semibold text-[#0A0A0A]">
+              Chuẩn: {SEASON_VI_LABELS[experiment.baselineSeason].title.replace(/\s*\([^)]*\)/, "")}
+            </span>
+          </div>
 
-            <div className="space-y-2">
-              {experiment.methods.map((m) => {
-                const isBest = m.method === beautyAiMethod.method;
-                return (
-                  <div
-                    key={m.method}
-                    className={`p-3 rounded-xl md:rounded-md border space-y-1 ${
-                      isBest ? "border-zinc-900 bg-white" : "border-zinc-200 bg-zinc-50/70"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={isBest ? "font-semibold text-zinc-900" : "text-zinc-600"}>
-                        {m.label}
-                      </span>
-                      <span className="font-mono tabular-nums text-[11px] font-semibold text-zinc-700 shrink-0">
-                        ΔE {m.deltaEFromDaylight.toFixed(1)}
-                      </span>
-                    </div>
-                    <div className="font-semibold text-zinc-900">
+          <div className="divide-y divide-[#EFEFEF] flex-1">
+            {experiment.methods.map((m) => {
+              const isBest = m.method === beautyAiMethod.method;
+              return (
+                <div
+                  key={m.method}
+                  className={`px-5 sm:px-6 py-4 flex items-start justify-between gap-4 ${
+                    isBest ? "bg-white" : "bg-[#FAFAFA]/60"
+                  }`}
+                >
+                  <div className="min-w-0 space-y-1">
+                    <div className="metric-label">{m.label}</div>
+                    <div className="text-sm font-bold text-[#0A0A0A]">
                       {SEASON_VI_LABELS[m.predictedSeason].title.replace(/\s*\([^)]*\)/, "")} ·{" "}
                       {UNDERTONE_VI_LABELS[m.undertone]}
                     </div>
                     <div
-                      className={
+                      className={`text-xs font-medium ${
                         m.seasonMatched
                           ? "text-emerald-700"
                           : m.method === rawMethod.method
-                            ? "text-rose-700"
-                            : "text-amber-700"
-                      }
+                            ? "text-[#DC2626]"
+                            : "text-[#B45309]"
+                      }`}
                     >
                       {m.seasonMatched
-                        ? "Khớp chuẩn như chụp dưới nắng ban ngày"
-                        : "Lệch mùa màu do ám sắc đèn phòng"}
+                        ? "Khớp chuẩn như chụp ban ngày"
+                        : "Lệch màu do ám sắc đèn phòng"}
                     </div>
                   </div>
-                );
-              })}
-            </div>
+
+                  <div className="text-right shrink-0">
+                    <div className="metric-label">Sai lệch ΔE</div>
+                    <div
+                      className={`metric-display-sm text-2xl font-bold mt-0.5 ${
+                        isBest ? "text-emerald-700" : "text-[#0A0A0A]"
+                      }`}
+                    >
+                      {m.deltaEFromDaylight.toFixed(1)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          <div className="border-t border-zinc-100 pt-3 space-y-1.5">
-            <div className="font-semibold text-zinc-800">
-              Độ bất biến sắc tố dưới đèn {simulatedCct}K
-            </div>
-            <div className="grid grid-cols-2 gap-2 font-mono tabular-nums text-[11px] text-zinc-600">
-              <div>
-                Melanin σ: {experiment.baselineMelaninStd.toFixed(3)} →{" "}
-                <strong className="text-zinc-900">{experiment.relitMelaninStd.toFixed(3)}</strong>
+          <div className="grid grid-cols-2 divide-x divide-[#E5E5E5] bg-[#FAFAFA]">
+            <div className="px-5 py-3.5 space-y-1">
+              <div className="metric-label">Melanin σ ({simulatedCct}K)</div>
+              <div className="metric-display-sm text-lg font-bold text-[#0A0A0A]">
+                {experiment.relitMelaninStd.toFixed(3)}
               </div>
-              <div>
-                Hemoglobin σ: {experiment.baselineHemoglobinStd.toFixed(3)} →{" "}
-                <strong className="text-zinc-900">{experiment.relitHemoglobinStd.toFixed(3)}</strong>
+              <div className="font-mono text-[10px] text-[#737373]">
+                Gốc {experiment.baselineMelaninStd.toFixed(3)}
+              </div>
+            </div>
+            <div className="px-5 py-3.5 space-y-1">
+              <div className="metric-label">Hemoglobin σ ({simulatedCct}K)</div>
+              <div className="metric-display-sm text-lg font-bold text-[#0A0A0A]">
+                {experiment.relitHemoglobinStd.toFixed(3)}
+              </div>
+              <div className="font-mono text-[10px] text-[#737373]">
+                Gốc {experiment.baselineHemoglobinStd.toFixed(3)}
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 };

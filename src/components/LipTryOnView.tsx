@@ -813,6 +813,10 @@ export const LipTryOnView: React.FC<LipTryOnViewProps> = ({
         </button>
       </div>
 
+      <p className="text-[11px] text-[#737373] leading-relaxed -mt-2">
+        Màu son và má được pha theo màu môi thật trong ảnh — ngoài đời có thể khác nhẹ tùy ánh sáng và số lớp thoa.
+      </p>
+
       <div className="grid grid-cols-1 md:grid-cols-12 gap-5 lg:gap-8 items-start">
         {/* Left: Sticky Portrait Mirror Studio (Tablet & Desktop) */}
         <div className="md:col-span-5 md:sticky md:top-20 space-y-3">

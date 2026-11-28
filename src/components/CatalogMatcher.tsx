@@ -37,16 +37,34 @@ export type CatalogFilterId =
 
 interface CatalogMatcherProps {
   products: CatalogProduct[];
-  blendedTargets: { lip: string; blush: string; eyeshadow: string };
-  lipBaseLab: [number, number, number];
-  skinMetrics: SkinMetrics;
-  userSeason: SeasonName;
+  blendedTargets: { lip: string; blush: string; eyeshadow: string } | null;
+  lipBaseLab: [number, number, number] | null;
+  skinMetrics: SkinMetrics | null;
+  userSeason: SeasonName | null;
   catalogIlluminant: IlluminantName;
   initialCategory?: CatalogFilterId;
   savedIds: Set<number>;
   onToggleSave: (id: number) => void;
   onInspectProduct: (product: MatchedProduct) => void;
   onTryLipstick: (product: MatchedProduct) => void;
+  onRequestAnalysis?: () => void;
+}
+
+type UndertoneFilterId = "all" | "warm" | "cool" | "neutral";
+
+const UNDERTONE_FILTER_OPTIONS: Array<{ id: UndertoneFilterId; label: string }> = [
+  { id: "all", label: "Mọi tông" },
+  { id: "warm", label: "Tông Ấm" },
+  { id: "cool", label: "Tông Lạnh" },
+  { id: "neutral", label: "Trung tính" },
+];
+
+function matchesUndertoneFilter(undertoneRaw: string, filter: UndertoneFilterId): boolean {
+  if (filter === "all") return true;
+  const u = undertoneRaw.toLowerCase();
+  if (filter === "warm") return u.includes("warm") || u.includes("ấm");
+  if (filter === "cool") return u.includes("cool") || u.includes("lạnh");
+  return u.includes("neutral") || u.includes("trung");
 }
 
 const VN_POPULAR_BRANDS = new Set([
@@ -99,9 +117,14 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
   onToggleSave,
   onInspectProduct,
   onTryLipstick,
+  onRequestAnalysis,
 }) => {
+  const hasPortraitProfile = Boolean(blendedTargets && lipBaseLab && skinMetrics && userSeason);
+
   const [activeType, setActiveType] = useState<CatalogFilterId>(initialCategory);
   const [budgetTier, setBudgetTier] = useState<PriceTierId>("all");
+  const [selectedBrand, setSelectedBrand] = useState<string>("all");
+  const [selectedUndertone, setSelectedUndertone] = useState<UndertoneFilterId>("all");
   const [onlyBareFace, setOnlyBareFace] = useState(false);
   const [onlyTeethBright, setOnlyTeethBright] = useState(false);
   const [query, setQuery] = useState("");
@@ -112,25 +135,56 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
     setVisibleCount(12);
   }, [initialCategory]);
 
-  const skinHex = useMemo(
-    () => rgbToHex(labToRgb([skinMetrics.L_star, skinMetrics.a_star, skinMetrics.b_star])),
-    [skinMetrics.L_star, skinMetrics.a_star, skinMetrics.b_star]
-  );
+  const availableBrands = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of products) {
+      if (p.brand) set.add(p.brand);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [products]);
+
+  const skinHex = useMemo(() => {
+    if (!skinMetrics) return "#E6C7B5";
+    return rgbToHex(labToRgb([skinMetrics.L_star, skinMetrics.a_star, skinMetrics.b_star]));
+  }, [skinMetrics]);
 
   const rankedItems: TrendingProductItem[] = useMemo(() => {
+    const sourceList =
+      activeType === "vn_popular"
+        ? products.filter((p) => VN_POPULAR_BRANDS.has(p.brand))
+        : activeType === "saved"
+          ? products.filter((p) => savedIds.has(p.id))
+          : activeType === "all" || activeType === "popular_only"
+            ? products
+            : products.filter((p) => p.product_type === activeType);
+
+    if (!hasPortraitProfile || !blendedTargets || !lipBaseLab || !userSeason) {
+      // Guest browse mode: full catalog access without claiming personalized skin deltaE
+      return sourceList.map((p) => ({
+        id: p.id,
+        brand: p.brand,
+        name: p.product_name,
+        shade: p.shade_name,
+        productType: p.product_type,
+        texture: p.texture_type,
+        hex: p.hex_color,
+        deltaE: 10,
+        matchTier: "Great Match" as const,
+        undertone: p.undertone,
+        bestSeasons: p.best_seasons,
+        popularityScore: VN_POPULAR_BRANDS.has(p.brand) ? 80 : 50,
+        isPopular: VN_POPULAR_BRANDS.has(p.brand),
+        popularityBadge: VN_POPULAR_BRANDS.has(p.brand) ? "Sinh viên hay dùng" : undefined,
+        hotReason: "",
+      }));
+    }
+
     const getTargetForType = (type: string) => {
       if (type === "lipstick") return blendedTargets.lip;
       if (type === "blush") return blendedTargets.blush;
       if (type === "eyeshadow") return blendedTargets.eyeshadow;
       return skinHex;
     };
-
-    const sourceList =
-      activeType === "vn_popular"
-        ? products.filter((p) => VN_POPULAR_BRANDS.has(p.brand))
-        : activeType === "saved"
-          ? products.filter((p) => savedIds.has(p.id))
-          : products;
 
     let baseMatched: MatchedProduct[] = [];
     if (
@@ -169,6 +223,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
     scored.sort((a, b) => a.deltaE - b.deltaE);
     return scored;
   }, [
+    hasPortraitProfile,
     activeType,
     products,
     blendedTargets,
@@ -195,6 +250,8 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
       })
       .filter(({ item, price, traits }) => {
         if (budgetTier !== "all" && price.tier !== budgetTier) return false;
+        if (selectedBrand !== "all" && item.brand !== selectedBrand) return false;
+        if (!matchesUndertoneFilter(item.undertone, selectedUndertone)) return false;
         if (onlyBareFace && !traits.bareFaceFriendly) return false;
         if (onlyTeethBright && !traits.teethBrightening) return false;
         if (q) {
@@ -206,20 +263,54 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
         }
         return true;
       });
-  }, [rankedItems, budgetTier, onlyBareFace, onlyTeethBright, query]);
+  }, [
+    rankedItems,
+    budgetTier,
+    selectedBrand,
+    selectedUndertone,
+    onlyBareFace,
+    onlyTeethBright,
+    query,
+  ]);
 
   const displayedItems = enrichedAndFiltered.slice(0, visibleCount);
 
   return (
-    <div className="space-y-4 sm:space-y-5 pb-6 md:pb-2">
+    <div data-testid="catalog-matcher-view" className="space-y-4 sm:space-y-5 pb-6 md:pb-2">
+      {/* Guest Browse Prompt Banner when no portrait is analyzed yet */}
+      {!hasPortraitProfile && (
+        <div
+          data-testid="catalog-guest-banner"
+          className="bg-[#FAFAFA] border border-[#E5E5E5] p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        >
+          <div className="space-y-0.5">
+            <div className="text-xs font-semibold text-[#111111]">
+              Đang xem toàn bộ {products.length} sản phẩm
+            </div>
+            <p className="text-xs text-[#666666]">
+              Bạn có thể lọc theo hãng, tông màu và lưu sản phẩm ngay. Tải ảnh để xếp hạng theo màu da của bạn.
+            </p>
+          </div>
+          {onRequestAnalysis && (
+            <button
+              type="button"
+              onClick={onRequestAnalysis}
+              className="min-h-[36px] px-3.5 py-1.5 rounded-[4px] bg-[#111111] hover:bg-[#2B2B2B] text-white text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              Đo tông da
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Header + Search */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-3.5">
         <div>
           <h1 className="text-2xl sm:text-[30px] font-bold tracking-[-0.03em] text-[#111111] leading-tight">
-            Mỹ phẩm hợp da &amp; ví tiền
+            {hasPortraitProfile ? "Mỹ phẩm gợi ý" : "Danh mục mỹ phẩm"}
           </h1>
           <p className="text-xs sm:text-sm text-[#666666] mt-0.5">
-            Lọc theo ngân sách sinh viên, hợp mặt mộc đi học hoặc tìm mua nhanh trên Shopee
+            Lọc theo hãng, tông màu hoặc tầm giá tham khảo tại Việt Nam
           </p>
         </div>
 
@@ -267,72 +358,135 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
         })}
       </div>
 
-      {/* Budget Tier & Vietnamese Student Needs Filter Bar (Clean Hairline Divided, Zero Nested Box Clutter) */}
+      {/* Budget Tier, Brand, Undertone & Student Quick Filter Bar */}
       <div
         data-testid="budget-filter-bar"
-        className="py-2.5 border-y border-[#E5E5E5] space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3"
+        className="py-3 border-y border-[#E5E5E5] space-y-2.5"
       >
-        {/* Price Tier Segmented Buttons */}
-        <div className="grid grid-cols-4 sm:flex sm:items-center gap-1.5">
-          {BUDGET_OPTIONS.map((opt) => {
-            const active = budgetTier === opt.id;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                data-testid={`budget-btn-${opt.id}`}
-                aria-pressed={active}
-                onClick={() => {
-                  setBudgetTier(opt.id);
-                  setVisibleCount(12);
-                }}
-                className={`min-h-[34px] px-1.5 sm:px-3 py-1 text-[11px] sm:text-xs font-medium rounded-[4px] whitespace-nowrap text-center border transition-colors cursor-pointer ${
-                  active
-                    ? "bg-[#DC2626] text-white border-[#DC2626]"
-                    : "bg-white text-[#525252] border-[#E5E5E5] hover:border-[#111111]"
-                }`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
+        <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3">
+          {/* Price Tier Segmented Buttons */}
+          <div className="grid grid-cols-4 sm:flex sm:items-center gap-1.5">
+            {BUDGET_OPTIONS.map((opt) => {
+              const active = budgetTier === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  data-testid={`budget-btn-${opt.id}`}
+                  aria-pressed={active}
+                  onClick={() => {
+                    setBudgetTier(opt.id);
+                    setVisibleCount(12);
+                  }}
+                  className={`min-h-[34px] px-1.5 sm:px-3 py-1 text-[11px] sm:text-xs font-medium rounded-[4px] whitespace-nowrap text-center border transition-colors cursor-pointer ${
+                    active
+                      ? "bg-[#DC2626] text-white border-[#DC2626]"
+                      : "bg-white text-[#525252] border-[#E5E5E5] hover:border-[#111111]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Student Suitability Quick Filters */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+            <button
+              type="button"
+              data-testid="filter-bareface"
+              aria-pressed={onlyBareFace}
+              onClick={() => {
+                setOnlyBareFace((v) => !v);
+                setVisibleCount(12);
+              }}
+              className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-[4px] whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
+                onlyBareFace
+                  ? "bg-[#111111] text-white border-[#111111]"
+                  : "bg-white text-[#525252] border-[#E5E5E5] hover:border-[#111111]"
+              }`}
+            >
+              Hợp mặt mộc đi học
+            </button>
+            <button
+              type="button"
+              data-testid="filter-teeth-bright"
+              aria-pressed={onlyTeethBright}
+              onClick={() => {
+                setOnlyTeethBright((v) => !v);
+                setVisibleCount(12);
+              }}
+              className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-[4px] whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
+                onlyTeethBright
+                  ? "bg-[#111111] text-white border-[#111111]"
+                  : "bg-white text-[#525252] border-[#E5E5E5] hover:border-[#111111]"
+              }`}
+            >
+              Sáng răng · Không xỉn da
+            </button>
+          </div>
         </div>
 
-        {/* Student Suitability Quick Filters */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
-          <button
-            type="button"
-            data-testid="filter-bareface"
-            aria-pressed={onlyBareFace}
-            onClick={() => {
-              setOnlyBareFace((v) => !v);
-              setVisibleCount(12);
-            }}
-            className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-[4px] whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
-              onlyBareFace
-                ? "bg-[#111111] text-white border-[#111111]"
-                : "bg-white text-[#525252] border-[#E5E5E5] hover:border-[#111111]"
-            }`}
-          >
-            Hợp mặt mộc đi học
-          </button>
-          <button
-            type="button"
-            data-testid="filter-teeth-bright"
-            aria-pressed={onlyTeethBright}
-            onClick={() => {
-              setOnlyTeethBright((v) => !v);
-              setVisibleCount(12);
-            }}
-            className={`min-h-[34px] px-3 py-1 text-xs font-medium rounded-[4px] whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
-              onlyTeethBright
-                ? "bg-[#111111] text-white border-[#111111]"
-                : "bg-white text-[#525252] border-[#E5E5E5] hover:border-[#111111]"
-            }`}
-          >
-            Sáng răng · Không xỉn da
-          </button>
+        {/* Brand & Undertone Filters */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-[#F0F0F0]">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            {UNDERTONE_FILTER_OPTIONS.map((opt) => {
+              const active = selectedUndertone === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  data-testid={`undertone-filter-${opt.id}`}
+                  aria-pressed={active}
+                  onClick={() => {
+                    setSelectedUndertone(opt.id);
+                    setVisibleCount(12);
+                  }}
+                  className={`min-h-[32px] px-2.5 py-1 text-[11px] font-medium rounded-[4px] whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
+                    active
+                      ? "bg-[#111111] text-white border-[#111111]"
+                      : "bg-white text-[#525252] border-[#E5E5E5] hover:border-[#111111]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <label htmlFor="catalog-brand-filter" className="text-[11px] text-[#666666] whitespace-nowrap">
+              Thương hiệu:
+            </label>
+            <select
+              id="catalog-brand-filter"
+              data-testid="catalog-brand-select"
+              value={selectedBrand}
+              onChange={(e) => {
+                setSelectedBrand(e.target.value);
+                setVisibleCount(12);
+              }}
+              className="min-h-[32px] px-2.5 py-1 text-xs bg-white border border-[#D4D4D4] rounded-[4px] text-[#111111] focus:outline-none focus:border-[#111111]"
+            >
+              <option value="all">Tất cả ({availableBrands.length} hãng)</option>
+              {availableBrands.map((brand) => (
+                <option key={brand} value={brand}>
+                  {brand}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+      </div>
+
+      {/* Explicit Estimated VN Price Disclaimer + Result Count */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-[#737373]">
+        <span>
+          Hiển thị <strong className="font-semibold text-[#111111]">{enrichedAndFiltered.length}</strong> sản phẩm
+        </span>
+        <span data-testid="price-estimate-disclaimer">
+          Giá tham khảo tại Việt Nam, có thể khác tùy nơi bán.
+        </span>
       </div>
 
       {/* Product Grid */}
@@ -361,7 +515,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
                       aria-label={`Xem chi tiết ${item.brand} ${item.name} ${item.shade}`}
                       className="block w-full text-left cursor-pointer"
                     >
-                      {isLip && item.renderedHex ? (
+                      {hasPortraitProfile && isLip && item.renderedHex ? (
                         <>
                           <div className="grid grid-cols-2 h-20 sm:h-24">
                             <div style={{ backgroundColor: item.hex }} />
@@ -410,21 +564,30 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
                     </h3>
                     <div className="text-xs text-zinc-600 truncate">{item.shade}</div>
 
-                    {/* Price + Match % cleanly wrapping with zero price truncation on 360px cards */}
+                    {/* Price + Match % (or Undertone in Guest mode) */}
                     <div className="pt-1 flex flex-wrap items-baseline justify-between gap-x-1.5 gap-y-0.5 text-[11px]">
+                      {hasPortraitProfile ? (
+                        <span
+                          className={`font-semibold tabular-nums whitespace-nowrap ${
+                            matchPct >= 90 ? "text-emerald-700" : "text-zinc-800"
+                          }`}
+                        >
+                          {matchPct}% hợp
+                        </span>
+                      ) : (
+                        <span className="font-medium text-zinc-500 truncate">
+                          {item.undertone || "Đa tông"}
+                        </span>
+                      )}
                       <span
-                        className={`font-semibold tabular-nums whitespace-nowrap ${
-                          matchPct >= 90 ? "text-emerald-700" : "text-zinc-800"
-                        }`}
+                        title="Giá ước tính tham khảo VN"
+                        className="font-semibold text-zinc-900 tabular-nums whitespace-nowrap"
                       >
-                        {matchPct}% hợp
-                      </span>
-                      <span className="font-semibold text-zinc-900 tabular-nums whitespace-nowrap">
-                        {price.priceRangeLabel}
+                        ~{price.priceRangeLabel}
                       </span>
                     </div>
 
-                    {/* Unboxed Student Suitability Cues (concise on narrow mobile cards so zero mid-word clipping) */}
+                    {/* Unboxed Student Suitability Cues */}
                     <div className="text-[11px] leading-snug truncate">
                       {traits.bareFaceFriendly || traits.teethBrightening ? (
                         <span className="font-medium text-rose-700">
@@ -444,7 +607,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
 
                 {/* Card Actions */}
                 <div className="px-3 pb-3 pt-1 flex items-center gap-1.5">
-                  {isLip ? (
+                  {isLip && hasPortraitProfile ? (
                     <button
                       type="button"
                       onClick={() => onTryLipstick(item)}
@@ -478,7 +641,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
           })}
         </div>
       ) : (
-        <div className="bg-white border border-zinc-200 rounded-2xl py-12 px-4 text-center space-y-2.5">
+        <div className="bg-white border border-[#E5E5E5] py-12 px-4 text-center space-y-2.5">
           <div className="text-sm font-semibold text-zinc-800">
             {activeType === "saved"
               ? "Bạn chưa lưu sản phẩm nào"
@@ -487,18 +650,25 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
           <p className="text-xs text-zinc-500 max-w-xs mx-auto">
             {activeType === "saved"
               ? "Chạm biểu tượng trái tim trên bất kỳ thỏi son hoặc phấn má nào để lưu lại so sánh."
-              : "Thử nới lỏng mức giá hoặc bỏ chọn bộ lọc nhanh để xem thêm gợi ý."}
+              : "Thử nới lỏng mức giá, thương hiệu hoặc bỏ chọn bộ lọc nhanh để xem thêm gợi ý."}
           </p>
-          {(budgetTier !== "all" || onlyBareFace || onlyTeethBright || query) && (
+          {(budgetTier !== "all" ||
+            selectedBrand !== "all" ||
+            selectedUndertone !== "all" ||
+            onlyBareFace ||
+            onlyTeethBright ||
+            query) && (
             <button
               type="button"
               onClick={() => {
                 setBudgetTier("all");
+                setSelectedBrand("all");
+                setSelectedUndertone("all");
                 setOnlyBareFace(false);
                 setOnlyTeethBright(false);
                 setQuery("");
               }}
-              className="mt-1 min-h-[38px] px-4 py-1.5 rounded-xl bg-zinc-900 text-white text-xs font-semibold cursor-pointer"
+              className="mt-1 min-h-[38px] px-4 py-1.5 rounded-[4px] bg-[#111111] text-white text-xs font-semibold cursor-pointer"
             >
               Xóa bộ lọc
             </button>

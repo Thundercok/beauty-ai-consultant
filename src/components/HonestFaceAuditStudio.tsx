@@ -662,19 +662,19 @@ export const HonestFaceAuditStudio: React.FC<HonestFaceAuditStudioProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-[#E5E5E5] bg-[#FAFAFA]">
         <div
           role="tablist"
-          aria-label="Chế độ xem phân tích thẳng thắn trên ảnh thật"
+          aria-label="Chế độ xem phân tích trên ảnh"
           className="grid grid-cols-3 sm:inline-flex items-center gap-1 p-0.5 bg-[#EFEFEF] rounded-[4px] w-full sm:w-auto"
         >
           {(
             [
-              { id: "cues", label: "Ảnh gốc + Dấu đỏ", testId: "honest-mode-cues", icon: Target },
+              { id: "cues", label: "Điểm lệch", testId: "honest-mode-cues", icon: Target },
               {
                 id: "slider",
-                label: "Trượt Trước / Sau",
+                label: "So trước / sau",
                 testId: "honest-mode-slider",
                 icon: SlidersHorizontal,
               },
-              { id: "makeup", label: "Real Makeup", testId: "honest-mode-makeup", icon: Sparkles },
+              { id: "makeup", label: "Thử chỉnh nét", testId: "honest-mode-makeup", icon: Sparkles },
             ] as const
           ).map(({ id, label, testId, icon: Icon }) => {
             const active = viewMode === id;
@@ -732,7 +732,7 @@ export const HonestFaceAuditStudio: React.FC<HonestFaceAuditStudioProps> = ({
             className="min-h-[34px] px-3 rounded-[4px] border border-[#D4D4D4] bg-white hover:bg-[#111111] hover:text-white hover:border-[#111111] text-xs font-semibold text-[#111111] inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
           >
             <Camera className="w-3.5 h-3.5" />
-            <span>Đổi ảnh thật</span>
+            <span>Đổi ảnh</span>
           </button>
         </div>
       </div>
@@ -752,8 +752,8 @@ export const HonestFaceAuditStudio: React.FC<HonestFaceAuditStudioProps> = ({
                 splitPct={splitPct}
                 onSplitPctChange={setSplitPct}
                 portraitMode={photoLighting}
-                ariaLabel="Thanh trượt so sánh ảnh gốc mặt mộc và Real Makeup chỉnh lệch"
-                hintText="Kéo so mặt mộc · Real Makeup"
+                ariaLabel="Thanh trượt so sánh mặt mộc và lớp trang điểm chỉnh nét"
+                hintText="Kéo so mặt mộc · Sau chỉnh nét"
                 testId="honest-real-makeup-slider"
               />
             </div>
@@ -782,10 +782,10 @@ export const HonestFaceAuditStudio: React.FC<HonestFaceAuditStudioProps> = ({
                   {viewMode === "cues"
                     ? focusedZone === "all"
                       ? actionableCount > 0
-                        ? `Ảnh gốc · ${actionableCount} điểm lệch cần sửa`
-                        : "Ảnh gốc · Không phát hiện điểm lệch rõ"
-                      : `Đang soi · ${ZONE_SHORT_LABELS[focusedZone]}`
-                    : `Real Makeup · ${activeLayerCount}/5 lớp`}
+                        ? `${actionableCount} điểm nên cân chỉnh`
+                        : "Không thấy điểm lệch rõ"
+                      : `Đang xem · ${ZONE_SHORT_LABELS[focusedZone]}`
+                    : `Chỉnh nét · ${activeLayerCount}/5 lớp`}
                 </div>
 
                 {viewMode === "cues" ? (
@@ -803,12 +803,12 @@ export const HonestFaceAuditStudio: React.FC<HonestFaceAuditStudioProps> = ({
                     {showRedMarkers ? (
                       <>
                         <EyeOff className="w-3 h-3 shrink-0" />
-                        <span>Ẩn dấu đỏ</span>
+                        <span>Ẩn ghi chú</span>
                       </>
                     ) : (
                       <>
                         <Eye className="w-3 h-3 shrink-0" />
-                        <span>Hiện dấu đỏ</span>
+                        <span>Hiện ghi chú</span>
                       </>
                     )}
                   </button>
@@ -836,7 +836,7 @@ export const HonestFaceAuditStudio: React.FC<HonestFaceAuditStudioProps> = ({
               {/* Measured Bottom Contrast Scrim Legend */}
               {viewMode === "cues" && audit.available && (
                 <div className="absolute inset-x-0 bottom-0 z-20 pt-10 pb-3 px-3.5 bg-gradient-to-t from-black/85 via-black/45 to-transparent pointer-events-none flex items-center justify-between gap-3 text-[10px] sm:text-[11px] text-white/90">
-                  <span>Dấu đỏ: điểm lệch &amp; hướng sửa trực tiếp</span>
+                  <span>Chạm vào từng ghi chú để xem hướng sửa</span>
                   <span className="font-mono tabular-nums text-white/75 shrink-0">
                     IPD {audit.pose.ipdPx.toFixed(0)}px
                   </span>
@@ -899,7 +899,7 @@ export const HonestFaceAuditStudio: React.FC<HonestFaceAuditStudioProps> = ({
               <>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[11px] font-semibold text-[#111111]">
-                    Lớp Real Makeup chỉnh lệch
+                    Lớp trang điểm chỉnh nét
                   </span>
                   <div
                     role="group"
@@ -1014,13 +1014,23 @@ export const HonestFaceAuditStudio: React.FC<HonestFaceAuditStudioProps> = ({
         <div className="lg:col-span-7 flex flex-col">
           {/* Top Verdict & 3D Pose Telemetry Header */}
           <div className="p-5 sm:p-7 space-y-4 border-b border-[#E5E5E5]">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="text-xs text-[#737373]">
-                Phản hồi thẳng thắn · Đo từ {report.landmarkCount} điểm chuẩn
-              </span>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="space-y-1">
+                <div className="metric-label">
+                  Nhận xét trực tiếp · {report.landmarkCount} điểm chuẩn
+                </div>
+                {audit.available && (
+                  <div className={`text-xs font-semibold ${scoreColorClass}`}>
+                    {audit.verdictTagVi}
+                  </div>
+                )}
+              </div>
               {audit.available && (
-                <div className={`text-sm font-bold font-mono tabular-nums ${scoreColorClass}`}>
-                  {audit.overallBalanceScore}/100 · {audit.verdictTagVi}
+                <div className="flex items-baseline gap-1 shrink-0">
+                  <span className={`metric-display text-[32px] sm:text-[36px] ${scoreColorClass}`}>
+                    {audit.overallBalanceScore}
+                  </span>
+                  <span className="text-sm font-mono tabular-nums text-[#737373]">/100</span>
                 </div>
               )}
             </div>
@@ -1037,7 +1047,7 @@ export const HonestFaceAuditStudio: React.FC<HonestFaceAuditStudioProps> = ({
             <div className="space-y-1.5">
               <h2
                 data-testid="honest-face-headline"
-                className="text-xl sm:text-[24px] font-bold tracking-[-0.025em] text-[#111111] leading-snug"
+                className="font-display text-xl sm:text-[24px] font-bold tracking-[-0.03em] text-[#0A0A0A] leading-snug"
               >
                 {audit.brutalHeadlineVi}
               </h2>
@@ -1047,24 +1057,24 @@ export const HonestFaceAuditStudio: React.FC<HonestFaceAuditStudioProps> = ({
             </div>
 
             {audit.available && (
-              <div className="grid grid-cols-3 gap-3 pt-3.5 border-t border-[#EAEAEA] text-xs">
-                <div>
-                  <div className="text-[11px] text-[#737373]">3 tầng mặt</div>
-                  <div className="font-mono tabular-nums font-semibold text-[#111111] mt-0.5">
-                    {audit.facialThirds.upperPct} / {audit.facialThirds.middlePct} /{" "}
+              <div className="grid grid-cols-3 divide-x divide-[#E5E5E5] border border-[#E5E5E5] bg-[#FAFAFA]">
+                <div className="px-3 py-2.5">
+                  <div className="metric-label">3 tầng mặt</div>
+                  <div className="metric-display-sm text-sm sm:text-base mt-1">
+                    {audit.facialThirds.upperPct}/{audit.facialThirds.middlePct}/
                     {audit.facialThirds.lowerPct}%
                   </div>
                 </div>
-                <div>
-                  <div className="text-[11px] text-[#737373]">Bù nghiêng · Xoay</div>
-                  <div className="font-mono tabular-nums font-semibold text-[#111111] mt-0.5">
+                <div className="px-3 py-2.5">
+                  <div className="metric-label">Nghiêng · Xoay</div>
+                  <div className="metric-display-sm text-sm sm:text-base mt-1">
                     {Math.abs(audit.pose.rollDeg).toFixed(1)}° · {Math.abs(audit.pose.yawDeg).toFixed(1)}°
                   </div>
                 </div>
-                <div>
-                  <div className="text-[11px] text-[#737373]">Hiệu chuẩn IPD</div>
-                  <div className="font-mono tabular-nums font-semibold text-[#111111] mt-0.5">
-                    1px ≈ {audit.pose.mmPerPx.toFixed(2)}mm
+                <div className="px-3 py-2.5">
+                  <div className="metric-label">Tỉ lệ ảnh</div>
+                  <div className="metric-display-sm text-sm sm:text-base mt-1">
+                    {audit.pose.mmPerPx.toFixed(2)} mm/px
                   </div>
                 </div>
               </div>

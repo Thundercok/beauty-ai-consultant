@@ -15,13 +15,15 @@ import type { MatchedProduct, SeasonName } from "../lib/beauty/types";
 
 interface ProductDetailSheetProps {
   product: MatchedProduct | null;
-  skinHex: string;
-  lipBaseHex: string;
-  userSeason: SeasonName;
+  skinHex?: string | null;
+  lipBaseHex?: string | null;
+  userSeason?: SeasonName | null;
+  hasPortraitProfile?: boolean;
   isSaved: boolean;
   onClose: () => void;
   onToggleSave: (id: number) => void;
   onTryLipstick: (product: MatchedProduct) => void;
+  onRequestAnalysis?: () => void;
 }
 
 export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
@@ -29,10 +31,12 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
   skinHex,
   lipBaseHex,
   userSeason,
+  hasPortraitProfile = false,
   isSaved,
   onClose,
   onToggleSave,
   onTryLipstick,
+  onRequestAnalysis,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -51,11 +55,12 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
 
   if (!product) return null;
 
+  const isAnalyzed = Boolean(hasPortraitProfile && skinHex && lipBaseHex && userSeason);
   const isLip = product.productType === "lipstick";
   const matchPct = deltaEToMatchPercent(product.deltaE);
   const typeLabel = PRODUCT_TYPE_VI_LABELS[product.productType] ?? product.productType;
   const textureLabel = TEXTURE_VI_LABELS[product.texture] ?? product.texture;
-  const seasonShort = SEASON_VI_LABELS[userSeason].title;
+  const seasonShort = userSeason ? SEASON_VI_LABELS[userSeason].title : null;
   const priceInfo = estimateProductPriceVn(product.brand, product.productType, product.name);
   const traits = evaluateVnStudentTraits({
     productType: product.productType,
@@ -96,7 +101,7 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
             <span className="w-10 h-1.5 rounded-full bg-white/75 shadow-xs" />
           </div>
 
-          {isLip && product.renderedHex ? (
+          {isAnalyzed && isLip && product.renderedHex && lipBaseHex ? (
             <div className="grid grid-cols-3 h-28">
               <div className="relative" style={{ backgroundColor: lipBaseHex }}>
                 <span className="absolute bottom-2 left-2.5 text-[10px] font-medium text-white bg-black/45 px-1.5 py-0.5 rounded-md">
@@ -114,7 +119,7 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
                 </span>
               </div>
             </div>
-          ) : (
+          ) : isAnalyzed && skinHex ? (
             <div className="grid grid-cols-2 h-28">
               <div className="relative" style={{ backgroundColor: skinHex }}>
                 <span className="absolute bottom-2 left-2.5 text-[10px] font-medium text-white bg-black/45 px-1.5 py-0.5 rounded-md">
@@ -126,6 +131,12 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
                   Màu sản phẩm
                 </span>
               </div>
+            </div>
+          ) : (
+            <div className="relative h-28" style={{ backgroundColor: product.hex }}>
+              <span className="absolute bottom-2 left-3 text-[10px] font-semibold text-white bg-black/55 px-2 py-0.5 rounded-md font-mono">
+                Màu sản phẩm · {product.hex.toUpperCase()}
+              </span>
             </div>
           )}
 
@@ -157,28 +168,46 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
 
           <div className="flex items-center justify-between gap-3 py-3 border-y border-zinc-100 text-xs">
             <div>
-              <div className="text-zinc-500">Độ hợp da ({seasonShort})</div>
-              <div
-                className={`text-sm font-bold tabular-nums mt-0.5 ${
-                  matchPct >= 90 ? "text-emerald-700" : "text-zinc-900"
-                }`}
-              >
-                {matchPct}% hợp da bạn
-              </div>
+              {isAnalyzed && seasonShort ? (
+                <>
+                  <div className="text-zinc-500">Độ hợp da ({seasonShort})</div>
+                  <div
+                    className={`text-sm font-bold tabular-nums mt-0.5 ${
+                      matchPct >= 90 ? "text-emerald-700" : "text-zinc-900"
+                    }`}
+                  >
+                    {matchPct}% hợp da bạn
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-zinc-500">Tông màu gợi ý</div>
+                  <div className="text-sm font-bold text-zinc-900 mt-0.5">
+                    {product.undertone || "Đa tông"}
+                  </div>
+                </>
+              )}
             </div>
             <div className="text-right">
-              <div className="text-zinc-500">Giá tham khảo VN</div>
+              <div className="text-zinc-500">Giá ước tính tham khảo VN</div>
               <div className="text-sm font-bold text-zinc-900 tabular-nums mt-0.5">
                 {priceInfo.priceRangeLabel}
               </div>
             </div>
           </div>
 
-          <p className="text-xs text-zinc-600 leading-relaxed">
-            {isLip
-              ? "Màu đã được tính sẵn độ hòa trộn với sắc môi mộc của bạn để khi mua về đánh thật sẽ không bị lệch tông hay xỉn da."
-              : `Gam màu hài hòa với sắc da ${seasonShort}, dễ đánh mỏng hằng ngày khi đi học hoặc đi chơi mà không làm nặng mặt.`}
-          </p>
+          <div className="space-y-1.5 text-xs text-zinc-600 leading-relaxed">
+            <p>
+              {isAnalyzed && seasonShort
+                ? isLip
+                  ? "Màu đã được tính sẵn độ hòa trộn với sắc môi mộc của bạn để khi mua về đánh thật sẽ không bị lệch tông hay xỉn da."
+                  : `Gam màu hài hòa với sắc da ${seasonShort}, dễ đánh mỏng hằng ngày khi đi học hoặc đi chơi mà không làm nặng mặt.`
+                : `Phù hợp tham khảo cho nhóm ${product.bestSeasons || "nhiều mùa màu"}. Tải ảnh chân dung để tính độ khớp màu chính xác với sắc da của bạn.`}
+            </p>
+            <p className="text-[11px] text-zinc-500">
+              Lưu ý: Mức giá chỉ mang tính ước tính tham khảo tại thị trường Việt Nam, không phải giá bán trực tiếp hay tồn kho thực tế.
+            </p>
+          </div>
 
           <div className="space-y-2.5 pt-1">
             {isLip && (
@@ -186,11 +215,17 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
                 type="button"
                 onClick={() => {
                   onClose();
-                  onTryLipstick(product);
+                  if (isAnalyzed) {
+                    onTryLipstick(product);
+                  } else if (onRequestAnalysis) {
+                    onRequestAnalysis();
+                  } else {
+                    onTryLipstick(product);
+                  }
                 }}
                 className="w-full min-h-[44px] px-4 py-2.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-semibold transition-colors cursor-pointer"
               >
-                Thử màu son này lên môi
+                {isAnalyzed ? "Thử màu son này lên môi" : "Phân tích ảnh để thử màu son này"}
               </button>
             )}
 
