@@ -2,7 +2,7 @@ import { SEASON_COLOR_PALETTES } from "./adviceEngine";
 import { adaptLabBradford, hexToLab, labToRgb, rgbToHex, rgbToLab } from "./bradfordCat";
 import { kubelkaMunkLipBlend } from "./kubelkaMunk";
 import { isValidHexColor, validateCatalogRecord } from "./recommendationIntegrity";
-import type { CatalogProduct, IlluminantName, MatchedProduct, SeasonName } from "./types";
+import type { CatalogProduct, IlluminantName, MatchedProduct, SeasonClassification, SeasonName } from "./types";
 
 /**
  * Documented CIEDE2000 (ΔE₀₀, kL = kC = kH = 1) perceptual color-similarity thresholds.
@@ -206,6 +206,61 @@ export function blendTargetColorsLab(
   };
 }
 
+/**
+ * Contextual lipstick ranking. The score is an explicitly heuristic 0–100 point index,
+ * not a probability or validated claim of beauty/suitability. Color remains the dominant
+ * signal; season and undertone are weak metadata tie-breakers. Unknown metadata is neutral.
+ */
+export function scoreLipstickRecommendation(input: {
+  deltaE: number;
+  productSeasons: string;
+  productUndertone: string;
+  userSeason?: SeasonName;
+  userUndertone?: SeasonClassification["undertone"];
+}): { score: number; reasons: string[] } {
+  const { deltaE, productSeasons, productUndertone, userSeason, userUndertone } = input;
+  const safeDelta = Number.isFinite(deltaE) ? Math.max(0, deltaE) : 10;
+  const colorPoints = 75 * (1 - Math.min(safeDelta, 10) / 10);
+  const reasons: string[] = ["Độ gần màu là tín hiệu chính (CIEDE2000)"];
+
+  let seasonPoints = 7.5;
+  if (userSeason) {
+    const seasons = productSeasons.split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
+    if (seasons.includes("all seasons") || seasons.includes(userSeason.toLowerCase())) {
+      seasonPoints = 15;
+      reasons.push("Nhãn mùa màu trùng với kết quả phân tích");
+    } else if (seasons.length > 0) {
+      seasonPoints = 0;
+      reasons.push("Nhãn mùa màu không trùng (chỉ là metadata tham khảo)");
+    } else {
+      reasons.push("Chưa có nhãn mùa màu trong catalog");
+    }
+  }
+
+  let undertonePoints = 5;
+  if (userUndertone) {
+    const productTone = productUndertone.toLowerCase();
+    const userTone = userUndertone.toLowerCase();
+    const productWarm = productTone.includes("warm") || productTone.includes("ấm") || productTone.includes("golden");
+    const productCool = productTone.includes("cool") || productTone.includes("lạnh") || productTone.includes("pink");
+    const userWarm = userTone.includes("warm") || userTone.includes("golden");
+    const userCool = userTone.includes("cool") || userTone.includes("pink");
+    const productNeutral = productTone.includes("neutral") || productTone.includes("trung");
+    const userNeutral = userTone.includes("neutral");
+    if (productNeutral || userNeutral || (productWarm && userWarm) || (productCool && userCool)) {
+      undertonePoints = 10;
+      reasons.push("Hướng undertone tương thích");
+    } else if ((productWarm && userCool) || (productCool && userWarm)) {
+      undertonePoints = 0;
+      reasons.push("Hướng undertone khác nhau");
+    } else {
+      reasons.push("Chưa đủ metadata undertone để đối chiếu");
+    }
+  }
+
+  return { score: Number((colorPoints + seasonPoints + undertonePoints).toFixed(2)), reasons };
+}
+
 export function matchProducts(
   targetHex: string,
   products: CatalogProduct[],
@@ -214,9 +269,11 @@ export function matchProducts(
     lipBaseLab?: [number, number, number];
     topK?: number;
     catalogIlluminant?: IlluminantName;
+    userSeason?: SeasonName;
+    userUndertone?: SeasonClassification["undertone"];
   }
 ): MatchedProduct[] {
-  const { productType, lipBaseLab, topK = 6, catalogIlluminant = "D65" } = options;
+  const { productType, lipBaseLab, topK = 6, catalogIlluminant = "D65", userSeason, userUndertone } = options;
   if (!isValidHexColor(targetHex)) return [];
 
   // Requirement 4: Enforce complete record validation (brand, product_name, product_type, valid HEX)
@@ -264,6 +321,16 @@ export function matchProducts(
     if (!Number.isFinite(deltaE)) continue;
 
     const matchTier = classifyColorSimilarityTier(deltaE);
+    const lipstickRanking =
+      productType === "lipstick" && (userSeason || userUndertone)
+        ? scoreLipstickRecommendation({
+            deltaE,
+            productSeasons: row.best_seasons,
+            productUndertone: row.undertone,
+            userSeason,
+            userUndertone,
+          })
+        : null;
 
     scored.push({
       id: row.id,
@@ -281,10 +348,21 @@ export function matchProducts(
       missingMetadataFields: validation.warnings.length > 0 ? validation.warnings : undefined,
       undertone: row.undertone,
       bestSeasons: row.best_seasons,
+      ...(lipstickRanking
+        ? {
+            recommendationScore: lipstickRanking.score,
+            recommendationReasons: lipstickRanking.reasons,
+          }
+        : {}),
     });
   }
 
-  scored.sort((a, b) => (a.deltaE ?? Infinity) - (b.deltaE ?? Infinity));
+  scored.sort((a, b) => {
+    if (a.recommendationScore !== undefined && b.recommendationScore !== undefined) {
+      return b.recommendationScore - a.recommendationScore || (a.deltaE ?? Infinity) - (b.deltaE ?? Infinity);
+    }
+    return (a.deltaE ?? Infinity) - (b.deltaE ?? Infinity);
+  });
   return scored.slice(0, topK);
 }
 
@@ -365,7 +443,10 @@ export function scoreMatchedProductsPopularity(
     }
 
     const isWithinCloseThreshold = validDelta < CIEDE2000_SIMILARITY_THRESHOLDS.CLOSE_MAX;
-    const colorFitScore = Math.max(0, EDITORIAL_CURATION_WEIGHTS.COLOR_FIT_MAX - validDelta);
+    const colorFitScore =
+      item.productType === "lipstick" && typeof item.recommendationScore === "number"
+        ? (item.recommendationScore / 100) * EDITORIAL_CURATION_WEIGHTS.COLOR_FIT_MAX
+        : Math.max(0, EDITORIAL_CURATION_WEIGHTS.COLOR_FIT_MAX - validDelta);
 
     const rawSeasons = (item.bestSeasons ?? "").trim();
     const seasonsList = rawSeasons
@@ -385,7 +466,9 @@ export function scoreMatchedProductsPopularity(
     // by promoting a "Distant Shade" (ΔE₀₀ ≥ 5.0) above close colorimetric matches or marking it popular.
     const metadataScale = isWithinCloseThreshold ? 1.0 : 0.25;
     const rawMetadataBonus =
-      (matchesUserSeason ? EDITORIAL_CURATION_WEIGHTS.SEASON_TAG_MATCH : 0) +
+      (matchesUserSeason && item.recommendationScore === undefined
+        ? EDITORIAL_CURATION_WEIGHTS.SEASON_TAG_MATCH
+        : 0) +
       (isUniversal ? EDITORIAL_CURATION_WEIGHTS.MULTI_SEASON_TAG : 0) +
       (isPopularBrand ? EDITORIAL_CURATION_WEIGHTS.CURATED_BRAND_FAMILIARITY : 0) +
       (isCultLine ? EDITORIAL_CURATION_WEIGHTS.CURATED_LINE_FAMILIARITY : 0);
@@ -419,6 +502,7 @@ export function selectTrendingProducts(
     skinHex: string;
     lipBaseLab: [number, number, number];
     userSeason: SeasonName;
+    userUndertone?: SeasonClassification["undertone"];
     catalogIlluminant?: IlluminantName;
     limit?: number;
   }
@@ -428,6 +512,7 @@ export function selectTrendingProducts(
     skinHex,
     lipBaseLab,
     userSeason,
+    userUndertone,
     catalogIlluminant = "D65",
     limit = 6,
   } = options;
@@ -451,6 +536,8 @@ export function selectTrendingProducts(
         lipBaseLab: type === "lipstick" ? lipBaseLab : undefined,
         topK: 80,
         catalogIlluminant,
+        userSeason: type === "lipstick" ? userSeason : undefined,
+        userUndertone: type === "lipstick" ? userUndertone : undefined,
       })
     );
   }
