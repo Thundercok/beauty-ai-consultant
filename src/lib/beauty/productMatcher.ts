@@ -443,7 +443,10 @@ export function scoreMatchedProductsPopularity(
     }
 
     const isWithinCloseThreshold = validDelta < CIEDE2000_SIMILARITY_THRESHOLDS.CLOSE_MAX;
-    const colorFitScore = Math.max(0, EDITORIAL_CURATION_WEIGHTS.COLOR_FIT_MAX - validDelta);
+    const colorFitScore =
+      item.productType === "lipstick" && typeof item.recommendationScore === "number"
+        ? (item.recommendationScore / 100) * EDITORIAL_CURATION_WEIGHTS.COLOR_FIT_MAX
+        : Math.max(0, EDITORIAL_CURATION_WEIGHTS.COLOR_FIT_MAX - validDelta);
 
     const rawSeasons = (item.bestSeasons ?? "").trim();
     const seasonsList = rawSeasons
@@ -463,7 +466,9 @@ export function scoreMatchedProductsPopularity(
     // by promoting a "Distant Shade" (ΔE₀₀ ≥ 5.0) above close colorimetric matches or marking it popular.
     const metadataScale = isWithinCloseThreshold ? 1.0 : 0.25;
     const rawMetadataBonus =
-      (matchesUserSeason ? EDITORIAL_CURATION_WEIGHTS.SEASON_TAG_MATCH : 0) +
+      (matchesUserSeason && item.recommendationScore === undefined
+        ? EDITORIAL_CURATION_WEIGHTS.SEASON_TAG_MATCH
+        : 0) +
       (isUniversal ? EDITORIAL_CURATION_WEIGHTS.MULTI_SEASON_TAG : 0) +
       (isPopularBrand ? EDITORIAL_CURATION_WEIGHTS.CURATED_BRAND_FAMILIARITY : 0) +
       (isCultLine ? EDITORIAL_CURATION_WEIGHTS.CURATED_LINE_FAMILIARITY : 0);
