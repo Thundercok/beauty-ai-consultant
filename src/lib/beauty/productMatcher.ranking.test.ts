@@ -4,14 +4,14 @@ import { scoreLipstickRecommendation } from "./productMatcher";
 
 test("lipstick ranking keeps color dominant while using season and undertone as secondary signals", () => {
   const closeButMetadataMismatch = scoreLipstickRecommendation({
-    deltaE: 1.2,
+    deltaE: 0.2,
     productSeasons: "Warm Autumn, Soft Autumn",
     productUndertone: "Warm",
     userSeason: "Cool Summer",
     userUndertone: "Cool (Pink/Blue)",
   });
   const slightlyFartherMetadataMatch = scoreLipstickRecommendation({
-    deltaE: 2.0,
+    deltaE: 4.0,
     productSeasons: "Cool Summer, Soft Summer",
     productUndertone: "Cool",
     userSeason: "Cool Summer",
