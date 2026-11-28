@@ -6,6 +6,7 @@ import { HonestFaceAuditStudio } from "./HonestFaceAuditStudio";
 import type { DemoPortraitPreset } from "./PhotoPickerSheet";
 import { PortraitCanvas } from "./PortraitCanvas";
 import { RelightingLab } from "./RelightingLab";
+import { SkinToneLabChart } from "./SkinToneLabChart";
 import { computeAnalysisConfidence } from "../lib/beauty/analysisConfidence";
 import { summarizeFaceMesh } from "../lib/beauty/faceMeshOverlay";
 import { analyzeFacialSymmetry } from "../lib/beauty/facialSymmetry";
@@ -202,7 +203,7 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
               ["faceshape", "Dáng mặt"],
               ["lighting", "Ánh đèn"],
               ["skinmaps", "Bản đồ da"],
-              ["metrics", "Chỉ số"],
+              ["metrics", "Biểu đồ & Chỉ số"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -502,6 +503,9 @@ export const ProInsightsView: React.FC<ProInsightsViewProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Interactive Recharts CIELAB Skin Tone Variance Chart (L*, a*, b*) */}
+          <SkinToneLabChart report={report} faceBox={faceBox} />
 
           {/* Facial Symmetry & Data-Driven Makeup Contouring Card */}
           <section

@@ -121,6 +121,11 @@ function makeMockReport(): ConsultationReport {
     },
     landmarkSource: "fallback_box",
     landmarkCount: 0,
+    skinEvidence: {
+      verifiedSkinPixels: 12000,
+      faceRegionPixels: 13500,
+      usedRegionFallback: false,
+    },
     neuralLandmarks: null,
     skinMask: mask,
     faceHullMask: mask,
