@@ -31,11 +31,15 @@ function statusFromScore(score: number): "good" | "fair" | "warn" {
  * based on lighting conditions (CCT deviation & off-Planckian cast), neural landmark
  * coverage, valid skin pixel count, and seasonal classification certainty.
  */
+/** Ceiling for the score when the skin colour had to be averaged from non-skin pixels. */
+export const MAX_SCORE_WITHOUT_SKIN = 30;
+
 export function computeAnalysisConfidence(
   report: Pick<
     ConsultationReport,
     "whiteBalance" | "landmarkSource" | "landmarkCount" | "skinMetrics" | "season"
-  >
+  > &
+    Partial<Pick<ConsultationReport, "skinEvidence">>
 ): AnalysisConfidenceResult {
   const cct = report.whiteBalance.estimatedCctK;
   const offLocus = report.whiteBalance.offLocusDeg ?? 0;
@@ -115,11 +119,18 @@ export function computeAnalysisConfidence(
     sampleScore * 0.15 +
     seasonClarityScore * 0.15;
 
-  const score = Math.round(clamp(weighted, 35, 99));
+  // Without real skin pixels every other factor describes the background, not the person.
+  // A grey or black frame even scores as perfect D65 light, so the evidence gate must cap
+  // the result instead of being just one more weighted term.
+  const noSkinEvidence = report.skinEvidence?.usedRegionFallback === true;
+  const score = noSkinEvidence
+    ? Math.min(MAX_SCORE_WITHOUT_SKIN, Math.round(weighted))
+    : Math.round(clamp(weighted, 35, 99));
   const level: AnalysisConfidenceResult["level"] =
     score >= 82 ? "high" : score >= 65 ? "medium" : "low";
-  const label =
-    level === "high"
+  const label = noSkinEvidence
+    ? "Không tìm thấy vùng da để đo"
+    : level === "high"
       ? "Độ tin cậy cao"
       : level === "medium"
         ? "Độ tin cậy khá"

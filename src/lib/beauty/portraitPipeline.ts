@@ -360,7 +360,16 @@ function sampleSkinFromImage(
     }
   }
 
-  if (skinCount < 60) {
+  // Pixels that actually passed the skin-colour gate. The region fallback below keeps the
+  // numbers finite for the UI, but it is NOT evidence of skin and must never be reported as such.
+  const verifiedSkinCount = skinCount;
+  let faceRegionPixels = 0;
+  for (let i = 0; i < n; i++) {
+    if (faceHullMask[i] && !featureExclusionMask[i]) faceRegionPixels++;
+  }
+  const usedRegionFallback = verifiedSkinCount < 60;
+
+  if (usedRegionFallback) {
     for (let i = 0; i < n; i++) {
       if (!faceHullMask[i] || featureExclusionMask[i]) continue;
       const idx = i * 4;
@@ -410,6 +419,9 @@ function sampleSkinFromImage(
     melIndex: melIndexSum / Math.max(1, skinCount),
     hemIndex: hemIndexSum / Math.max(1, skinCount),
     skinCount,
+    verifiedSkinCount,
+    faceRegionPixels,
+    usedRegionFallback,
   };
 }
 
@@ -475,7 +487,7 @@ export function runPortraitAnalysisPipeline(
     skinSample.skinB,
     skinSample.melIndex,
     skinSample.hemIndex,
-    skinSample.skinCount,
+    skinSample.verifiedSkinCount,
     hasNeural
       ? "mediapipe_468_face_hull_hsv_trimmed_mean"
       : "fallback_oval_hsv_trimmed_mean"
@@ -592,6 +604,11 @@ export function runPortraitAnalysisPipeline(
     advice,
     landmarkSource: hasNeural ? "mediapipe_468" : "fallback_box",
     landmarkCount: options.neuralLandmarks?.length ?? 0,
+    skinEvidence: {
+      verifiedSkinPixels: skinSample.verifiedSkinCount,
+      faceRegionPixels: skinSample.faceRegionPixels,
+      usedRegionFallback: skinSample.usedRegionFallback,
+    },
     neuralLandmarks: options.neuralLandmarks ?? null,
     skinMask: skinSample.skinMask,
     faceHullMask,

@@ -140,6 +140,16 @@ export interface RelightingExperimentReport {
   methods: RelightingMethodMetric[];
 }
 
+/** How much of the measured "skin" colour is backed by pixels that really look like skin. */
+export interface SkinEvidence {
+  /** Pixels inside the face region that passed the HSV skin-colour gate */
+  verifiedSkinPixels: number;
+  /** All pixels inside the face region (eyes, brows and lips excluded) */
+  faceRegionPixels: number;
+  /** True when too few skin pixels were found and every face-region pixel was averaged instead */
+  usedRegionFallback: boolean;
+}
+
 export interface ConsultationReport {
   whiteBalance: WhiteBalanceDiagnostics;
   faceShape: FaceShapeResult;
@@ -173,6 +183,7 @@ export interface ConsultationReport {
   };
   landmarkSource: "mediapipe_468" | "fallback_box";
   landmarkCount: number;
+  skinEvidence: SkinEvidence;
   neuralLandmarks: Array<[number, number, number]> | null;
   skinMask: Uint8Array;
   faceHullMask: Uint8Array;

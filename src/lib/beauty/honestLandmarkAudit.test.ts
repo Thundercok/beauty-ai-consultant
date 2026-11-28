@@ -114,6 +114,7 @@ function makeReport(landmarks: Array<[number, number, number]> | null): Consulta
     landmarkSource: landmarks ? "mediapipe_468" : "fallback_box",
     neuralLandmarks: landmarks,
     landmarkCount: landmarks ? landmarks.length : 0,
+    skinEvidence: { verifiedSkinPixels: 20000, faceRegionPixels: 24000, usedRegionFallback: false },
     whiteBalance: {
       method: "planckian_grey_edge",
       estimatedCctK: 5800,

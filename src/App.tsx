@@ -26,6 +26,7 @@ import { triggerHaptic } from "./lib/beauty/haptics";
 import type { EnhancementStats } from "./lib/beauty/imageEnhancement";
 import { detectNeuralFaceLandmarks } from "./lib/beauty/neuralLandmarks";
 import { detectInitialFaceBox, runPortraitAnalysisPipeline } from "./lib/beauty/portraitPipeline";
+import { assessAnalysisValidity, type FaceDetectionOutcome } from "./lib/beauty/analysisValidity";
 import { matchProducts } from "./lib/beauty/productMatcher";
 import type {
   CatalogProduct,
@@ -133,6 +134,7 @@ export default function App() {
   const [imageBuffer, setImageBuffer] = useState<LoadedImageBuffer | null>(null);
   const [isDecodingImage, setIsDecodingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [faceDetection, setFaceDetection] = useState<FaceDetectionOutcome>("pending");
   const [activeDemoId, setActiveDemoId] = useState<string | null>(DEMO_PORTRAIT_PRESETS[0].id);
   const [neuralLandmarks, setNeuralLandmarks] = useState<Array<[number, number, number]> | null>(
     null
@@ -347,9 +349,11 @@ export default function App() {
       setNeuralLandmarks(null);
       setEnhancementStats(null);
       setLandmarkStatus("loading");
+      setFaceDetection("pending");
       setProgressValue((p) => Math.max(p, 0.45));
       setProcessingLabel("Đang tinh chỉnh 478 điểm khuôn mặt…");
 
+      let outcome: FaceDetectionOutcome = "unavailable";
       try {
         const { landmarks, enhancement } = await detectNeuralFaceLandmarks(
           buf.rgba,
@@ -361,20 +365,27 @@ export default function App() {
         setProcessingLabel("Hoàn tất nhận diện khuôn mặt");
         setProgressValue(0.92);
         if (landmarks && landmarks.length >= 468) {
+          outcome = "found";
           setNeuralLandmarks(landmarks);
           setLandmarkStatus("neural");
         } else {
+          outcome = "not_found";
           setNeuralLandmarks(null);
           setLandmarkStatus("fallback");
         }
       } catch {
         if (token !== processTokenRef.current) return;
+        outcome = "unavailable";
         setNeuralLandmarks(null);
         setLandmarkStatus("fallback");
       } finally {
         if (token === processTokenRef.current) {
+          setFaceDetection(outcome);
           finishProgress();
-          showToast("Phân tích hoàn tất", "success");
+          // The banner states the exact reason; the toast must not claim success when it isn't.
+          if (outcome === "found") showToast("Phân tích hoàn tất", "success");
+          else if (outcome === "not_found") showToast("Không tìm thấy khuôn mặt trong ảnh", "info");
+          else showToast("Đang dùng khung ước lượng khuôn mặt", "info");
         }
       }
     },
@@ -538,7 +549,7 @@ export default function App() {
     setCameraModalOpen(true);
   }, []);
 
-  const report: ConsultationReport | null = useMemo(() => {
+  const rawReport: ConsultationReport | null = useMemo(() => {
     if (!imageBuffer) return null;
     return runPortraitAnalysisPipeline(
       imageBuffer.rgba,
@@ -548,6 +559,16 @@ export default function App() {
       { wbMethod, occasion, texture, neuralLandmarks }
     );
   }, [imageBuffer, faceBox, wbMethod, occasion, texture, neuralLandmarks]);
+
+  const analysisValidity = useMemo(
+    () =>
+      rawReport
+        ? assessAnalysisValidity({ faceDetection, skinEvidence: rawReport.skinEvidence })
+        : null,
+    [rawReport, faceDetection]
+  );
+  // A rejected analysis is withheld everywhere: no season, no products, no makeup advice.
+  const report = analysisValidity?.status === "reject" ? null : rawReport;
 
   // Never block the rendered analysis on slow MediaPipe WASM downloads; only show decoding state while reading a new file
   const isProcessingPortrait = isDecodingImage && !report;
@@ -750,6 +771,19 @@ export default function App() {
         {(imageError || catalogError) && (
           <div className="mb-5 bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] px-4 py-3 rounded-[4px] text-xs">
             {imageError || catalogError}
+          </div>
+        )}
+
+        {analysisValidity?.message && (
+          <div
+            role={analysisValidity.status === "reject" ? "alert" : "status"}
+            className={
+              analysisValidity.status === "reject"
+                ? "mb-5 bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] px-4 py-3 rounded-[4px] text-xs"
+                : "mb-5 bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] px-4 py-3 rounded-[4px] text-xs"
+            }
+          >
+            {analysisValidity.message}
           </div>
         )}
 
