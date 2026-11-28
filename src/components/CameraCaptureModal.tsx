@@ -74,6 +74,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   const [lighting, setLighting] = useState<LightingReading>(INITIAL_LIGHTING);
   const [alignment, setAlignment] = useState<FaceAlignmentReading>(INITIAL_ALIGNMENT);
   const [retryCounter, setRetryCounter] = useState(0);
+  const [capturedFrame, setCapturedFrame] = useState<CapturedCameraFrame | null>(null);
+  const [capturedPreviewUrl, setCapturedPreviewUrl] = useState<string | null>(null);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -153,6 +155,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     setCameraError(null);
     setLighting(INITIAL_LIGHTING);
     setAlignment(INITIAL_ALIGNMENT);
+    setCapturedFrame(null);
+    setCapturedPreviewUrl(null);
 
     async function startStream() {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -289,15 +293,32 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     ctx.restore();
 
     const imgData = ctx.getImageData(0, 0, width, height);
-    stopCamera();
-    onCaptureFrame({
+    const frame: CapturedCameraFrame = {
       rgba: new Uint8ClampedArray(imgData.data),
       width,
       height,
       sourceLabel: "Ảnh chụp selfie trực tiếp",
-    });
+    };
+    setCapturedFrame(frame);
+    setCapturedPreviewUrl(canvas.toDataURL("image/jpeg", 0.92));
+    stopCamera();
+  }, [mirrored, stopCamera]);
+
+  const handleRetakePhoto = useCallback(() => {
+    setCapturedFrame(null);
+    setCapturedPreviewUrl(null);
+    setLighting(INITIAL_LIGHTING);
+    setAlignment(INITIAL_ALIGNMENT);
+    setRetryCounter((count) => count + 1);
+  }, []);
+
+  const handleConfirmPhoto = useCallback(() => {
+    if (!capturedFrame) return;
+    onCaptureFrame(capturedFrame);
+    setCapturedFrame(null);
+    setCapturedPreviewUrl(null);
     onClose();
-  }, [mirrored, onCaptureFrame, onClose, stopCamera]);
+  }, [capturedFrame, onCaptureFrame, onClose]);
 
   if (!open) return null;
 
@@ -346,26 +367,42 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
         {/* Live Viewfinder + Lighting Assistant Overlay + Face Alignment Guide Overlay */}
         <div className="relative flex-1 min-h-[420px] sm:min-h-[480px] bg-zinc-900 overflow-hidden">
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            autoPlay
-            className={`absolute inset-0 w-full h-full object-cover ${
-              mirrored ? "-scale-x-100" : ""
-            } ${cameraState === "live" ? "opacity-100" : "opacity-0"}`}
-          />
+          {capturedPreviewUrl ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 p-3">
+              <img
+                src={capturedPreviewUrl}
+                alt="Ảnh selfie vừa chụp để xem trước"
+                className="max-h-full max-w-full rounded-2xl object-contain"
+                data-testid="camera-photo-preview"
+              />
+              <div className="absolute bottom-4 left-4 right-4 rounded-xl bg-zinc-950/80 px-3 py-2 text-center text-xs text-white/90 backdrop-blur-sm">
+                Kiểm tra ảnh có rõ nét, đủ sáng và khuôn mặt nằm trọn trong khung
+              </div>
+            </div>
+          ) : (
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              autoPlay
+              className={`absolute inset-0 w-full h-full object-cover ${
+                mirrored ? "-scale-x-100" : ""
+              } ${cameraState === "live" ? "opacity-100" : "opacity-0"}`}
+            />
+          )}
 
           {/* Real-time Face Alignment Guide Frame Overlay */}
-          <FaceAlignmentGuideOverlay alignment={alignment} />
+          {!capturedFrame && <FaceAlignmentGuideOverlay alignment={alignment} />}
 
           {/* Real-time Lighting Assistant Overlay pinned cleanly at top of viewfinder */}
-          <div className="absolute top-3 inset-x-3 z-20">
-            <LightingAssistantOverlay reading={lighting} />
-          </div>
+          {!capturedFrame && (
+            <div className="absolute top-3 inset-x-3 z-20">
+              <LightingAssistantOverlay reading={lighting} />
+            </div>
+          )}
 
           {/* Starting / Camera Unavailable Center Panel */}
-          {cameraState !== "live" && (
+          {!capturedFrame && cameraState !== "live" && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center pointer-events-auto">
               <div className="max-w-[290px] rounded-2xl bg-zinc-950/85 backdrop-blur-md border border-white/15 p-4 space-y-3 shadow-xl">
                 {cameraState === "starting" ? (
@@ -423,6 +460,35 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
         {/* Bottom Camera Controls Bar */}
         <div className="px-5 py-4 bg-zinc-950 border-t border-white/10 flex items-center justify-between gap-4 z-20">
+          {capturedFrame ? (
+            <>
+              <button
+                type="button"
+                onClick={handleRetakePhoto}
+                className="min-h-[44px] px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Chụp lại</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPhoto}
+                className="min-h-[46px] px-6 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-zinc-950 text-sm font-bold inline-flex items-center gap-2 cursor-pointer"
+                data-testid="camera-confirm-photo"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Sử dụng ảnh này</span>
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="min-h-[44px] px-3 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-medium cursor-pointer"
+              >
+                Hủy
+              </button>
+            </>
+          ) : (
+            <>
           <button
             type="button"
             onClick={() => {
@@ -464,6 +530,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
           >
             Đóng
           </button>
+            </>
+          )}
         </div>
       </div>
     </div>
