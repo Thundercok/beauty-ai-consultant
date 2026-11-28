@@ -1147,7 +1147,7 @@ export default function App() {
       {/* Quiet Desktop Footer */}
       <footer className="hidden md:block border-t border-[#E5E5E5] bg-white mt-auto">
         <div className="max-w-[1280px] mx-auto px-6 py-4 flex items-center justify-between text-xs text-[#737373]">
-          <span>Beauty AI · Xử lý ngay trên máy, không gửi ảnh lên máy chủ</span>
+          <span>Beauty AI · Xử lý ngay trên máy, không gửi ảnh lên máy chủ · <a href="https://github.com/Thundercok" target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[#111111]">Built by @Thundercok</a></span>
           <span className="font-mono tabular-nums">{products.length} sản phẩm</span>
         </div>
       </footer>
