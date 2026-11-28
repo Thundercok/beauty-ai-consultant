@@ -282,7 +282,7 @@ export function estimateNonskinIlluminant(
   ]);
 }
 
-function buildBradfordRgbMatrix(estIlluminantLinear: [number, number, number]): number[][] {
+export function buildBradfordRgbMatrix(estIlluminantLinear: [number, number, number]): number[][] {
   const srcWhiteXyz = mat3Vec(SRGB_TO_XYZ_MATRIX, normalizeIlluminantLuma(estIlluminantLinear));
   const dstWhiteXyz = WHITEPOINTS.D65;
 

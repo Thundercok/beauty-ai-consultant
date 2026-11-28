@@ -3,11 +3,18 @@ import { extractRelativeChromophoresSrgb } from "./chromophores";
 import {
   applyBradfordWhiteBalance,
   applyNaturalDaylightRelighting,
+  buildBradfordRgbMatrix,
   estimateNonskinIlluminant,
   illuminantLocusLinearRgb,
   projectToPlanckianLocus,
 } from "./colorConstancy";
 import { buildSkinMetrics, classifyFaceShapeFromRatios, classifySeason, resolveGlowupProfile } from "./faceAnalysis";
+import {
+  type LinearRgb,
+  clippedChannels,
+  estimateSkinChannelRatios,
+  reconstructClippedPixel,
+} from "./highlightRecovery";
 import {
   FEATURE_POLYGONS,
   INNER_LIP_INDICES,
@@ -325,9 +332,6 @@ function buildFallbackBoxMasks(width: number, height: number, box: FaceLandmarks
   };
 }
 
-/** 8-bit value at or above which a camera channel is treated as clipped. */
-const CLIPPED_CHANNEL = 250;
-
 /** Margin around the face hull, as a share of its width, kept out of illuminant estimation. */
 const ILLUMINANT_EXCLUSION_MARGIN = 0.15;
 
@@ -384,8 +388,10 @@ function sampleSkinFromImage(
   height: number,
   faceHullMask: Uint8Array,
   featureExclusionMask: Uint8Array,
-  /** Uncorrected camera pixels, used only to skip channels the camera clipped */
-  sourceRgba: Uint8ClampedArray = rgba
+  /** Uncorrected camera pixels, used to find and rebuild channels the camera clipped */
+  sourceRgba: Uint8ClampedArray = rgba,
+  /** Linear-RGB matrix that turned sourceRgba into rgba; null when no correction was applied */
+  correctionRgb: number[][] | null = null
 ) {
   const n = width * height;
   const skinMask = new Uint8Array(n);
@@ -396,30 +402,60 @@ function sampleSkinFromImage(
   let hemIndexSum = 0;
   let skinCount = 0;
 
+  const acceptIfSkin = (i: number, r: number, g: number, b: number): boolean => {
+    const [h, s, v] = rgbToHsvOpenCv(r, g, b);
+    if (!((h <= 25 || h >= 170) && s >= 20 && s <= 220 && v >= 55)) return false;
+    skinMask[i] = 1;
+    const [lStar, aStar, bStar] = rgbToLab([r, g, b]);
+    lVals.push(lStar);
+    aVals.push(aStar);
+    bVals.push(bStar);
+    melIndexSum += 100 * Math.log10(255 / (r + 1));
+    hemIndexSum += 100 * Math.log10((r + 1) / (g + 1));
+    skinCount++;
+    return true;
+  };
+
+  const linearSource = (idx: number): LinearRgb => [
+    srgbChannelToLinear(sourceRgba[idx]),
+    srgbChannelToLinear(sourceRgba[idx + 1]),
+    srgbChannelToLinear(sourceRgba[idx + 2]),
+  ];
+
+  // Pass 1: pixels the camera recorded in full. Their channel ratios are the reference for pass 2.
+  const clippedPixels: number[] = [];
+  const ratioSamples: LinearRgb[] = [];
   for (let i = 0; i < n; i++) {
     if (!faceHullMask[i] || featureExclusionMask[i]) continue;
     const idx = i * 4;
-    // A clipped channel has lost its true value; white balance cannot bring the hue back.
-    if (
-      sourceRgba[idx] >= CLIPPED_CHANNEL ||
-      sourceRgba[idx + 1] >= CLIPPED_CHANNEL ||
-      sourceRgba[idx + 2] >= CLIPPED_CHANNEL
-    ) {
+    if (clippedChannels(sourceRgba[idx], sourceRgba[idx + 1], sourceRgba[idx + 2]).some(Boolean)) {
+      clippedPixels.push(i);
       continue;
     }
-    const r = rgba[idx];
-    const g = rgba[idx + 1];
-    const b = rgba[idx + 2];
-    const [h, s, v] = rgbToHsvOpenCv(r, g, b);
-    if ((h <= 25 || h >= 170) && s >= 20 && s <= 220 && v >= 55) {
-      skinMask[i] = 1;
-      const [lStar, aStar, bStar] = rgbToLab([r, g, b]);
-      lVals.push(lStar);
-      aVals.push(aStar);
-      bVals.push(bStar);
-      melIndexSum += 100 * Math.log10(255 / (r + 1));
-      hemIndexSum += 100 * Math.log10((r + 1) / (g + 1));
-      skinCount++;
+    if (acceptIfSkin(i, rgba[idx], rgba[idx + 1], rgba[idx + 2])) {
+      ratioSamples.push(linearSource(idx));
+    }
+  }
+
+  // Pass 2: clipped pixels, rebuilt from the surviving channels. Leaving them out entirely
+  // would keep only the shadow side of a lamp-lit face and bias L* (and season) towards deep.
+  let recoveredHighlightPixels = 0;
+  const ratios = clippedPixels.length ? estimateSkinChannelRatios(ratioSamples) : null;
+  if (ratios) {
+    const m = correctionRgb ?? [
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+    ];
+    for (const i of clippedPixels) {
+      const idx = i * 4;
+      const clipped = clippedChannels(sourceRgba[idx], sourceRgba[idx + 1], sourceRgba[idx + 2]);
+      const rebuilt = reconstructClippedPixel(linearSource(idx), clipped, ratios);
+      if (!rebuilt) continue;
+      const corrected = m.map((row) =>
+        linearChannelToSrgb(row[0] * rebuilt[0] + row[1] * rebuilt[1] + row[2] * rebuilt[2])
+      );
+      if (acceptIfSkin(i, corrected[0], corrected[1], corrected[2])) recoveredHighlightPixels++;
     }
   }
 
@@ -483,6 +519,7 @@ function sampleSkinFromImage(
     hemIndex: hemIndexSum / Math.max(1, skinCount),
     skinCount,
     verifiedSkinCount,
+    recoveredHighlightPixels,
     faceRegionPixels,
     usedRegionFallback,
   };
@@ -515,6 +552,7 @@ export function runPortraitAnalysisPipeline(
   //   so skin and lip colour stay the same whatever room light the photo was taken under.
   let correctedRgba: Uint8ClampedArray;
   let colorimetricRgba: Uint8ClampedArray;
+  let colorimetricMatrix: number[][] | null = null;
 
   if (options.wbMethod === "none") {
     correctedRgba = new Uint8ClampedArray(originalRgba);
@@ -540,6 +578,7 @@ export function runPortraitAnalysisPipeline(
       faceHullMask,
     });
     colorimetricRgba = applyBradfordWhiteBalance(originalRgba, proj.illuminantLinear);
+    colorimetricMatrix = buildBradfordRgbMatrix(proj.illuminantLinear);
     wbDiagnostics = {
       method: options.wbMethod,
       estimatedCctK: Number(proj.cctKelvin.toFixed(1)),
@@ -554,7 +593,8 @@ export function runPortraitAnalysisPipeline(
     height,
     faceHullMask,
     featureExclusionMask,
-    originalRgba
+    originalRgba,
+    colorimetricMatrix
   );
 
   const skinMetrics = buildSkinMetrics(
@@ -687,6 +727,7 @@ export function runPortraitAnalysisPipeline(
     landmarkCount: options.neuralLandmarks?.length ?? 0,
     skinEvidence: {
       verifiedSkinPixels: skinSample.verifiedSkinCount,
+      recoveredHighlightPixels: skinSample.recoveredHighlightPixels,
       faceRegionPixels: skinSample.faceRegionPixels,
       usedRegionFallback: skinSample.usedRegionFallback,
     },

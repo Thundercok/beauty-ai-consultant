@@ -144,6 +144,11 @@ export interface RelightingExperimentReport {
 export interface SkinEvidence {
   /** Pixels inside the face region that passed the HSV skin-colour gate */
   verifiedSkinPixels: number;
+  /**
+   * How many of verifiedSkinPixels had a clipped camera channel that was rebuilt from the
+   * other two. Optional so reports built before highlight recovery still type-check.
+   */
+  recoveredHighlightPixels?: number;
   /** All pixels inside the face region (eyes, brows and lips excluded) */
   faceRegionPixels: number;
   /** True when too few skin pixels were found and every face-region pixel was averaged instead */
