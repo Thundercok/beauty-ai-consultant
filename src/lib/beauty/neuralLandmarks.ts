@@ -78,8 +78,8 @@ async function getFaceLandmarker(): Promise<FaceLandmarker> {
           },
           runningMode: "IMAGE",
           numFaces: 2,
-          minFaceDetectionConfidence: 0.45,
-          minFacePresenceConfidence: 0.45,
+          minFaceDetectionConfidence: 0.35,
+          minFacePresenceConfidence: 0.35,
         });
         landmarkerReady = true;
         return instance;

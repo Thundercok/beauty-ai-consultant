@@ -14,7 +14,7 @@ Generated from direct inspection of the repository source, bundled assets, catal
 | Model & WASM Assets | `public/mediapipe/face_landmarker.task` (**3.6 MB**), `public/mediapipe/wasm/vision_wasm_internal.wasm` & `vision_wasm_module_internal.wasm` (copied cleanly to `dist/mediapipe/wasm/` via `copyMediaPipeWasmPlugin`) |
 | Product Catalog | `data/product_database.csv` (**25 KB**, **217 records**, **48 unique brands**, 13 product types) |
 | Persistence | Local-only IndexedDB v1 + `localStorage` / memory fallback (`src/lib/beauty/localProfileStore.ts`). Raw portrait pixel buffers are NOT persisted to storage. |
-| Automated Tests | `node:test` via `tsx` under `src/lib/beauty/*.test.ts` (**107 passing tests**) |
+| Automated Tests | `node:test` via `tsx` under `src/lib/beauty/*.test.ts` (**114 passing tests**) |
 
 ### Catalog Data Integrity Check (Verified on all 217 rows via `validateCatalog()`)
 - Invalid HEX color codes: **0 / 217**
@@ -106,18 +106,21 @@ Generated from direct inspection of the repository source, bundled assets, catal
 
 ## 8. Deep Colorimetry & Recommendation Engine Audit (`productMatcher.ts`, `bradfordCat.ts`, `kubelkaMunk.ts`)
 
-### 8.1 CIEDE2000 Verification (`src/lib/beauty/productMatcher.ts`)
-- **Reference Benchmark:** Verified against **29 published test pairs from Sharma, Wu & Dalal (2005), Table 1** (`kL = kC = kH = 1`), covering blue-region rotation (`R_T` near `h̄' = 275°`), achromatic `C' = 0` pairs, hue wrap-around across `0°/360°` (`h1' + h2' < 360°` and `≥ 360°`), and extreme lightness `S_L` near `L* = 2` and `L* = 91`.
-- **Observed Precision:** Maximum absolute error across all 29 Sharma pairs is **`< 0.0001`** (exact to 4 decimal places), with strict symmetry `ΔE₀₀(A, B) === ΔE₀₀(B, A)` (`< 1e-12`).
+### 8.1 CIEDE2000 Verification (`src/lib/beauty/productMatcher.ts` — note: `ciede2000` resides in `productMatcher.ts`, while `bradfordCat.ts` provides sRGB/XYZ/CIELAB and Bradford CAT utilities)
+- **Reference Benchmark:** Verified against **all 34 published test pairs from Sharma, Wu & Dalal (2005), Table 1** (`kL = kC = kH = 1`), including the `|h1' - h2'| = 180°` hue-mean discontinuity pairs (#11–#14), blue-region rotation (`R_T` near `h̄' = 275°`), achromatic `C' = 0` pairs, and extreme lightness `S_L` near `L* = 2` and `L* = 91`.
+- **Observed Precision:** Maximum absolute error across all 34 Sharma pairs is **`4.95 × 10⁻⁵`** (`< 0.0001`, exact to all 4 published decimal places), with strict symmetry `ΔE₀₀(A, B) === ΔE₀₀(B, A)` (`< 1e-12`).
 - **Hardening Applied:** Added explicit Sharma Eq. (7) zero-chroma / IEEE-754 negative-zero guard (`a' === 0 && b === 0 => h' = 0`) and Eq. (10) `C1' * C2' === 0 => Δh' = 0` guard plus `Math.max(0, ...)` under the outer square root.
 
 ### 8.2 Bradford CAT & sRGB/XYZ/CIELAB Verification (`src/lib/beauty/bradfordCat.ts`)
-- **Reference Standards:** Verified against **IEC 61966-2-1** (sRGB transfer function & D65 primaries), **ASTM E308 / CIE 1931 2°** whitepoints (`D50`, `D65`), and **Lam (1985) / Bruce Lindbloom** Bradford chromatic adaptation matrices.
+- **Reference Standards:** Verified against **IEC 61966-2-1** (sRGB transfer function & D65 primaries), **ASTM E308 / CIE 1931 2°** whitepoints (`D50`, `D65`), **CIE 1976** exact rational threshold `ε = (6/29)³`, and **Lam (1985) / Bruce Lindbloom** Bradford chromatic adaptation matrices (`D50 ↔ D65`).
 - **Measured Accuracy:**
   - `BRADFORD_MATRIX × BRADFORD_INV_MATRIX` max residual vs identity: **`8.45 × 10⁻⁸`**
   - `SRGB_TO_XYZ_MATRIX × XYZ_TO_SRGB_MATRIX` max residual vs identity: **`1.42 × 10⁻⁷`**
-  - Computed Bradford `D50 → D65` 3×3 matrix vs Lindbloom published matrix max element error: **`1.27 × 10⁻⁷`**
+  - Computed Bradford `D50 → D65` vs Lindbloom published matrix max element error: **`1.27 × 10⁻⁷`**
+  - Computed Bradford `D65 → D50` vs Lindbloom published matrix max element error: **`7.48 × 10⁻⁸`**
+  - `xyzToLab` ↔ `labToXyz` round-trip across CIE rational `ε = (6/29)³`: max error **`1.11 × 10⁻¹⁶`**
   - `rgbToLab` on sRGB primaries & neutrals (`White`, `Black`, `Red`, `Green`, `Blue`, `Gray128`) vs Lindbloom D65 CIELAB reference: **`ΔE₀₀ ≤ 0.00003`**
+- **Hardening Applied (`AUD-16`):** Fixed `hexToRgb()` to enforce strict `/^[0-9A-Fa-f]{6}$/` validation (preventing `parseInt("1Z", 16) === 1` partial-hex coercion) and added `Number.isFinite()` guards in `srgbChannelToLinear()` / `linearChannelToSrgb()`.
 - **Documented D50 Workflow Caveat:** `matchProducts(..., { catalogIlluminant: "D50" })` converts swatch hex via `hexToLab` (sRGB D65) and then adapts Lab from `D50 → D65` via `adaptLabBradford`. This is appropriate when the hex values originate from ICC D50 PCS-converted swatch tables (white stays white with `ΔE₀₀ = 0`), but cannot recover true spectral shift of an unknown studio-lit photograph.
 
 ### 8.3 Kubelka–Munk Lip Model Audit & Bug Fix (`src/lib/beauty/kubelkaMunk.ts`)
@@ -128,8 +131,11 @@ Generated from direct inspection of the repository source, bundled assets, catal
   3. **No Saunderson Surface Correction:** Omits front-surface Fresnel specular reflection (`k1 ≈ 0.04`) and internal diffuse reflection (`k2 ≈ 0.4–0.6`), which visibly alters dark glossy shades (`Mirror Gloss`, `Juicy Tint`).
   4. **Heuristic Texture Constants:** `TEXTURE_KS_MAP` (`scattering`, `thickness`) are uncalibrated visual approximations, not spectrophotometer-measured `K(λ)/S(λ)` curves, and do not model staining/pH dyes, shimmer/pearl, wear-down, or oxidation.
 
-### 8.4 Recommendation Engine Integrity Audit (`src/lib/beauty/productMatcher.ts`, `viLabels.ts`, `virtualMakeup.ts`)
-- **Documented CIEDE2000 Thresholds Fixed (`AUD-09`):** Previously `matchProducts` labeled every shade with `ΔE₀₀ ≥ 2.0` (including completely unrelated shades at `ΔE₀₀ = 25.38`) as `"Close Alternative"`. Replaced with exported `CIEDE2000_SIMILARITY_THRESHOLDS` (`< 1.0 Exact Match`, `< 2.0 Great Match`, `< 5.0 Close Alternative`, `≥ 5.0 Distant Shade`) and `classifyColorSimilarityTier()`.
-- **Suitability Probability Separation (`AUD-10`):** Updated `translateMatchTier()` in `viLabels.ts` from personal suitability claims (`"Rất hợp với bạn"`, `"Hợp tự nhiên"`) to honest color-similarity descriptions (`"Rất gần màu mục tiêu"`, `"Gần màu mục tiêu"`, `"Cùng họ sắc độ"`, `"Khác sắc độ đáng kể"`). Documented `deltaEToMatchPercent()` in `virtualMakeup.ts` explicitly as a monotonic UI rescaling (`clamp(round(99 - 2.15 × ΔE₀₀), 52, 99)`), not a calibrated cosmetic suitability probability.
-- **Unverified Popularity Claims Removed (`AUD-11`):** In `scoreMatchedProductsPopularity()`, replaced substring season checks with exact comma-separated token matching, exported explicit `EDITORIAL_CURATION_WEIGHTS`, and replaced unverified retail sales copy (`"Dòng bán chạy"`) with honest catalog metadata copy (`"Dòng quen thuộc"`, `"Gần màu & trùng mùa"`, `"Thương hiệu nội địa VN"`, `"Gắn nhãn nhiều mùa"`).
+### 8.4 Recommendation Engine Integrity Audit (`src/lib/beauty/productMatcher.ts`, `CatalogMatcher.tsx`, `ToneHomeView.tsx`, `ProductDetailSheet.tsx`, `reportExport.ts`, `viLabels.ts`, `virtualMakeup.ts`)
+- **Documented CIEDE2000 Thresholds Fixed (`AUD-09`):** Previously `matchProducts` labeled every shade with `ΔE₀₀ ≥ 2.0` (including completely unrelated shades at `ΔE₀₀ = 25.38`) as `"Close Alternative"`. Replaced with exported `CIEDE2000_SIMILARITY_THRESHOLDS` (`< 1.0 Exact Match`, `< 2.0 Great Match`, `< 5.0 Close Alternative`, `≥ 5.0 Distant Shade`), `classifyColorSimilarityTier()`, and `describeColorSimilarity()`.
+- **Suitability Probability Separation (`AUD-10` & `AUD-12`):** Updated `translateMatchTier()` in `viLabels.ts` from personal suitability claims to honest color-similarity descriptions, and replaced rescaled `% hợp` / `% hợp màu` / `% khớp màu` badges across `CatalogMatcher.tsx`, `ToneHomeView.tsx`, `ProductDetailSheet.tsx`, and `reportExport.ts` with documented CIEDE2000 similarity tiers and raw `ΔE₀₀` distance (previously `deltaEToMatchPercent(5.0)` rendered `"88% hợp"` for a `"Distant Shade"`).
+- **Unverified Popularity & Curation Override Fixed (`AUD-11` & `AUD-13`):** In `scoreMatchedProductsPopularity()`, unscored/unpersonalized items (`deltaE === null` or `isPersonalized === false`) now strictly receive `popularityScore = 0` and `isPopular = false` (never boosted by static brand/season tags), `"Distant Shade"` items (`ΔE₀₀ ≥ 5.0`) are hard-gated from `isPopular: true`, and metadata curation bonuses are scaled (`0.25×`) beyond `CLOSE_MAX` so static brand/line familiarity can never push a distant shade above an `"Exact Match"`.
+- **Non-Colorimetric Category Gating (`AUD-14`):** Added `COLORIMETRIC_MATCH_PRODUCT_TYPES` (`lipstick`, `blush`, `eyeshadow`, `foundation`, `concealer`, `powder`) and `isColorimetricMatchProductType()` in `productMatcher.ts`, and updated `CatalogMatcher.tsx` so non-colorimetric categories (`glasses`, `mascara`, `eyeliner`, `setting_spray`, `contour`, `eyebrow`, `highlighter`) are displayed as honest catalog browse items (`deltaE: null`, `similarityBasis: "catalog_browse_only"`) instead of being scored against bare `skinHex`.
+- **Strict Catalog Record & Missing-Data Gating (`AUD-15`):** `matchProducts()` now enforces `validateCatalogRecord(row).validForColorMatch` (rejecting rows with missing `brand`, `product_name`, `product_type`, or invalid HEX), guards against non-finite `lipBaseLab` / `seasonProbabilities`, and surfaces `similarityBasis` + `missingMetadataFields` explicitly on `MatchedProduct`.
+
 

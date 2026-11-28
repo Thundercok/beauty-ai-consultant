@@ -45,6 +45,10 @@ export interface MatchedProduct {
   matchTier: "Exact Match" | "Great Match" | "Close Alternative" | "Distant Shade" | null;
   /** Explicitly distinguishes personalized matches from unanalyzed catalog browse items */
   isPersonalized?: boolean;
+  /** Documents exact colorimetric basis used to compute deltaE (or browse-only when unmeasured) */
+  similarityBasis?: "ciede2000_d65_kubelka_munk_lip" | "ciede2000_d65_swatch" | "catalog_browse_only";
+  /** Optional catalog warnings for missing non-HEX attributes (e.g. UNKNOWN_UNDERTONE) */
+  missingMetadataFields?: string[];
   undertone: string;
   bestSeasons: string;
 }

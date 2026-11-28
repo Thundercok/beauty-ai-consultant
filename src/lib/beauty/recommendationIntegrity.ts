@@ -179,6 +179,7 @@ export function catalogProductToBrowseItem(product: CatalogProduct): MatchedProd
     deltaE: null,
     matchTier: null,
     isPersonalized: false,
+    similarityBasis: "catalog_browse_only",
     undertone: product.undertone,
     bestSeasons: product.best_seasons,
   };

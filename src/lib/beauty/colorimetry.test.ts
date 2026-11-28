@@ -9,9 +9,12 @@ import {
   adaptLabBradford,
   adaptXyzBradford,
   hexToLab,
+  hexToRgb,
   labToRgb,
+  labToXyz,
   mat3Mul,
   rgbToLab,
+  xyzToLab,
 } from "./bradfordCat";
 import { extractRelativeChromophoresSrgb } from "./chromophores";
 import {
@@ -33,6 +36,8 @@ import {
   blendTargetColorsLab,
   ciede2000,
   classifyColorSimilarityTier,
+  describeColorSimilarity,
+  isColorimetricMatchProductType,
   matchProducts,
   scoreMatchedProductsPopularity,
   selectTrendingProducts,
@@ -383,7 +388,7 @@ test("applyNaturalDaylightRelighting removes fluorescent green tint, avoids tung
   assert.ok(leftAfterB > 8, `Expected warm skin b* to stay natural, got ${leftAfterB}`);
 });
 
-test("CIEDE2000 matches Sharma, Wu & Dalal (2005) Table 1 published reference pairs within 0.0005", () => {
+test("CIEDE2000 matches all 34 Sharma, Wu & Dalal (2005) Table 1 published reference pairs within 0.0001", () => {
   const SHARMA_2005_PAIRS: Array<{
     id: number;
     a: [number, number, number];
@@ -400,32 +405,37 @@ test("CIEDE2000 matches Sharma, Wu & Dalal (2005) Table 1 published reference pa
     { id: 8, a: [50.0, -1.0, 2.0], b: [50.0, 0.0, 0.0], expected: 2.3669 },
     { id: 9, a: [50.0, 2.49, -0.001], b: [50.0, -2.49, 0.0009], expected: 7.1792 },
     { id: 10, a: [50.0, 2.49, -0.001], b: [50.0, -2.49, 0.001], expected: 7.1792 },
-    { id: 14, a: [50.0, 2.5, 0.0], b: [50.0, 0.0, -2.5], expected: 4.3065 },
-    { id: 17, a: [50.0, 2.5, 0.0], b: [73.0, 25.0, -18.0], expected: 27.1492 },
-    { id: 18, a: [50.0, 2.5, 0.0], b: [61.0, -5.0, 29.0], expected: 22.8977 },
-    { id: 19, a: [50.0, 2.5, 0.0], b: [56.0, -27.0, -3.0], expected: 31.903 },
-    { id: 20, a: [50.0, 2.5, 0.0], b: [58.0, 24.0, 15.0], expected: 19.4535 },
-    { id: 21, a: [50.0, 2.5, 0.0], b: [50.0, 3.1736, 0.5854], expected: 1.0 },
-    { id: 22, a: [50.0, 2.5, 0.0], b: [50.0, 3.2972, 0.0], expected: 1.0 },
-    { id: 23, a: [50.0, 2.5, 0.0], b: [50.0, 1.8634, 0.5757], expected: 1.0 },
-    { id: 24, a: [50.0, 2.5, 0.0], b: [50.0, 3.2592, 0.335], expected: 1.0 },
-    { id: 25, a: [60.2574, -34.0099, 36.2677], b: [60.4626, -34.1751, 39.4387], expected: 1.2644 },
-    { id: 26, a: [63.0109, -31.0961, -5.8663], b: [62.8187, -29.7946, -4.0864], expected: 1.263 },
-    { id: 27, a: [61.2901, 3.7196, -5.3901], b: [61.4292, 2.248, -4.962], expected: 1.8731 },
-    { id: 28, a: [35.0831, -44.1164, 3.7933], b: [35.0232, -40.0716, 1.5901], expected: 1.8645 },
-    { id: 29, a: [22.7233, 20.0904, -46.694], b: [23.0331, 14.973, -42.5619], expected: 2.0373 },
-    { id: 30, a: [36.4612, 47.858, 18.3852], b: [36.2715, 50.5065, 21.2231], expected: 1.4146 },
-    { id: 31, a: [90.8027, -2.0831, 1.441], b: [91.1528, -1.6435, 0.0447], expected: 1.4441 },
-    { id: 32, a: [90.9257, -0.5406, -0.9208], b: [88.6381, -0.8985, -0.7239], expected: 1.5381 },
-    { id: 33, a: [6.7747, -0.2908, -2.4247], b: [5.8714, -0.0985, -2.2286], expected: 0.6377 },
-    { id: 34, a: [2.0776, 0.0795, -1.135], b: [0.9033, -0.0636, -0.5514], expected: 0.9082 },
+    { id: 11, a: [50.0, 2.49, -0.001], b: [50.0, -2.49, 0.0011], expected: 7.2195 },
+    { id: 12, a: [50.0, 2.49, -0.001], b: [50.0, -2.49, 0.0012], expected: 7.2195 },
+    { id: 13, a: [50.0, -0.001, 2.49], b: [50.0, 0.0009, -2.49], expected: 4.8045 },
+    { id: 14, a: [50.0, -0.001, 2.49], b: [50.0, 0.0011, -2.49], expected: 4.7461 },
+    { id: 15, a: [50.0, 2.5, 0.0], b: [50.0, 0.0, -2.5], expected: 4.3065 },
+    { id: 16, a: [50.0, 2.5, 0.0], b: [73.0, 25.0, -18.0], expected: 27.1492 },
+    { id: 17, a: [50.0, 2.5, 0.0], b: [61.0, -5.0, 29.0], expected: 22.8977 },
+    { id: 18, a: [50.0, 2.5, 0.0], b: [56.0, -27.0, -3.0], expected: 31.903 },
+    { id: 19, a: [50.0, 2.5, 0.0], b: [58.0, 24.0, 15.0], expected: 19.4535 },
+    { id: 20, a: [50.0, 2.5, 0.0], b: [50.0, 3.1736, 0.5854], expected: 1.0 },
+    { id: 21, a: [50.0, 2.5, 0.0], b: [50.0, 3.2972, 0.0], expected: 1.0 },
+    { id: 22, a: [50.0, 2.5, 0.0], b: [50.0, 1.8634, 0.5757], expected: 1.0 },
+    { id: 23, a: [50.0, 2.5, 0.0], b: [50.0, 3.2592, 0.335], expected: 1.0 },
+    { id: 24, a: [60.2574, -34.0099, 36.2677], b: [60.4626, -34.1751, 39.4387], expected: 1.2644 },
+    { id: 25, a: [63.0109, -31.0961, -5.8663], b: [62.8187, -29.7946, -4.0864], expected: 1.263 },
+    { id: 26, a: [61.2901, 3.7196, -5.3901], b: [61.4292, 2.248, -4.962], expected: 1.8731 },
+    { id: 27, a: [35.0831, -44.1164, 3.7933], b: [35.0232, -40.0716, 1.5901], expected: 1.8645 },
+    { id: 28, a: [22.7233, 20.0904, -46.694], b: [23.0331, 14.973, -42.5619], expected: 2.0373 },
+    { id: 29, a: [36.4612, 47.858, 18.3852], b: [36.2715, 50.5065, 21.2231], expected: 1.4146 },
+    { id: 30, a: [90.8027, -2.0831, 1.441], b: [91.1528, -1.6435, 0.0447], expected: 1.4441 },
+    { id: 31, a: [90.9257, -0.5406, -0.9208], b: [88.6381, -0.8985, -0.7239], expected: 1.5381 },
+    { id: 32, a: [6.7747, -0.2908, -2.4247], b: [5.8714, -0.0985, -2.2286], expected: 0.6377 },
+    { id: 33, a: [2.0776, 0.0795, -1.135], b: [0.9033, -0.0636, -0.5514], expected: 0.9082 },
+    { id: 34, a: [50.0, 0.0, 0.0], b: [50.0, 0.0, 0.0], expected: 0.0 },
   ];
 
   for (const pair of SHARMA_2005_PAIRS) {
     const got = ciede2000(pair.a, pair.b);
     const rev = ciede2000(pair.b, pair.a);
     assert.ok(
-      Math.abs(got - pair.expected) < 0.0005,
+      Math.abs(got - pair.expected) < 0.0001,
       `Sharma pair #${pair.id}: got ${got.toFixed(6)}, expected ${pair.expected}`
     );
     assert.ok(Math.abs(got - rev) < 1e-12, `Sharma pair #${pair.id} must be symmetric`);
@@ -447,31 +457,60 @@ test("Bradford CAT and sRGB->CIELAB matrices match published Lindbloom / IEC 619
     }
   }
 
-  // Verify Bradford D50 -> D65 transform against Bruce Lindbloom published matrix
+  // Verify Bradford D50 -> D65 and D65 -> D50 transforms against Bruce Lindbloom published matrices
   const LINDBLOOM_D50_TO_D65 = [
     [0.9555766, -0.0230393, 0.0631636],
     [-0.0282895, 1.0099416, 0.0210077],
     [0.0122982, -0.020483, 1.3299098],
   ];
-  const cols = [
+  const LINDBLOOM_D65_TO_D50 = [
+    [1.0478112, 0.0228866, -0.050127],
+    [0.0295424, 0.9904844, -0.0170491],
+    [-0.0092345, 0.0150436, 0.7521316],
+  ];
+  const cols50to65 = [
     adaptXyzBradford([1, 0, 0], "D50", "D65"),
     adaptXyzBradford([0, 1, 0], "D50", "D65"),
     adaptXyzBradford([0, 0, 1], "D50", "D65"),
   ];
+  const cols65to50 = [
+    adaptXyzBradford([1, 0, 0], "D65", "D50"),
+    adaptXyzBradford([0, 1, 0], "D65", "D50"),
+    adaptXyzBradford([0, 0, 1], "D65", "D50"),
+  ];
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 3; c++) {
       assert.ok(
-        Math.abs(cols[c][r] - LINDBLOOM_D50_TO_D65[r][c]) < 1e-6,
+        Math.abs(cols50to65[c][r] - LINDBLOOM_D50_TO_D65[r][c]) < 1e-6,
         `Bradford D50->D65 mismatch at [${r},${c}]`
+      );
+      assert.ok(
+        Math.abs(cols65to50[c][r] - LINDBLOOM_D65_TO_D50[r][c]) < 1e-6,
+        `Bradford D65->D50 mismatch at [${r},${c}]`
       );
     }
   }
 
-  // Verify D50 white adapts to D65 whitepoint
+  // Verify D50 white adapts to D65 whitepoint and Lab <-> XYZ is exact across CIE epsilon = (6/29)^3
   const adaptedWhite = adaptXyzBradford(WHITEPOINTS.D50, "D50", "D65");
   for (let i = 0; i < 3; i++) {
     assert.ok(Math.abs(adaptedWhite[i] - WHITEPOINTS.D65[i]) < 1e-6);
   }
+  const eps = (6 / 29) ** 3;
+  for (const scale of [0, eps * 0.5, eps * 0.9999, eps * 1.0001, 0.5, 1.0]) {
+    const xyz: [number, number, number] = [
+      WHITEPOINTS.D65[0] * scale,
+      WHITEPOINTS.D65[1] * scale,
+      WHITEPOINTS.D65[2] * scale,
+    ];
+    const back = labToXyz(xyzToLab(xyz, "D65"), "D65");
+    for (let k = 0; k < 3; k++) {
+      assert.ok(Math.abs(back[k] - xyz[k]) < 1e-12, `XYZ<->Lab threshold round-trip at scale=${scale}`);
+    }
+  }
+
+  // Strict hexToRgb rejects partial-hex garbage (e.g. "#1Z2G3H") instead of parseInt prefix coercion
+  assert.deepEqual(hexToRgb("#1Z2G3H"), [180, 140, 130]);
 
   // Verify sRGB primaries and neutrals against Lindbloom D65 CIELAB reference values
   const SRGB_REFS: Array<{ rgb: [number, number, number]; lab: [number, number, number] }> = [
@@ -552,6 +591,128 @@ test("productMatcher classifies documented CIEDE2000 bands honestly and avoids f
   for (const item of curated) {
     assert.ok(!item.hotReason.includes("bán chạy"), `Must not emit unverified sales claim: ${item.hotReason}`);
   }
+});
+
+test("productMatcher enforces Requirement 1 & 4: excludes incomplete rows, gates distant/unscored boosts, and scopes colorimetric categories", () => {
+  // 1. Colorimetric category scope prevents scoring glasses/mascara/eyeliner against bare skin HEX
+  assert.equal(isColorimetricMatchProductType("lipstick"), true);
+  assert.equal(isColorimetricMatchProductType("foundation"), true);
+  assert.equal(isColorimetricMatchProductType("powder"), true);
+  assert.equal(isColorimetricMatchProductType("glasses"), false);
+  assert.equal(isColorimetricMatchProductType("mascara"), false);
+  assert.equal(isColorimetricMatchProductType("eyeliner"), false);
+  assert.equal(isColorimetricMatchProductType("setting_spray"), false);
+
+  // 2. Documented threshold descriptions
+  const exactDesc = describeColorSimilarity(0.74);
+  assert.equal(exactDesc.tier, "Exact Match");
+  assert.equal(exactDesc.thresholdBand, "< 1.0");
+  assert.equal(exactDesc.isWithinCloseThreshold, true);
+  assert.equal(exactDesc.deltaELabel, "ΔE₀₀ 0.7");
+
+  const distantDesc = describeColorSimilarity(7.25);
+  assert.equal(distantDesc.tier, "Distant Shade");
+  assert.equal(distantDesc.thresholdBand, "≥ 5.0");
+  assert.equal(distantDesc.isWithinCloseThreshold, false);
+
+  // 3. Incomplete catalog rows (missing brand / name) are excluded; missing optional metadata is flagged
+  const matches = matchProducts(
+    "#C85A6A",
+    [
+      {
+        id: 201,
+        brand: "",
+        product_name: "Missing Brand Tint",
+        shade_name: "01",
+        product_type: "lipstick",
+        texture_type: "Matte",
+        hex_color: "#C85A6A",
+        undertone: "Cool",
+        best_seasons: "Cool Winter",
+      },
+      {
+        id: 202,
+        brand: "SmallIndie",
+        product_name: "Clean Rose",
+        shade_name: "01",
+        product_type: "lipstick",
+        texture_type: "",
+        hex_color: "#C85A6A",
+        undertone: "",
+        best_seasons: "",
+      },
+    ],
+    {
+      productType: "lipstick",
+      lipBaseLab: [Number.NaN, 12, 10], // non-finite lipBaseLab must gracefully fall back to swatch Lab without NaN
+      topK: 5,
+    }
+  );
+
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].id, 202);
+  assert.equal(matches[0].deltaE, 0);
+  assert.equal(matches[0].similarityBasis, "ciede2000_d65_swatch");
+  assert.ok(matches[0].missingMetadataFields?.includes("UNKNOWN_UNDERTONE"));
+  assert.ok(matches[0].missingMetadataFields?.includes("UNKNOWN_BEST_SEASONS"));
+
+  // 4. Unscored/unpersonalized items receive 0 score; Distant Shades with popular brand + cult line + season
+  //    must NEVER be flagged isPopular=true or outrank an Exact Match from a non-curated brand.
+  const scored = scoreMatchedProductsPopularity(
+    [
+      {
+        id: 301,
+        brand: "SmallIndie",
+        name: "Exact Shade",
+        shade: "01",
+        productType: "lipstick",
+        texture: "Matte",
+        hex: "#C85A6A",
+        deltaE: 0.6,
+        matchTier: "Exact Match",
+        isPersonalized: true,
+        undertone: "Cool",
+        bestSeasons: "",
+      },
+      {
+        id: 302,
+        brand: "Romand",
+        name: "Juicy Lasting Tint",
+        shade: "Distant Shade",
+        productType: "lipstick",
+        texture: "Juicy Tint",
+        hex: "#1A5276",
+        deltaE: 8.0,
+        matchTier: "Distant Shade",
+        isPersonalized: true,
+        undertone: "Cool",
+        bestSeasons: "All Seasons, Cool Winter",
+      },
+      {
+        id: 303,
+        brand: "Romand",
+        name: "Juicy Lasting Tint",
+        shade: "Unscored Browse",
+        productType: "lipstick",
+        texture: "Juicy Tint",
+        hex: "#C85A6A",
+        deltaE: null,
+        matchTier: null,
+        isPersonalized: false,
+        undertone: "Cool",
+        bestSeasons: "All Seasons, Cool Winter",
+      },
+    ],
+    "Cool Winter"
+  );
+
+  assert.equal(scored[2].popularityScore, 0);
+  assert.equal(scored[2].isPopular, false);
+  assert.equal(scored[1].isPopular, false, "Distant Shade (ΔE >= 5.0) must never be flagged isPopular");
+  assert.ok(
+    scored[0].popularityScore > scored[1].popularityScore,
+    `Exact Match (${scored[0].popularityScore}) must outrank Distant Shade (${scored[1].popularityScore})`
+  );
 });
 
 

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, FlipHorizontal2, ImagePlus, RefreshCw, X } from "lucide-react";
 import {
   analyzeCameraFrame,
+  computeCoverCrop,
   evaluateAmbientLux,
   type FaceAlignmentReading,
   type LightingReading,
@@ -226,12 +227,14 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       if (!ctx) return;
 
+      const crop = computeCoverCrop(video.videoWidth, video.videoHeight, sampleW, sampleH);
+
       ctx.save();
       if (mirrored) {
         ctx.translate(sampleW, 0);
         ctx.scale(-1, 1);
       }
-      ctx.drawImage(video, 0, 0, sampleW, sampleH);
+      ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, sampleW, sampleH);
       ctx.restore();
 
       const imgData = ctx.getImageData(0, 0, sampleW, sampleH);
@@ -257,10 +260,19 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     const video = videoRef.current;
     if (!video || video.videoWidth === 0 || video.videoHeight === 0) return;
 
+    // Match the 3:4 portrait viewfinder framing so desktop wide webcams don't leave the face tiny
+    const targetAspect = video.videoWidth > video.videoHeight ? 3 / 4 : video.videoWidth / video.videoHeight;
+    const crop = computeCoverCrop(
+      video.videoWidth,
+      video.videoHeight,
+      Math.round(targetAspect * 1000),
+      1000
+    );
+
     const maxWidth = 420;
-    const scale = video.videoWidth > maxWidth ? maxWidth / video.videoWidth : 1;
-    const width = Math.max(64, Math.round(video.videoWidth * scale));
-    const height = Math.max(64, Math.round(video.videoHeight * scale));
+    const scale = crop.sw > maxWidth ? maxWidth / crop.sw : 1;
+    const width = Math.max(64, Math.round(crop.sw * scale));
+    const height = Math.max(64, Math.round(crop.sh * scale));
 
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -273,7 +285,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       ctx.translate(width, 0);
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(video, 0, 0, width, height);
+    ctx.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, width, height);
     ctx.restore();
 
     const imgData = ctx.getImageData(0, 0, width, height);
@@ -430,7 +442,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
             aria-label="Chụp ảnh phân tích"
             className={`w-16 h-16 rounded-full p-1 border-2 transition-all flex items-center justify-center ${
               cameraState === "live"
-                ? lighting.level === "perfect" && alignment.isReady
+                ? alignment.isReady && lighting.level !== "too_dark" && lighting.level !== "too_bright"
                   ? "border-emerald-400 cursor-pointer active:scale-95"
                   : "border-white cursor-pointer active:scale-95"
                 : "border-white/25 opacity-40 cursor-not-allowed"
@@ -438,7 +450,9 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
           >
             <span
               className={`w-full h-full rounded-full transition-colors ${
-                lighting.level === "perfect" && alignment.isReady ? "bg-emerald-400" : "bg-white"
+                alignment.isReady && lighting.level !== "too_dark" && lighting.level !== "too_bright"
+                  ? "bg-emerald-400"
+                  : "bg-white"
               }`}
             />
           </button>

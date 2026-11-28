@@ -1,7 +1,7 @@
 import { SEASON_COLOR_PALETTES } from "./adviceEngine";
 import { adaptLabBradford, hexToLab, labToRgb, rgbToHex, rgbToLab } from "./bradfordCat";
 import { kubelkaMunkLipBlend } from "./kubelkaMunk";
-import { isValidHexColor } from "./recommendationIntegrity";
+import { isValidHexColor, validateCatalogRecord } from "./recommendationIntegrity";
 import type { CatalogProduct, IlluminantName, MatchedProduct, SeasonName } from "./types";
 
 /**
@@ -18,6 +18,25 @@ export const CIEDE2000_SIMILARITY_THRESHOLDS = {
   CLOSE_MAX: 5.0,
 } as const;
 
+/**
+ * Product categories that have a scientifically meaningful colorimetric target
+ * (seasonal lip/blush/eye palette target or measured facial skin shade).
+ * Categories outside this set (e.g. glasses frames, black mascara/eyeliner, setting spray,
+ * contour/highlighter) must NOT be scored by comparing their swatch HEX to bare skin HEX.
+ */
+export const COLORIMETRIC_MATCH_PRODUCT_TYPES = new Set([
+  "lipstick",
+  "blush",
+  "eyeshadow",
+  "foundation",
+  "concealer",
+  "powder",
+]);
+
+export function isColorimetricMatchProductType(productType: string | null | undefined): boolean {
+  return typeof productType === "string" && COLORIMETRIC_MATCH_PRODUCT_TYPES.has(productType.trim());
+}
+
 export function classifyColorSimilarityTier(
   deltaE: number | null | undefined
 ): MatchedProduct["matchTier"] {
@@ -26,6 +45,49 @@ export function classifyColorSimilarityTier(
   if (deltaE < CIEDE2000_SIMILARITY_THRESHOLDS.GREAT_MAX) return "Great Match";
   if (deltaE < CIEDE2000_SIMILARITY_THRESHOLDS.CLOSE_MAX) return "Close Alternative";
   return "Distant Shade";
+}
+
+export interface ColorSimilarityDescription {
+  tier: MatchedProduct["matchTier"];
+  deltaE: number | null;
+  deltaELabel: string | null;
+  thresholdBand: "< 1.0" | "1.0–2.0" | "2.0–5.0" | "≥ 5.0" | null;
+  isWithinCloseThreshold: boolean;
+}
+
+/**
+ * Maps a CIEDE2000 ΔE₀₀ value directly to its documented perceptual threshold band
+ * without rescaling into an uncalibrated suitability probability percentage.
+ */
+export function describeColorSimilarity(
+  deltaE: number | null | undefined
+): ColorSimilarityDescription {
+  const tier = classifyColorSimilarityTier(deltaE);
+  if (tier === null || typeof deltaE !== "number" || !Number.isFinite(deltaE)) {
+    return {
+      tier: null,
+      deltaE: null,
+      deltaELabel: null,
+      thresholdBand: null,
+      isWithinCloseThreshold: false,
+    };
+  }
+  const rounded = Number(deltaE.toFixed(2));
+  const thresholdBand =
+    tier === "Exact Match"
+      ? "< 1.0"
+      : tier === "Great Match"
+        ? "1.0–2.0"
+        : tier === "Close Alternative"
+          ? "2.0–5.0"
+          : "≥ 5.0";
+  return {
+    tier,
+    deltaE: rounded,
+    deltaELabel: `ΔE₀₀ ${rounded.toFixed(1)}`,
+    thresholdBand,
+    isWithinCloseThreshold: deltaE < CIEDE2000_SIMILARITY_THRESHOLDS.CLOSE_MAX,
+  };
 }
 
 /**
@@ -112,11 +174,16 @@ export function blendTargetColorsLab(
   seasonProbabilities: Record<SeasonName, number>
 ): { lip: string; blush: string; eyeshadow: string } {
   const entries = (Object.keys(seasonProbabilities) as SeasonName[])
-    .filter((name) => name in SEASON_COLOR_PALETTES && seasonProbabilities[name] > 0)
+    .filter(
+      (name) =>
+        name in SEASON_COLOR_PALETTES &&
+        Number.isFinite(seasonProbabilities[name]) &&
+        seasonProbabilities[name] > 0
+    )
     .map((name) => ({ name, prob: seasonProbabilities[name] }));
 
   const total = entries.reduce((acc, item) => acc + item.prob, 0);
-  if (total <= 0) {
+  if (!Number.isFinite(total) || total <= 0) {
     return { lip: "#B76D83", blush: "#D791A4", eyeshadow: "#9C8691" };
   }
 
@@ -152,15 +219,26 @@ export function matchProducts(
   const { productType, lipBaseLab, topK = 6, catalogIlluminant = "D65" } = options;
   if (!isValidHexColor(targetHex)) return [];
 
-  const filtered = products.filter(
-    (p) => p.product_type === productType && isValidHexColor(p.hex_color)
-  );
-  if (filtered.length === 0) return [];
+  // Requirement 4: Enforce complete record validation (brand, product_name, product_type, valid HEX)
+  // so malformed or incomplete catalog rows cannot silently pollute color-similarity rankings.
+  const validated = products
+    .filter((p) => p.product_type === productType)
+    .map((row) => ({ row, validation: validateCatalogRecord(row) }))
+    .filter(({ validation }) => validation.validForColorMatch);
+
+  if (validated.length === 0) return [];
 
   const targetLab = hexToLab(targetHex);
-  const substrateRgb = lipBaseLab ? labToRgb(lipBaseLab) : null;
+  const validLipBaseLab =
+    Array.isArray(lipBaseLab) &&
+    lipBaseLab.length === 3 &&
+    lipBaseLab.every((v) => typeof v === "number" && Number.isFinite(v))
+      ? lipBaseLab
+      : null;
+  const substrateRgb = validLipBaseLab ? labToRgb(validLipBaseLab) : null;
 
-  const scored: MatchedProduct[] = filtered.map((row) => {
+  const scored: MatchedProduct[] = [];
+  for (const { row, validation } of validated) {
     let productLab = hexToLab(row.hex_color);
     // When catalog swatches are tagged as D50-referenced (ICC PCS studio workflow),
     // adapt from D50 -> D65 via Bradford CAT before D65 comparison / lip blending.
@@ -170,6 +248,7 @@ export function matchProducts(
 
     let candidateLab = productLab;
     let renderedHex: string | undefined;
+    let similarityBasis: MatchedProduct["similarityBasis"] = "ciede2000_d65_swatch";
 
     if (substrateRgb && productType === "lipstick") {
       const productRgb = labToRgb(productLab);
@@ -178,12 +257,15 @@ export function matchProducts(
       });
       candidateLab = rgbToLab(renderedRgb);
       renderedHex = rgbToHex(renderedRgb);
+      similarityBasis = "ciede2000_d65_kubelka_munk_lip";
     }
 
     const deltaE = ciede2000(targetLab, candidateLab);
+    if (!Number.isFinite(deltaE)) continue;
+
     const matchTier = classifyColorSimilarityTier(deltaE);
 
-    return {
+    scored.push({
       id: row.id,
       brand: row.brand,
       name: row.product_name,
@@ -195,10 +277,12 @@ export function matchProducts(
       deltaE: Number(deltaE.toFixed(2)),
       matchTier,
       isPersonalized: true,
+      similarityBasis,
+      missingMetadataFields: validation.warnings.length > 0 ? validation.warnings : undefined,
       undertone: row.undertone,
       bestSeasons: row.best_seasons,
-    };
-  });
+    });
+  }
 
   scored.sort((a, b) => (a.deltaE ?? Infinity) - (b.deltaE ?? Infinity));
   return scored.slice(0, topK);
@@ -262,13 +346,26 @@ export function scoreMatchedProductsPopularity(
 
   return items.map((item) => {
     const validDelta =
-      typeof item.deltaE === "number" && Number.isFinite(item.deltaE) && item.deltaE >= 0
+      item.isPersonalized !== false &&
+      typeof item.deltaE === "number" &&
+      Number.isFinite(item.deltaE) &&
+      item.deltaE >= 0
         ? item.deltaE
         : null;
-    const colorFitScore =
-      validDelta !== null
-        ? Math.max(0, EDITORIAL_CURATION_WEIGHTS.COLOR_FIT_MAX - validDelta)
-        : 0;
+
+    // Requirement 4: Missing / unpersonalized color-distance records must NEVER receive
+    // static metadata or brand boosts that let them outrank valid CIEDE2000 matches.
+    if (validDelta === null) {
+      return {
+        ...item,
+        hotReason: "Chưa đo độ gần màu",
+        popularityScore: 0,
+        isPopular: false,
+      };
+    }
+
+    const isWithinCloseThreshold = validDelta < CIEDE2000_SIMILARITY_THRESHOLDS.CLOSE_MAX;
+    const colorFitScore = Math.max(0, EDITORIAL_CURATION_WEIGHTS.COLOR_FIT_MAX - validDelta);
 
     const rawSeasons = (item.bestSeasons ?? "").trim();
     const seasonsList = rawSeasons
@@ -284,22 +381,19 @@ export function scoreMatchedProductsPopularity(
     const isCultLine =
       CULT_FAVORITE_PATTERN.test(item.name) || CULT_FAVORITE_PATTERN.test(item.shade);
 
-    const popularityScore = Number(
-      (
-        colorFitScore +
-        (matchesUserSeason ? EDITORIAL_CURATION_WEIGHTS.SEASON_TAG_MATCH : 0) +
-        (isUniversal ? EDITORIAL_CURATION_WEIGHTS.MULTI_SEASON_TAG : 0) +
-        (isPopularBrand ? EDITORIAL_CURATION_WEIGHTS.CURATED_BRAND_FAMILIARITY : 0) +
-        (isCultLine ? EDITORIAL_CURATION_WEIGHTS.CURATED_LINE_FAMILIARITY : 0)
-      ).toFixed(2)
-    );
+    // Requirement 1: Static brand/line/tag curation must never override CIEDE2000 color proximity
+    // by promoting a "Distant Shade" (ΔE₀₀ ≥ 5.0) above close colorimetric matches or marking it popular.
+    const metadataScale = isWithinCloseThreshold ? 1.0 : 0.25;
+    const rawMetadataBonus =
+      (matchesUserSeason ? EDITORIAL_CURATION_WEIGHTS.SEASON_TAG_MATCH : 0) +
+      (isUniversal ? EDITORIAL_CURATION_WEIGHTS.MULTI_SEASON_TAG : 0) +
+      (isPopularBrand ? EDITORIAL_CURATION_WEIGHTS.CURATED_BRAND_FAMILIARITY : 0) +
+      (isCultLine ? EDITORIAL_CURATION_WEIGHTS.CURATED_LINE_FAMILIARITY : 0);
+
+    const popularityScore = Number((colorFitScore + rawMetadataBonus * metadataScale).toFixed(2));
 
     let hotReason = "Gợi ý danh mục";
-    if (
-      matchesUserSeason &&
-      validDelta !== null &&
-      validDelta < CIEDE2000_SIMILARITY_THRESHOLDS.CLOSE_MAX
-    ) {
+    if (matchesUserSeason && isWithinCloseThreshold) {
       hotReason = "Gần màu & trùng mùa";
     } else if (VN_LOCAL_BRANDS.has(item.brand)) {
       hotReason = "Thương hiệu nội địa VN";
@@ -313,7 +407,7 @@ export function scoreMatchedProductsPopularity(
       ...item,
       hotReason,
       popularityScore,
-      isPopular: popularityScore >= POPULARITY_HIGHLIGHT_THRESHOLD,
+      isPopular: isWithinCloseThreshold && popularityScore >= POPULARITY_HIGHLIGHT_THRESHOLD,
     };
   });
 }

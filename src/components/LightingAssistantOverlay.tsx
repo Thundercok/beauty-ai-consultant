@@ -84,7 +84,7 @@ export const LightingAssistantOverlay: React.FC<LightingAssistantOverlayProps> =
           {/* Optimal daylight zone indicator */}
           <div
             aria-hidden="true"
-            className="absolute inset-y-0 left-[44%] right-[14%] bg-emerald-400/20"
+            className="absolute inset-y-0 left-[37%] right-[12%] bg-emerald-400/20"
           />
           <div
             className={`h-full rounded-full transition-all duration-200 ${styles.bar}`}

@@ -56,11 +56,13 @@ export function mat3Mul(a: number[][], b: number[][]): number[][] {
 }
 
 export function srgbChannelToLinear(c255: number): number {
+  if (!Number.isFinite(c255)) return 0;
   const c = Math.min(1, Math.max(0, c255 / 255));
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 }
 
 export function linearChannelToSrgb(lin: number): number {
+  if (!Number.isFinite(lin)) return 0;
   const c = Math.min(1, Math.max(0, lin));
   const srgb = c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
   return Math.min(255, Math.max(0, srgb * 255));
@@ -142,15 +144,12 @@ export function adaptLabBradford(
 
 export function hexToRgb(hex: string): [number, number, number] {
   const clean = hex.trim().replace(/^#/, "");
-  if (clean.length !== 6) {
+  if (!/^[0-9A-Fa-f]{6}$/.test(clean)) {
     return [180, 140, 130];
   }
   const r = Number.parseInt(clean.slice(0, 2), 16);
   const g = Number.parseInt(clean.slice(2, 4), 16);
   const b = Number.parseInt(clean.slice(4, 6), 16);
-  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
-    return [180, 140, 130];
-  }
   return [r, g, b];
 }
 

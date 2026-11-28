@@ -94,14 +94,56 @@ export function evaluateAmbientLux(lux: number): LightingReading {
   };
 }
 
+export interface CoverCropRect {
+  sx: number;
+  sy: number;
+  sw: number;
+  sh: number;
+}
+
+/**
+ * Computes the centered source crop rectangle equivalent to CSS `object-cover`
+ * so sampled camera pixels align 1:1 with the displayed viewfinder and oval guide.
+ */
+export function computeCoverCrop(
+  sourceWidth: number,
+  sourceHeight: number,
+  targetWidth: number,
+  targetHeight: number
+): CoverCropRect {
+  if (sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) {
+    return { sx: 0, sy: 0, sw: Math.max(0, sourceWidth), sh: Math.max(0, sourceHeight) };
+  }
+  const sourceAspect = sourceWidth / sourceHeight;
+  const targetAspect = targetWidth / targetHeight;
+
+  if (sourceAspect > targetAspect) {
+    const sw = sourceHeight * targetAspect;
+    return {
+      sx: (sourceWidth - sw) / 2,
+      sy: 0,
+      sw,
+      sh: sourceHeight,
+    };
+  }
+  const sh = sourceWidth / targetAspect;
+  return {
+    sx: 0,
+    sy: (sourceHeight - sh) / 2,
+    sw: sourceWidth,
+    sh,
+  };
+}
+
 function isCameraSkinPixel(r: number, g: number, b: number): boolean {
-  if (r < 45 || g < 28 || b < 18) return false;
+  if (r < 36 || g < 22 || b < 14) return false;
   const maxC = Math.max(r, g, b);
   const minC = Math.min(r, g, b);
-  if (maxC - minC < 10) return false;
+  if (maxC - minC < 7) return false;
+  if (r < b) return false;
   const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
   const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
-  return cr >= 131 && cr <= 178 && cb >= 75 && cb <= 132;
+  return cr >= 127 && cr <= 182 && cb >= 72 && cb <= 135;
 }
 
 /**
@@ -146,18 +188,34 @@ export function analyzeCameraFrame(
   const ry = height * 0.33;
 
   let totalOvalPx = 0;
-  let lumaSum = 0;
-  let leftLumaSum = 0;
-  let leftPx = 0;
-  let rightLumaSum = 0;
-  let rightPx = 0;
-  let clippedBrightPx = 0;
+  let ovalLumaSum = 0;
+  let coreLeftLumaSum = 0;
+  let coreLeftPx = 0;
+  let coreRightLumaSum = 0;
+  let coreRightPx = 0;
+  let ovalClippedBrightPx = 0;
 
+  // Skin-weighted metrics inside the face oval prevent dark hair or dim room corners
+  // from causing false "Dim" or "Uneven" lighting warnings.
   let skinInsideOval = 0;
-  let skinOutsideOval = 0;
-  let skinXSum = 0;
-  let skinYSum = 0;
-  let skinTotal = 0;
+  let skinLumaSum = 0;
+  let skinLeftLumaSum = 0;
+  let skinLeftPx = 0;
+  let skinRightLumaSum = 0;
+  let skinRightPx = 0;
+  let skinClippedBrightPx = 0;
+
+  // Centroid inside the face oval (excluding neck/shirt pixels below the chin line)
+  let inOvalSkinXSum = 0;
+  let inOvalSkinYSum = 0;
+  let inOvalSkinCount = 0;
+
+  // Wider search window (still excluding below-chin neck/shirt area) used only when the
+  // face has not yet entered the oval so we can still give directional centering hints.
+  let wideSkinXSum = 0;
+  let wideSkinYSum = 0;
+  let wideSkinCount = 0;
+  let sideTopOverflowSkin = 0;
 
   for (let y = 0; y < height; y++) {
     const dyNorm = (y - cy) / ry;
@@ -169,57 +227,92 @@ export function analyzeCameraFrame(
       const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
       const dxNorm = (x - cx) / rx;
-      const inOval = dxNorm * dxNorm + dyNorm * dyNorm <= 1.0;
+      const normDist2 = dxNorm * dxNorm + dyNorm * dyNorm;
+      const inOval = normDist2 <= 1.0;
       const isSkin = isCameraSkinPixel(r, g, b);
 
       if (inOval) {
         totalOvalPx++;
-        lumaSum += luma;
-        if (luma >= 244) clippedBrightPx++;
-        if (x < cx) {
-          leftLumaSum += luma;
-          leftPx++;
-        } else {
-          rightLumaSum += luma;
-          rightPx++;
+        ovalLumaSum += luma;
+        if (luma >= 246) ovalClippedBrightPx++;
+        if (normDist2 <= 0.65) {
+          if (x < cx) {
+            coreLeftLumaSum += luma;
+            coreLeftPx++;
+          } else {
+            coreRightLumaSum += luma;
+            coreRightPx++;
+          }
         }
         if (isSkin) {
           skinInsideOval++;
-          skinXSum += x;
-          skinYSum += y;
-          skinTotal++;
+          skinLumaSum += luma;
+          if (luma >= 246) skinClippedBrightPx++;
+          if (x < cx) {
+            skinLeftLumaSum += luma;
+            skinLeftPx++;
+          } else {
+            skinRightLumaSum += luma;
+            skinRightPx++;
+          }
+          inOvalSkinXSum += x;
+          inOvalSkinYSum += y;
+          inOvalSkinCount++;
+          wideSkinXSum += x;
+          wideSkinYSum += y;
+          wideSkinCount++;
         }
-      } else if (isSkin && Math.abs(dxNorm) < 1.55 && Math.abs(dyNorm) < 1.45) {
-        skinOutsideOval++;
-        skinXSum += x;
-        skinYSum += y;
-        skinTotal++;
+      } else if (isSkin && Math.abs(dxNorm) < 1.55 && dyNorm > -1.35 && dyNorm <= 0.98) {
+        // Only count skin around the sides/top of the face — exclude neck & shirt below chin
+        sideTopOverflowSkin++;
+        wideSkinXSum += x;
+        wideSkinYSum += y;
+        wideSkinCount++;
       }
     }
   }
 
-  const meanLuma = totalOvalPx > 0 ? lumaSum / totalOvalPx : 0;
-  const leftLuma = leftPx > 0 ? leftLumaSum / leftPx : meanLuma;
-  const rightLuma = rightPx > 0 ? rightLumaSum / rightPx : meanLuma;
-  const asymmetry = Math.abs(leftLuma - rightLuma) / Math.max(meanLuma, 35);
-  const clippedRatio = totalOvalPx > 0 ? clippedBrightPx / totalOvalPx : 0;
-  const brightnessPct = Math.round(Math.max(0, Math.min(100, (meanLuma / 225) * 100)));
+  const skinCoverage = totalOvalPx > 0 ? skinInsideOval / totalOvalPx : 0;
+  const hasFaceSkinForMetering = skinCoverage >= 0.1;
+
+  const meanOvalLuma = totalOvalPx > 0 ? ovalLumaSum / totalOvalPx : 0;
+  const effectiveLuma = hasFaceSkinForMetering ? skinLumaSum / skinInsideOval : meanOvalLuma;
+
+  const useSkinSideSplit = skinLeftPx >= 12 && skinRightPx >= 12;
+  const leftLuma = useSkinSideSplit
+    ? skinLeftLumaSum / skinLeftPx
+    : coreLeftPx > 0
+      ? coreLeftLumaSum / coreLeftPx
+      : effectiveLuma;
+  const rightLuma = useSkinSideSplit
+    ? skinRightLumaSum / skinRightPx
+    : coreRightPx > 0
+      ? coreRightLumaSum / coreRightPx
+      : effectiveLuma;
+
+  const asymmetry = Math.abs(leftLuma - rightLuma) / Math.max(effectiveLuma, 35);
+  const clippedRatio = hasFaceSkinForMetering
+    ? skinClippedBrightPx / skinInsideOval
+    : totalOvalPx > 0
+      ? ovalClippedBrightPx / totalOvalPx
+      : 0;
+  const brightnessPct = Math.round(Math.max(0, Math.min(100, (effectiveLuma / 225) * 100)));
 
   let lighting: LightingReading;
-  if (meanLuma < 68) {
+  if (effectiveLuma < 56) {
     lighting = {
       level: "too_dark",
       badgeEn: "Too Dark",
       labelVi: "Quá tối",
       guidanceVi: "Hướng mặt ra nguồn sáng hoặc bật thêm đèn để đo đúng sắc da.",
-      score: Math.max(10, Math.round((meanLuma / 68) * 44)),
+      score: Math.max(10, Math.round((effectiveLuma / 56) * 44)),
       brightnessPct,
       source: "camera_frame",
       lux: null,
-      luma: Math.round(meanLuma),
+      luma: Math.round(effectiveLuma),
       asymmetry: Number(asymmetry.toFixed(2)),
     };
-  } else if (meanLuma > 218 || clippedRatio > 0.16) {
+  } else if (effectiveLuma > 224 || clippedRatio > 0.22) {
     lighting = {
       level: "too_bright",
       badgeEn: "Too Bright",
@@ -229,33 +322,33 @@ export function analyzeCameraFrame(
       brightnessPct: 100,
       source: "camera_frame",
       lux: null,
-      luma: Math.round(meanLuma),
+      luma: Math.round(effectiveLuma),
       asymmetry: Number(asymmetry.toFixed(2)),
     };
-  } else if (meanLuma < 102) {
+  } else if (effectiveLuma < 84) {
     lighting = {
       level: "slightly_dim",
       badgeEn: "Dim",
       labelVi: "Hơi tối",
       guidanceVi: "Tăng sáng thêm một chút hoặc đứng gần cửa sổ hơn.",
-      score: Math.round(55 + ((meanLuma - 68) / 34) * 20),
+      score: Math.round(58 + ((effectiveLuma - 56) / 28) * 20),
       brightnessPct,
       source: "camera_frame",
       lux: null,
-      luma: Math.round(meanLuma),
+      luma: Math.round(effectiveLuma),
       asymmetry: Number(asymmetry.toFixed(2)),
     };
-  } else if (asymmetry > 0.28) {
+  } else if (asymmetry > 0.44) {
     lighting = {
       level: "uneven",
       badgeEn: "Uneven",
-      labelVi: "Ánh sáng lệch",
-      guidanceVi: "Một bên má đang bị tối bóng — xoay mặt đối diện nguồn sáng.",
+      labelVi: "Ánh sáng lệch mạnh",
+      guidanceVi: "Một bên mặt đang tối hẳn — xoay nhẹ về phía nguồn sáng.",
       score: 68,
       brightnessPct,
       source: "camera_frame",
       lux: null,
-      luma: Math.round(meanLuma),
+      luma: Math.round(effectiveLuma),
       asymmetry: Number(asymmetry.toFixed(2)),
     };
   } else {
@@ -264,25 +357,38 @@ export function analyzeCameraFrame(
       badgeEn: "Perfect",
       labelVi: "Ánh sáng chuẩn",
       guidanceVi: "Ánh sáng đều — sẵn sàng chụp!",
-      score: Math.min(98, Math.round(88 + (1 - asymmetry) * 10)),
+      score: Math.min(98, Math.round(88 + Math.max(0, 1 - asymmetry) * 10)),
       brightnessPct,
       source: "camera_frame",
       lux: null,
-      luma: Math.round(meanLuma),
+      luma: Math.round(effectiveLuma),
       asymmetry: Number(asymmetry.toFixed(2)),
     };
   }
 
-  // Real-time alignment estimate inside the oval guide
-  const skinCoverage = totalOvalPx > 0 ? skinInsideOval / totalOvalPx : 0;
-  const meanSkinX = skinTotal > 0 ? skinXSum / skinTotal : cx;
-  const meanSkinY = skinTotal > 0 ? skinYSum / skinTotal : cy;
+  // Real-time alignment estimate inside the oval guide.
+  // When face skin is already well inside the oval, use the in-oval skin centroid so
+  // background warmth or clothing never pulls the alignment guide off-center.
+  // Hair naturally covers the upper ~20% of the oval, so skin centroid sits slightly below `cy`.
+  const useInOvalCentroid = skinCoverage >= 0.16 && inOvalSkinCount > 0;
+  const meanSkinX = useInOvalCentroid
+    ? inOvalSkinXSum / inOvalSkinCount
+    : wideSkinCount > 0
+      ? wideSkinXSum / wideSkinCount
+      : cx;
+  const meanSkinY = useInOvalCentroid
+    ? inOvalSkinYSum / inOvalSkinCount
+    : wideSkinCount > 0
+      ? wideSkinYSum / wideSkinCount
+      : cy;
+
+  const targetCy = cy + ry * 0.1;
   const horizontalOffset = Math.max(-1, Math.min(1, (meanSkinX - cx) / rx));
-  const verticalOffset = Math.max(-1, Math.min(1, (meanSkinY - cy) / ry));
-  const overflowRatio = skinInsideOval > 0 ? skinOutsideOval / skinInsideOval : 0;
+  const verticalOffset = Math.max(-1, Math.min(1, (meanSkinY - targetCy) / ry));
+  const sideTopOverflowRatio = skinInsideOval > 0 ? sideTopOverflowSkin / skinInsideOval : 0;
 
   let alignment: FaceAlignmentReading;
-  if (skinCoverage < 0.14) {
+  if (skinCoverage < 0.11) {
     alignment = {
       status: "move_closer",
       labelVi: "Đưa mặt vào gần khung",
@@ -292,7 +398,7 @@ export function analyzeCameraFrame(
       verticalOffset: Number(verticalOffset.toFixed(2)),
       horizontalOffset: Number(horizontalOffset.toFixed(2)),
     };
-  } else if (skinCoverage > 0.72 && overflowRatio > 0.85) {
+  } else if (skinCoverage > 0.85 && sideTopOverflowRatio > 1.05) {
     alignment = {
       status: "move_back",
       labelVi: "Lùi nhẹ ra xa một chút",
@@ -302,7 +408,7 @@ export function analyzeCameraFrame(
       verticalOffset: Number(verticalOffset.toFixed(2)),
       horizontalOffset: Number(horizontalOffset.toFixed(2)),
     };
-  } else if (Math.abs(horizontalOffset) > 0.28 || Math.abs(verticalOffset) > 0.28) {
+  } else if (Math.abs(horizontalOffset) > 0.36 || Math.abs(verticalOffset) > 0.38) {
     const dirHint =
       Math.abs(horizontalOffset) >= Math.abs(verticalOffset)
         ? horizontalOffset > 0

@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Check, ChevronDown, Copy, ExternalLink, Heart, X } from "lucide-react";
 import {
+  CIEDE2000_SIMILARITY_THRESHOLDS,
+  describeColorSimilarity,
+} from "../lib/beauty/productMatcher";
+import {
   buildRecommendationTransparency,
   evaluateProductCompatibility,
   getProductDataProvenance,
 } from "../lib/beauty/recommendationIntegrity";
-import { deltaEToMatchPercent } from "../lib/beauty/virtualMakeup";
 import {
   buildVnShopLinks,
   estimateProductPriceVn,
@@ -15,6 +18,7 @@ import {
   PRODUCT_TYPE_VI_LABELS,
   SEASON_VI_LABELS,
   TEXTURE_VI_LABELS,
+  translateMatchTier,
 } from "../lib/beauty/viLabels";
 import type { MatchedProduct, SeasonClassification, SeasonName } from "../lib/beauty/types";
 
@@ -70,10 +74,9 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
       Number.isFinite(product.deltaE)
   );
   const isLip = product.productType === "lipstick";
-  const matchPct =
-    hasVerifiedMatchScore && typeof product.deltaE === "number"
-      ? deltaEToMatchPercent(product.deltaE)
-      : null;
+  const colorSimilarity = hasVerifiedMatchScore
+    ? describeColorSimilarity(product.deltaE)
+    : null;
   const compatibility = evaluateProductCompatibility(
     product,
     isAnalyzed ? userSeason ?? null : null,
@@ -195,15 +198,20 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
 
           <div className="flex items-center justify-between gap-3 py-3 border-y border-zinc-100 text-xs">
             <div>
-              {matchPct !== null && seasonShort ? (
+              {colorSimilarity && colorSimilarity.deltaE !== null && seasonShort ? (
                 <>
-                  <div className="text-zinc-500">Độ gần màu gợi ý ({seasonShort})</div>
+                  <div className="text-zinc-500">Độ gần màu CIEDE2000 ({seasonShort})</div>
                   <div
                     className={`text-sm font-bold tabular-nums mt-0.5 ${
-                      matchPct >= 90 ? "text-emerald-700" : "text-zinc-900"
+                      colorSimilarity.deltaE < CIEDE2000_SIMILARITY_THRESHOLDS.GREAT_MAX
+                        ? "text-emerald-700"
+                        : "text-zinc-900"
                     }`}
                   >
-                    {matchPct}% khớp màu
+                    {translateMatchTier(colorSimilarity.tier)} · ΔE₀₀ {colorSimilarity.deltaE.toFixed(2)}
+                  </div>
+                  <div className="text-[10px] text-zinc-500 mt-0.5">
+                    Ngưỡng chuẩn: &lt;1 rất gần · &lt;2 gần · &lt;5 cùng họ · ≥5 khác sắc độ
                   </div>
                 </>
               ) : (

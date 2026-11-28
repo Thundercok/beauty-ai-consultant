@@ -18,6 +18,7 @@ import {
   UNDERTONE_VI_LABELS,
   describeCctVi,
   translateItaCategory,
+  translateMatchTier,
 } from "./viLabels";
 import type {
   ConsultationReport,
@@ -35,6 +36,8 @@ export interface ReportProductEntry {
   textureVi: string;
   swatchHex: string;
   renderedHex?: string;
+  deltaE: number | null;
+  matchTierVi: string;
   matchPercent: number;
   priceRangeVi: string;
   tagsVi: string[];
@@ -152,6 +155,8 @@ function mapProductToEntry(item: MatchedProduct): ReportProductEntry {
     textureVi: TEXTURE_VI_LABELS[item.texture] ?? item.texture,
     swatchHex: item.hex,
     renderedHex: item.renderedHex,
+    deltaE: validDelta !== undefined ? Number(validDelta.toFixed(2)) : null,
+    matchTierVi: translateMatchTier(item.matchTier),
     matchPercent: validDelta !== undefined ? deltaEToMatchPercent(validDelta) : 0,
     priceRangeVi: price.priceRangeLabel,
     tagsVi,
@@ -1314,9 +1319,14 @@ export function renderReportPage2Canvas(
       ctx.fillText(`${prod.brand}  ·  ${prod.categoryVi}`, tx, py + 24);
 
       ctx.textAlign = "right";
-      ctx.fillStyle = prod.matchPercent >= 90 ? SIGNAL_EMERALD : INK_PRIMARY;
-      ctx.font = `700 12.5px ${FONT_MONO}`;
-      ctx.fillText(`${prod.matchPercent}% hợp`, px + prodW - 14, py + 24);
+      ctx.fillStyle =
+        prod.deltaE !== null && prod.deltaE < 2.0 ? SIGNAL_EMERALD : INK_PRIMARY;
+      ctx.font = `700 12px ${FONT_MONO}`;
+      ctx.fillText(
+        prod.deltaE !== null ? `ΔE₀₀ ${prod.deltaE.toFixed(1)}` : "Tham khảo",
+        px + prodW - 14,
+        py + 24
+      );
       ctx.textAlign = "left";
 
       ctx.fillStyle = INK_PRIMARY;

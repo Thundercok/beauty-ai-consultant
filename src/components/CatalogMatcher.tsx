@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Heart, Search } from "lucide-react";
 import { labToRgb, rgbToHex } from "../lib/beauty/bradfordCat";
 import {
+  CIEDE2000_SIMILARITY_THRESHOLDS,
+  isColorimetricMatchProductType,
   matchProducts,
   scoreMatchedProductsPopularity,
   type TrendingProductItem,
@@ -12,14 +14,17 @@ import {
   catalogProductToBrowseItem,
   evaluateRecommendationEligibility,
 } from "../lib/beauty/recommendationIntegrity";
-import { deltaEToMatchPercent } from "../lib/beauty/virtualMakeup";
 import {
   buildVnShopLinks,
   estimateProductPriceVn,
   evaluateVnStudentTraits,
   type PriceTierId,
 } from "../lib/beauty/vnBeautyGuide";
-import { PRODUCT_TYPE_VI_LABELS, TEXTURE_VI_LABELS } from "../lib/beauty/viLabels";
+import {
+  PRODUCT_TYPE_VI_LABELS,
+  TEXTURE_VI_LABELS,
+  translateMatchTier,
+} from "../lib/beauty/viLabels";
 import type {
   CatalogProduct,
   IlluminantName,
@@ -190,11 +195,29 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
       }));
     }
 
-    const getTargetForType = (type: string) => {
+    const getTargetForType = (type: string): string | null => {
       if (type === "lipstick") return blendedTargets.lip;
       if (type === "blush") return blendedTargets.blush;
       if (type === "eyeshadow") return blendedTargets.eyeshadow;
-      return skinHex;
+      if (isColorimetricMatchProductType(type)) return skinHex;
+      return null;
+    };
+
+    const matchOrBrowseType = (type: string, list: CatalogProduct[]): MatchedProduct[] => {
+      const targetHex = getTargetForType(type);
+      if (!targetHex) {
+        // Non-colorimetric categories (glasses, mascara, eyeliner, setting spray, etc.)
+        // are displayed as honest catalog entries rather than scored against bare skin HEX.
+        return list
+          .filter((p) => p.product_type === type)
+          .map((p) => catalogProductToBrowseItem(p));
+      }
+      return matchProducts(targetHex, list, {
+        productType: type,
+        lipBaseLab: type === "lipstick" ? lipBaseLab : undefined,
+        topK: 180,
+        catalogIlluminant,
+      });
     };
 
     let baseMatched: MatchedProduct[] = [];
@@ -206,22 +229,10 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
     ) {
       const types = Array.from(new Set(sourceList.map((p) => p.product_type)));
       for (const t of types) {
-        baseMatched.push(
-          ...matchProducts(getTargetForType(t), sourceList, {
-            productType: t,
-            lipBaseLab: t === "lipstick" ? lipBaseLab : undefined,
-            topK: 180,
-            catalogIlluminant,
-          })
-        );
+        baseMatched.push(...matchOrBrowseType(t, sourceList));
       }
     } else {
-      baseMatched = matchProducts(getTargetForType(activeType), sourceList, {
-        productType: activeType,
-        lipBaseLab: activeType === "lipstick" ? lipBaseLab : undefined,
-        topK: 180,
-        catalogIlluminant,
-      });
+      baseMatched = matchOrBrowseType(activeType, sourceList);
     }
 
     const scored = scoreMatchedProductsPopularity(baseMatched, userSeason);
@@ -531,9 +542,12 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
           {displayedItems.map(({ item, price, traits }) => {
             const typeLabel = PRODUCT_TYPE_VI_LABELS[item.productType] ?? item.productType;
             const textureLabel = TEXTURE_VI_LABELS[item.texture] ?? item.texture;
-            const matchPct =
-              hasPortraitProfile && typeof item.deltaE === "number"
-                ? deltaEToMatchPercent(item.deltaE)
+            const validDelta =
+              hasPortraitProfile &&
+              item.isPersonalized !== false &&
+              typeof item.deltaE === "number" &&
+              Number.isFinite(item.deltaE)
+                ? item.deltaE
                 : null;
             const isSaved = savedIds.has(item.id);
             const isLip = item.productType === "lipstick";
@@ -603,15 +617,20 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
                     </h3>
                     <div className="text-xs text-zinc-600 truncate">{item.shade}</div>
 
-                    {/* Price + Match % (or Undertone in Guest mode) */}
+                    {/* Price + Documented CIEDE2000 Color Similarity Tier (or Undertone when unmeasured) */}
                     <div className="pt-1 flex flex-wrap items-baseline justify-between gap-x-1.5 gap-y-0.5 text-[11px]">
-                      {matchPct !== null ? (
+                      {validDelta !== null ? (
                         <span
+                          title={`Khoảng cách màu CIEDE2000 ΔE₀₀ = ${validDelta.toFixed(2)} (<1.0 rất gần, <2.0 gần, <5.0 cùng họ, ≥5.0 khác sắc độ)`}
                           className={`font-semibold tabular-nums whitespace-nowrap ${
-                            matchPct >= 90 ? "text-emerald-700" : "text-zinc-800"
+                            validDelta < CIEDE2000_SIMILARITY_THRESHOLDS.GREAT_MAX
+                              ? "text-emerald-700"
+                              : validDelta < CIEDE2000_SIMILARITY_THRESHOLDS.CLOSE_MAX
+                                ? "text-zinc-800"
+                                : "text-zinc-500"
                           }`}
                         >
-                          {matchPct}% hợp màu
+                          {translateMatchTier(item.matchTier)} · ΔE {validDelta.toFixed(1)}
                         </span>
                       ) : (
                         <span className="font-medium text-zinc-500 truncate">

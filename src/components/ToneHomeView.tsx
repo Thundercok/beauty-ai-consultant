@@ -34,7 +34,6 @@ import {
   type FaceGuideZoneId,
 } from "../lib/beauty/faceGuideMap";
 import { analyzeVnFacialFeaturesFromReport } from "../lib/beauty/vnFeatureAnalysis";
-import { deltaEToMatchPercent } from "../lib/beauty/virtualMakeup";
 import {
   VN_SEASON_PLAIN_GUIDE,
   estimateProductPriceVn,
@@ -45,6 +44,7 @@ import {
   SHAPE_VI_LABELS,
   UNDERTONE_VI_LABELS,
   translateItaCategory,
+  translateMatchTier,
 } from "../lib/beauty/viLabels";
 import type {
   ConsultationReport,
@@ -978,8 +978,10 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
 
                 <div className="flex sm:grid sm:grid-cols-3 gap-3 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
                   {quickPicks.map((item) => {
-                    const validDelta = typeof item.deltaE === "number" ? item.deltaE : undefined;
-                    const matchPct = validDelta !== undefined ? deltaEToMatchPercent(validDelta) : null;
+                    const validDelta =
+                      typeof item.deltaE === "number" && Number.isFinite(item.deltaE)
+                        ? item.deltaE
+                        : undefined;
                     const isSaved = savedIds.has(item.id);
                     const isLip = item.productType === "lipstick";
                     const priceInfo = estimateProductPriceVn(item.brand, item.productType, item.name);
@@ -1040,9 +1042,18 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                             </h3>
                             <div className="text-xs text-[#525252] truncate">{item.shade}</div>
                             <div className="pt-0.5 flex items-center gap-1.5 text-[11px] truncate">
-                              <span className="font-semibold text-[#111111] tabular-nums">
-                                {matchPct}% hợp
-                              </span>
+                              {validDelta !== undefined ? (
+                                <span
+                                  title={`Độ gần màu CIEDE2000: ΔE₀₀ = ${validDelta.toFixed(2)}`}
+                                  className="font-semibold text-[#111111] tabular-nums truncate"
+                                >
+                                  {translateMatchTier(item.matchTier)} · ΔE {validDelta.toFixed(1)}
+                                </span>
+                              ) : (
+                                <span className="font-medium text-[#525252] truncate">
+                                  {item.undertone || "Danh mục"}
+                                </span>
+                              )}
                               <span className="text-[#D4D4D4]" aria-hidden="true">
                                 ·
                               </span>
