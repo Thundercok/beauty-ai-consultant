@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Check, Copy, ExternalLink, Heart, X } from "lucide-react";
+import { Check, ChevronDown, Copy, ExternalLink, Heart, X } from "lucide-react";
+import {
+  buildRecommendationTransparency,
+  evaluateProductCompatibility,
+  getProductDataProvenance,
+} from "../lib/beauty/recommendationIntegrity";
 import { deltaEToMatchPercent } from "../lib/beauty/virtualMakeup";
 import {
   buildVnShopLinks,
@@ -11,13 +16,14 @@ import {
   SEASON_VI_LABELS,
   TEXTURE_VI_LABELS,
 } from "../lib/beauty/viLabels";
-import type { MatchedProduct, SeasonName } from "../lib/beauty/types";
+import type { MatchedProduct, SeasonClassification, SeasonName } from "../lib/beauty/types";
 
 interface ProductDetailSheetProps {
   product: MatchedProduct | null;
   skinHex?: string | null;
   lipBaseHex?: string | null;
   userSeason?: SeasonName | null;
+  userUndertone?: SeasonClassification["undertone"] | null;
   hasPortraitProfile?: boolean;
   isSaved: boolean;
   onClose: () => void;
@@ -31,6 +37,7 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
   skinHex,
   lipBaseHex,
   userSeason,
+  userUndertone = null,
   hasPortraitProfile = false,
   isSaved,
   onClose,
@@ -56,8 +63,28 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
   if (!product) return null;
 
   const isAnalyzed = Boolean(hasPortraitProfile && skinHex && lipBaseHex && userSeason);
+  const hasVerifiedMatchScore = Boolean(
+    isAnalyzed &&
+      product.isPersonalized !== false &&
+      typeof product.deltaE === "number" &&
+      Number.isFinite(product.deltaE)
+  );
   const isLip = product.productType === "lipstick";
-  const matchPct = deltaEToMatchPercent(product.deltaE);
+  const matchPct =
+    hasVerifiedMatchScore && typeof product.deltaE === "number"
+      ? deltaEToMatchPercent(product.deltaE)
+      : null;
+  const compatibility = evaluateProductCompatibility(
+    product,
+    isAnalyzed ? userSeason ?? null : null,
+    isAnalyzed ? userUndertone : null
+  );
+  const provenance = getProductDataProvenance(product);
+  const transparency = buildRecommendationTransparency({
+    product,
+    userSeason: isAnalyzed ? userSeason ?? null : null,
+    userUndertone: isAnalyzed ? userUndertone : null,
+  });
   const typeLabel = PRODUCT_TYPE_VI_LABELS[product.productType] ?? product.productType;
   const textureLabel = TEXTURE_VI_LABELS[product.texture] ?? product.texture;
   const seasonShort = userSeason ? SEASON_VI_LABELS[userSeason].title : null;
@@ -67,7 +94,7 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
     texture: product.texture,
     hex: product.hex,
     renderedHex: product.renderedHex,
-    deltaE: product.deltaE,
+    deltaE: hasVerifiedMatchScore && typeof product.deltaE === "number" ? product.deltaE : undefined,
   });
   const shopLinks = buildVnShopLinks(product.brand, product.name, product.shade);
 
@@ -168,22 +195,22 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
 
           <div className="flex items-center justify-between gap-3 py-3 border-y border-zinc-100 text-xs">
             <div>
-              {isAnalyzed && seasonShort ? (
+              {matchPct !== null && seasonShort ? (
                 <>
-                  <div className="text-zinc-500">Độ hợp da ({seasonShort})</div>
+                  <div className="text-zinc-500">Độ gần màu gợi ý ({seasonShort})</div>
                   <div
                     className={`text-sm font-bold tabular-nums mt-0.5 ${
                       matchPct >= 90 ? "text-emerald-700" : "text-zinc-900"
                     }`}
                   >
-                    {matchPct}% hợp da bạn
+                    {matchPct}% khớp màu
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="text-zinc-500">Tông màu gợi ý</div>
+                  <div className="text-zinc-500">Tông màu sản phẩm</div>
                   <div className="text-sm font-bold text-zinc-900 mt-0.5">
-                    {product.undertone || "Đa tông"}
+                    {product.undertone || "Chưa có dữ liệu"}
                   </div>
                 </>
               )}
@@ -196,17 +223,63 @@ export const ProductDetailSheet: React.FC<ProductDetailSheetProps> = ({
             </div>
           </div>
 
-          <div className="space-y-1.5 text-xs text-zinc-600 leading-relaxed">
-            <p>
-              {isAnalyzed && seasonShort
-                ? isLip
-                  ? "Màu đã được tính sẵn độ hòa trộn với sắc môi mộc của bạn để khi mua về đánh thật sẽ không bị lệch tông hay xỉn da."
-                  : `Gam màu hài hòa với sắc da ${seasonShort}, dễ đánh mỏng hằng ngày khi đi học hoặc đi chơi mà không làm nặng mặt.`
-                : `Phù hợp tham khảo cho nhóm ${product.bestSeasons || "nhiều mùa màu"}. Tải ảnh chân dung để tính độ khớp màu chính xác với sắc da của bạn.`}
-            </p>
-            <p className="text-[11px] text-zinc-500">
-              Lưu ý: Mức giá chỉ mang tính ước tính tham khảo tại thị trường Việt Nam, không phải giá bán trực tiếp hay tồn kho thực tế.
-            </p>
+          {isAnalyzed && (
+            <div className="grid grid-cols-2 gap-2.5 text-[11px] bg-zinc-50 border border-zinc-200/70 rounded-xl px-3 py-2">
+              <div>
+                <div className="text-zinc-500">Hướng tông</div>
+                <div className="font-semibold text-zinc-900 mt-0.5">
+                  {compatibility.undertoneLabelVi}
+                </div>
+              </div>
+              <div>
+                <div className="text-zinc-500">Nhóm mùa</div>
+                <div className="font-semibold text-zinc-900 mt-0.5">
+                  {compatibility.seasonLabelVi}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2 text-xs text-zinc-600 leading-relaxed">
+            <p>{transparency.whyRecommendedVi}</p>
+
+            <details
+              data-testid="product-transparency-details"
+              className="border border-zinc-200/80 rounded-xl bg-zinc-50/70 px-3 py-2 group"
+            >
+              <summary className="list-none flex items-center justify-between gap-2 text-[11px] font-semibold text-zinc-800 cursor-pointer select-none">
+                <span>Minh bạch gợi ý &amp; nguồn dữ liệu ({transparency.modeLabelVi})</span>
+                <ChevronDown className="w-3.5 h-3.5 text-zinc-500 transition-transform group-open:rotate-180 shrink-0" />
+              </summary>
+              <div className="pt-2 mt-2 border-t border-zinc-200/70 space-y-2 text-[11px] text-zinc-600">
+                <div>
+                  <div className="font-semibold text-zinc-800">Cơ sở hiển thị:</div>
+                  <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                    {transparency.signalsUsedVi.map((sig) => (
+                      <li key={sig}>{sig}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="font-semibold text-zinc-800">Giới hạn so màu HEX:</div>
+                  <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                    {transparency.limitationsVi.map((lim) => (
+                      <li key={lim}>{lim}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="font-semibold text-zinc-800">Nguồn dữ liệu sản phẩm:</div>
+                  <p className="mt-0.5">
+                    {provenance.colorSourceLabelVi}. {provenance.priceStatusLabelVi}.{" "}
+                    {provenance.availabilityLabelVi}.
+                  </p>
+                  <p className="mt-1 text-zinc-500">
+                    Thiếu dữ liệu trực tiếp: {provenance.missingFieldsVi.join(", ")}.
+                  </p>
+                </div>
+              </div>
+            </details>
           </div>
 
           <div className="space-y-2.5 pt-1">

@@ -1,23 +1,26 @@
 import type { IlluminantName } from "./types";
 
+/** CIE 1931 2° standard illuminant whitepoints (ASTM E308 / Lindbloom). */
 export const WHITEPOINTS: Record<IlluminantName, [number, number, number]> = {
   D50: [0.96422, 1.0, 0.82521],
   D65: [0.95047, 1.0, 1.08883],
 };
 
+/** Lam (1985) / Lindbloom Bradford cone-response matrix (XYZ -> LMS). */
 export const BRADFORD_MATRIX: number[][] = [
   [0.8951, 0.2664, -0.1614],
   [-0.7502, 1.7135, 0.0367],
   [0.0389, -0.0685, 1.0296],
 ];
 
-// Exact inverse of BRADFORD_MATRIX
+/** Inverse of BRADFORD_MATRIX (LMS -> XYZ; max residual vs I < 1e-7). */
 export const BRADFORD_INV_MATRIX: number[][] = [
   [0.9869929, -0.1470543, 0.1599627],
   [0.4323053, 0.5183603, 0.0492912],
   [-0.0085287, 0.0400428, 0.9684867],
 ];
 
+/** IEC 61966-2-1 / Lindbloom linear sRGB -> CIE XYZ (D65 reference white). */
 export const SRGB_TO_XYZ_MATRIX: number[][] = [
   [0.4124564, 0.3575761, 0.1804375],
   [0.2126729, 0.7151522, 0.072175],

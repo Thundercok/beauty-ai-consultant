@@ -77,7 +77,7 @@ async function getFaceLandmarker(): Promise<FaceLandmarker> {
             delegate: "CPU",
           },
           runningMode: "IMAGE",
-          numFaces: 1,
+          numFaces: 2,
           minFaceDetectionConfidence: 0.45,
           minFacePresenceConfidence: 0.45,
         });
@@ -102,6 +102,7 @@ export async function detectNeuralFaceLandmarks(
 ): Promise<{
   landmarks: Array<[number, number, number]> | null;
   enhancement: EnhancementStats;
+  faceCount: number;
 }> {
   // Preprocess with bilateral denoising, adaptive low-light contrast, and luma sharpening
   // ONLY for landmark inference — colorimetry continues to use untouched raw/WB pixels.
@@ -112,20 +113,26 @@ export async function detectNeuralFaceLandmarks(
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) return { landmarks: null, enhancement: stats };
+  if (!ctx) return { landmarks: null, enhancement: stats, faceCount: 0 };
 
   const imgData = new ImageData(new Uint8ClampedArray(enhancedRgba), width, height);
   ctx.putImageData(imgData, 0, 0);
 
   const result = landmarker.detect(canvas);
+  const faceCount = result.faceLandmarks?.length ?? 0;
+  if (faceCount > 1) {
+    return { landmarks: null, enhancement: stats, faceCount };
+  }
+
   const face = result.faceLandmarks?.[0];
   if (!face || face.length < 468) {
-    return { landmarks: null, enhancement: stats };
+    return { landmarks: null, enhancement: stats, faceCount: 0 };
   }
 
   return {
     landmarks: face.map((lm) => [lm.x * width, lm.y * height, lm.z * width]),
     enhancement: stats,
+    faceCount: 1,
   };
 }
 

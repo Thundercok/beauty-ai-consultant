@@ -37,6 +37,22 @@ export function pigmentKsFromRgb(
   return { k, s };
 }
 
+/**
+ * 3-channel linear-sRGB single-constant Kubelka–Munk two-flux lip-layer approximation.
+ *
+ * Scientific limitations (documented for audit transparency):
+ * - Operates on 3 linear sRGB channels rather than full spectral reflectance R(λ) (400–700 nm),
+ *   so metamerism and narrow-band pigment absorption differences are not captured.
+ * - Assumes wavelength-independent scattering S(λ) = constant per texture class.
+ * - Omits Saunderson front-surface Fresnel specular (k1) and internal diffuse (k2) corrections.
+ * - `TEXTURE_KS_MAP` scattering and thickness constants are uncalibrated visual heuristics,
+ *   not spectrophotometer measurements of individual commercial formulations.
+ *
+ * Numerical stability:
+ * Uses the exact hyperbolic identity layerR = tanh(x) / (a*tanh(x) + b) and
+ * layerT = b*sech(x) / (a*tanh(x) + b) to eliminate IEEE-754 Infinity/Infinity -> NaN overflow
+ * for very dark pigments or high optical depth (x > 709), converging smoothly to R_inf = 1/(a+b).
+ */
 export function kubelkaMunkLipBlend(
   substrateRgb: [number, number, number],
   productRgb: [number, number, number],
@@ -62,11 +78,11 @@ export function kubelkaMunkLipBlend(
     const a = 1 + k[i] / s[i];
     const b = Math.sqrt(Math.max(a * a - 1, 1e-12));
     const opticalDepth = b * s[i] * thickness;
-    const sinh = Math.sinh(opticalDepth);
-    const cosh = Math.cosh(opticalDepth);
-    const denom = a * sinh + b * cosh;
-    const layerR = sinh / denom;
-    const layerT = b / denom;
+    const tanhOd = Math.tanh(opticalDepth);
+    const sechOd = opticalDepth > 700 ? 0 : 1 / Math.cosh(opticalDepth);
+    const denom = Math.max(a * tanhOd + b, 1e-12);
+    const layerR = tanhOd / denom;
+    const layerT = (b * sechOd) / denom;
     const renderedReflectance =
       layerR + (layerT * layerT * substrate) / Math.max(1 - layerR * substrate, 1e-8);
     out[i] = linearChannelToSrgb(renderedReflectance);

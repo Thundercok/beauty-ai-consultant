@@ -978,7 +978,8 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
 
                 <div className="flex sm:grid sm:grid-cols-3 gap-3 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
                   {quickPicks.map((item) => {
-                    const matchPct = deltaEToMatchPercent(item.deltaE);
+                    const validDelta = typeof item.deltaE === "number" ? item.deltaE : undefined;
+                    const matchPct = validDelta !== undefined ? deltaEToMatchPercent(validDelta) : null;
                     const isSaved = savedIds.has(item.id);
                     const isLip = item.productType === "lipstick";
                     const priceInfo = estimateProductPriceVn(item.brand, item.productType, item.name);
@@ -987,7 +988,7 @@ export const ToneHomeView: React.FC<ToneHomeViewProps> = ({
                       texture: item.texture,
                       hex: item.hex,
                       renderedHex: item.renderedHex,
-                      deltaE: item.deltaE,
+                      deltaE: validDelta,
                     });
 
                     return (

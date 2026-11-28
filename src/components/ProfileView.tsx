@@ -24,6 +24,7 @@ import {
   TEXTURE_VI_LABELS,
   UNDERTONE_VI_LABELS,
 } from "../lib/beauty/viLabels";
+import { catalogProductToBrowseItem } from "../lib/beauty/recommendationIntegrity";
 import { estimateProductPriceVn } from "../lib/beauty/vnBeautyGuide";
 import type {
   CatalogProduct,
@@ -76,19 +77,7 @@ function formatDateTimeVi(iso: string): string {
 }
 
 function catalogProductToInspectable(p: CatalogProduct): MatchedProduct {
-  return {
-    id: p.id,
-    brand: p.brand,
-    name: p.product_name,
-    shade: p.shade_name,
-    productType: p.product_type,
-    texture: p.texture_type,
-    hex: p.hex_color,
-    deltaE: 0,
-    matchTier: "Great Match",
-    undertone: p.undertone,
-    bestSeasons: p.best_seasons,
-  };
+  return catalogProductToBrowseItem(p);
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({

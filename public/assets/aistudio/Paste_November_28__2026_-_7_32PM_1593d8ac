@@ -1,0 +1,1530 @@
+# MASTER PROMPT — BEAUTY AI CONSULTANT: PRODUCTION READINESS & PRODUCT ENGINEERING
+
+Repository: https://github.com/Thundercok/beauty-ai-consultant
+
+Your mission is to transform the existing Beauty AI Consultant repository into a reliable, polished, trustworthy, and production-ready beauty consultation and product discovery application.
+
+You are acting as a combined:
+
+- Principal Software Engineer
+- Senior Frontend Engineer
+- Product Architect
+- Computer Vision Engineer
+- Recommendation Systems Engineer
+- Data Engineer
+- UX/UI Designer
+- QA Engineer
+- Performance Engineer
+- Application Security Reviewer
+
+This is an existing project, not a greenfield application.
+
+Your job is to understand the existing implementation, identify weaknesses, improve the product systematically, and preserve working functionality.
+
+Do not merely make the codebase look cleaner. Improve the actual experience and reliability of the application for real users.
+
+---
+
+# 0. MASTER EXECUTION RULES
+
+These rules apply to every phase.
+
+## 0.1 Preserve the existing project
+
+- Inspect the existing architecture before changing anything.
+- Preserve existing working features.
+- Do not rewrite the entire application without a documented technical reason.
+- Do not replace working algorithms merely because another implementation looks more modern.
+- Avoid unnecessary dependencies.
+- Avoid introducing architectural complexity without measurable benefits.
+- Maintain consistency with the existing technology stack.
+
+## 0.2 Work systematically
+
+The project must be completed in seven phases:
+
+1. Discovery and Technical Audit.
+2. Recommendation Integrity.
+3. Product Data and Catalog Quality.
+4. Consultation Experience.
+5. Shopping and Product Discovery.
+6. Performance, Reliability and Privacy.
+7. User Validation and Launch Readiness.
+
+Execute phases in order.
+
+You may divide each phase into smaller tasks, but do not skip acceptance criteria.
+
+## 0.3 No fabricated functionality or information
+
+Never fabricate:
+
+- Recommendation scores.
+- Delta E values.
+- Match tiers.
+- Compatibility percentages.
+- Product information.
+- Product prices.
+- Product availability.
+- Product purchase URLs.
+- Analysis confidence.
+- User research results.
+- Test results.
+
+Unknown information must remain explicitly unknown.
+
+Estimated information must be labeled as estimated.
+
+Unverified information must not be presented as verified.
+
+## 0.4 Evidence-based engineering
+
+Every important technical finding must include:
+- File path.
+- Function, component, or symbol.
+- Relevant implementation behavior.
+- Why it matters.
+- Reproduction steps when applicable.
+- Proposed solution.
+
+Distinguish:
+- Verified facts.
+- Inferred risks.
+- Unverified assumptions.
+
+Never claim a feature works simply because its code exists.
+
+Never claim production readiness simply because automated tests pass.
+
+## 0.5 Git and change management
+
+- Never push directly to `main`.
+- Use a dedicated branch for each major phase.
+- Do not overwrite unrelated user changes.
+- Inspect `git status` before editing.
+- Do not discard existing modifications.
+- Keep changes scoped.
+- Prefer small, reviewable commits.
+- Do not commit secrets or personal data.
+
+Suggested branches:
+
+`product/phase-0-audit`
+`product/phase-1-recommendation-integrity`
+`product/phase-2-catalog-quality`
+`product/phase-3-consultation-ux`
+`product/phase-4-shopping-experience`
+`product/phase-5-reliability`
+`product/phase-6-launch-readiness`
+
+## 0.6 Testing discipline
+
+Before declaring any implementation complete:
+
+- Run relevant unit tests.
+- Run integration tests.
+- Run E2E tests where available.
+- Run TypeScript checks.
+- Run lint.
+- Run production build.
+- Add regression tests for fixed defects.
+- Report exact commands and actual outputs.
+
+Never report tests as passed if they were not executed.
+
+Do not weaken or delete tests simply to achieve a passing result.
+
+## 0.7 Approval gates
+
+You are authorized to proceed through the roadmap, but you must respect the following restrictions:
+
+- Phase 0 must not modify application code.
+- Before major architectural changes, explain the proposed approach and its consequences.
+- Do not introduce external paid services, cloud processing, authentication providers, payment systems, or third-party data providers without approval.
+- Do not scrape external websites without approval.
+- Do not change the application's core analysis methodology without documenting the expected impact.
+- Do not claim real-world device testing if only browser emulation was used.
+
+If a decision materially changes the product architecture, privacy model, cost, or user experience, document it and request approval before proceeding.
+
+---
+
+# PHASE 0 — COMPLETE PRODUCT DISCOVERY AND TECHNICAL AUDIT
+
+## Objective
+
+Understand exactly what currently exists before implementation.
+
+Do not modify application source code during this phase.
+
+## 0.1 Repository reconnaissance
+
+Inspect:
+
+- Repository structure.
+- Framework and versions.
+- Programming language.
+- Package manager.
+- Build configuration.
+- Routing.
+- State management.
+- UI architecture.
+- Styling.
+- Data persistence.
+- AI/ML libraries.
+- Computer vision dependencies.
+- WASM assets.
+- Model assets.
+- Static assets.
+- Environment variables.
+- PWA configuration.
+- Deployment configuration.
+- CI/CD.
+- Testing infrastructure.
+
+Inspect package manifests, lockfiles, scripts, configuration files, and relevant source files.
+
+Identify:
+- Core business logic.
+- Presentation components.
+- Data access.
+- Analysis pipeline.
+- Recommendation pipeline.
+- Virtual try-on pipeline.
+- Catalog.
+- Storage.
+- Shared types.
+- Tests.
+
+Look for:
+- Duplicate logic.
+- Dead code.
+- Unused dependencies.
+- TODO/FIXME comments.
+- Overly large components.
+- Circular dependencies.
+- Inconsistent data models.
+- Unnecessary loading of large assets.
+
+Record file sizes for large assets, especially WASM and ML models.
+
+## 0.2 Complete feature inventory
+
+Inspect every major feature.
+
+### First-time experience
+- Landing page.
+- Navigation.
+- Onboarding.
+- Guest access.
+- Feature discovery.
+- Permission requests.
+
+### Image acquisition
+- Upload.
+- Camera.
+- Camera permission.
+- Camera switching.
+- Image validation.
+- Orientation.
+- Image dimensions.
+- Image quality.
+- Retry behavior.
+
+### Analysis
+- Face detection.
+- Landmarks.
+- Skin region extraction.
+- Skin pixel filtering.
+- Lighting assessment.
+- Color calculations.
+- Undertone classification.
+- Seasonal color classification.
+- Confidence.
+- Invalid image handling.
+
+### Recommendation
+- Target colors.
+- Product eligibility.
+- Color similarity.
+- Undertone compatibility.
+- Seasonal compatibility.
+- Ranking.
+- Match tiers.
+- Explanation.
+- Guest mode.
+- Low-confidence handling.
+
+### Virtual try-on
+- Input image.
+- Face/lip detection.
+- Mask generation.
+- Color application.
+- Blending.
+- Rendering.
+- Preview.
+- Failure handling.
+
+### Product discovery
+- Catalog.
+- Search.
+- Filters.
+- Product cards.
+- Product details.
+- Price.
+- Purchase links.
+- Comparison.
+- Saved products.
+
+### Profile and persistence
+- Local profile.
+- History.
+- Preferences.
+- Saved items.
+- Restoration.
+- Deletion.
+
+### PWA
+- Installation.
+- Service worker.
+- Cache.
+- Offline behavior.
+- Update behavior.
+
+For every feature, document:
+- Status: Implemented / Partial / Missing / Unknown.
+- Entry point.
+- Main implementation.
+- Inputs and outputs.
+- Dependencies.
+- Tests.
+- Limitations.
+- User impact.
+
+## 0.3 End-to-end data flow tracing
+
+Trace the real implementation of these flows.
+
+### Flow A: Portrait analysis
+
+User action
+→ Image input
+→ Validation
+→ Preprocessing
+→ Face detection
+→ Landmark extraction
+→ Skin region extraction
+→ Color calculation
+→ Classification
+→ Confidence
+→ Persistence
+→ UI.
+
+### Flow B: Product recommendation
+
+Analysis
+→ Target profile
+→ Product catalog
+→ Eligibility
+→ Color comparison
+→ Compatibility
+→ Ranking
+→ Match explanation
+→ UI.
+
+### Flow C: Virtual try-on
+
+Image
+→ Detection
+→ Mask
+→ Color transformation
+→ Blending
+→ Rendering
+→ Preview.
+
+### Flow D: Persistence
+
+User data
+→ Serialization
+→ Storage
+→ Restoration
+→ Update
+→ Deletion.
+
+For each stage, document exact functions, data types, validation, errors, fallbacks, and transformations.
+
+## 0.4 Trust and scientific validity audit
+
+Explicitly inspect:
+
+- `src/components/CatalogMatcher.tsx`
+- `src/lib/beauty/productMatcher.ts`
+- `src/lib/beauty/analysisConfidence.ts`
+- `src/lib/beauty/analysisValidity.ts`
+- `src/lib/beauty/productCatalog.ts`
+
+Follow all related callers and consumers.
+
+Investigate:
+- Hardcoded match values.
+- Fake Delta E.
+- Default match tiers.
+- Fake confidence.
+- Guest-mode personalization.
+- Invalid analysis handling.
+- Missing product attributes.
+- Incorrect sorting.
+- Stale analysis.
+- Unsupported compatibility claims.
+
+Review the CIEDE2000 implementation:
+- HEX parsing.
+- RGB to Lab.
+- Color space assumptions.
+- Numerical correctness.
+- Input validation.
+- Missing data.
+- Reference color selection.
+
+Review confidence:
+- Formula.
+- Input signals.
+- Weighting.
+- Thresholds.
+- Calibration.
+- User-facing wording.
+
+Determine whether confidence is statistically calibrated or merely a heuristic quality score.
+
+Review virtual try-on:
+- Mask quality.
+- Facial boundaries.
+- Texture preservation.
+- Lighting and shadows.
+- Color blending.
+- Realism limitations.
+
+Do not equate color similarity with actual cosmetic suitability.
+
+## 0.5 Product data audit
+
+Inspect every catalog record.
+
+Evaluate:
+- Product identity.
+- Shade identity.
+- Duplicate records.
+- Brand consistency.
+- Category consistency.
+- HEX validity.
+- Undertone.
+- Seasonal attributes.
+- Product image.
+- Purchase URL.
+- Price.
+- Data source.
+- Verification timestamp.
+
+Inspect estimated price logic, including `estimateProductPriceVn()`, and purchase link generation, including `buildVnShopLinks()`.
+
+Determine whether estimated information is being presented as verified information.
+
+## 0.6 UX and accessibility audit
+
+Inspect:
+- Navigation.
+- First-time experience.
+- Main consultation flow.
+- Camera experience.
+- Loading states.
+- Errors.
+- Result screens.
+- Recommendation screens.
+- Product browsing.
+- Mobile layouts.
+- Accessibility.
+- Keyboard navigation.
+- Focus states.
+- Contrast.
+- Touch target sizes.
+
+Document confusing terminology, dead ends, missing feedback, and unnecessary steps.
+
+## 0.7 Engineering quality audit
+
+Inspect:
+- Type safety.
+- Null handling.
+- Error boundaries.
+- Component responsibilities.
+- Business logic separation.
+- Testing coverage.
+- Performance.
+- Reliability.
+- Privacy.
+- External network requests.
+- Secrets.
+- Storage.
+- Image lifecycle.
+
+Run safe existing checks and record actual results.
+
+## 0.8 Audit deliverables
+
+Create:
+
+- `AUDIT_00_REPOSITORY_MAP.md`
+- `AUDIT_01_FEATURE_INVENTORY.md`
+- `AUDIT_02_DATA_FLOWS.md`
+- `AUDIT_03_TRUST_AND_DATA_INTEGRITY.md`
+- `AUDIT_04_UX_ACCESSIBILITY.md`
+- `AUDIT_05_ENGINEERING_QUALITY.md`
+- `PRODUCT_AUDIT.md`
+
+The executive report must contain:
+
+1. Product summary.
+2. Current capabilities.
+3. Incomplete features.
+4. Top 10 findings.
+5. Top 5 risks.
+6. Top 5 improvement opportunities.
+7. Product readiness scorecard.
+8. Issue register.
+9. Recommended implementation roadmap.
+10. Decisions requiring owner approval.
+11. Unverified areas.
+
+Severity levels:
+
+- P0: Critical trust, privacy, data integrity, or core functionality issue.
+- P1: Major user journey issue.
+- P2: Significant usability or maintainability issue.
+- P3: Enhancement.
+
+Do not implement anything during Phase 0.
+
+---
+
+# PHASE 1 — RECOMMENDATION INTEGRITY ENGINEERING
+
+## Objective
+
+Make recommendations technically defensible, consistent, transparent, and useful.
+
+## 1.1 Recommendation data contract
+
+Trace all producers and consumers of recommendation data.
+
+Inspect:
+- `MatchedProduct`.
+- `deltaE`.
+- `matchTier`.
+- Compatibility fields.
+- Product score fields.
+- Ranking logic.
+- UI consumers.
+
+Define a consistent data model separating:
+
+- Analysis result.
+- Product catalog data.
+- Match evaluation.
+- Recommendation result.
+- Recommendation status.
+- User-facing explanation.
+
+Avoid duplicate models and unnecessary breaking changes.
+
+## 1.2 Centralized eligibility engine
+
+Implement or improve a single reusable eligibility mechanism.
+
+It must distinguish:
+
+- Browsing eligibility.
+- Color similarity eligibility.
+- Personalized recommendation eligibility.
+
+Evaluate:
+- Analysis existence.
+- Analysis validity.
+- Required analysis fields.
+- Analysis quality.
+- Target color availability.
+- Product category.
+- Product color availability.
+- Catalog availability.
+
+Use explicit reason codes.
+
+Examples:
+- `NO_ANALYSIS`
+- `INVALID_ANALYSIS`
+- `INSUFFICIENT_SKIN_EVIDENCE`
+- `LOW_ANALYSIS_QUALITY`
+- `MISSING_TARGET_COLOR`
+- `INVALID_PRODUCT_COLOR`
+- `EMPTY_CATALOG`
+
+Adapt these codes to the existing architecture.
+
+Missing optional product data must not automatically exclude a product from browsing.
+
+## 1.3 Matching and ranking
+
+Separate:
+
+- Color similarity.
+- Undertone compatibility.
+- Seasonal palette compatibility.
+- Finish preference.
+- Coverage preference.
+- Personal preferences.
+
+A missing dimension must be unknown, not silently treated as compatible.
+
+Preserve the CIEDE2000 implementation if verified correct.
+
+Do not introduce arbitrary scoring weights or unsupported percentages.
+
+If composite ranking is necessary:
+- Document the formula.
+- Explain every factor.
+- Define missing-value behavior.
+- Make ranking deterministic.
+- Add tests.
+- Explain limitations.
+
+Never imply that HEX or Delta E predicts exact cosmetic appearance on real skin or lips.
+
+## 1.4 Recommendation UI
+
+Implement correct states:
+
+### Browse
+- User can browse products without analysis.
+- No personalized scores.
+- No fabricated match tiers.
+
+### Personalized
+- Show only dimensions actually evaluated.
+- Explain the evidence.
+- Separate color similarity from overall suitability.
+
+### Caution
+- Explain limitations.
+- Offer retaking or correction where appropriate.
+
+### Unavailable
+- Explain why recommendation cannot be generated.
+- Offer a recovery action.
+
+### Empty catalog
+- Show a proper empty state.
+- Do not display broken cards.
+
+### Stale analysis
+- Never silently reuse an outdated result for a new image.
+
+## 1.5 Testing
+
+Test:
+- Guest browsing.
+- Invalid analysis.
+- Missing fields.
+- Invalid HEX.
+- Sorting.
+- Ranking.
+- Unknown compatibility.
+- Empty catalog.
+- Stale analysis.
+- Failed analysis.
+- Analysis replacement.
+- UI integration.
+
+## Acceptance criteria
+
+- No fabricated guest match scores.
+- No fabricated match tiers.
+- No invalid analysis producing personalized recommendations.
+- Missing data remains unknown.
+- Displayed match dimensions have supporting evidence.
+- Existing valid functionality is preserved.
+- Regression tests pass.
+- Production build succeeds.
+
+Deliver:
+- `PHASE_1_IMPLEMENTATION_PLAN.md`
+- `PHASE_1_REPORT.md`
+- Updated source code.
+- Regression tests.
+
+---
+
+# PHASE 2 — PRODUCT DATA AND CATALOG ENGINEERING
+
+## Objective
+
+Create a consistent, validated, trustworthy product catalog.
+
+## 2.1 Full catalog audit
+
+Inspect every record.
+
+Analyze:
+- Total products.
+- Unique brands.
+- Unique products.
+- Unique shades.
+- Duplicates.
+- Missing values.
+- Invalid HEX.
+- Inconsistent categories.
+- Inconsistent undertones.
+- Missing images.
+- Missing URLs.
+- Missing prices.
+- Missing sources.
+
+Produce a record-level issue report.
+
+## 2.2 Product schema
+
+Review whether the current catalog should distinguish:
+
+### Brand
+- Brand ID.
+- Brand name.
+- Official website.
+
+### Product
+- Product ID.
+- Brand ID.
+- Name.
+- Category.
+- Description.
+- Finish.
+- Coverage.
+- Texture.
+- Size.
+- Image.
+- Official URL.
+
+### Shade
+- Shade ID.
+- Product ID.
+- Shade name.
+- HEX or color representation.
+- Color measurement method.
+- Undertone.
+- Shade image.
+
+### Commercial information
+- Price.
+- Currency.
+- Retailer.
+- Purchase URL.
+- Availability.
+- Source.
+- Verification date.
+
+### Provenance
+- Manufacturer.
+- Official website.
+- Authorized retailer.
+- Other retailer.
+- Manual verification.
+- Estimated.
+- Unknown.
+
+Do not introduce unnecessary mandatory fields.
+
+Explain migration implications before changing the model.
+
+## 2.3 Validation pipeline
+
+Create repeatable validation for:
+
+- Required fields.
+- Data types.
+- Unique identifiers.
+- Product-shade relationships.
+- HEX.
+- URLs.
+- Category.
+- Undertone.
+- Currency.
+- Prices.
+- Provenance.
+- Timestamps.
+
+Distinguish errors from warnings.
+
+Invalid records must not enter personalized matching.
+
+## 2.4 Catalog normalization
+
+Normalize existing records carefully.
+
+- Preserve valid information.
+- Resolve only unambiguous issues.
+- Flag uncertain records.
+- Avoid destructive transformations.
+- Maintain an audit trail.
+- Make scripts safely repeatable.
+
+## 2.5 Product UI integration
+
+Display:
+- Brand.
+- Product.
+- Shade.
+- Image.
+- Category.
+- Finish.
+- Coverage.
+- Verified price.
+- Verification status.
+
+Do not display estimated prices as live prices.
+
+Do not fabricate product images, links, or attributes.
+
+## Acceptance criteria
+
+- All records are valid or explicitly flagged.
+- No duplicate identifiers.
+- No fabricated prices or links.
+- Invalid records cannot produce personalized color scores.
+- Existing valid products remain available.
+- Catalog validation is repeatable.
+
+Deliver:
+- `CATALOG_AUDIT.md`
+- `PRODUCT_SCHEMA.md`
+- `CATALOG_VALIDATION_REPORT.md`
+- Normalization scripts where needed.
+- Tests.
+- `PHASE_2_REPORT.md`
+
+---
+
+# PHASE 3 — CONSULTATION EXPERIENCE AND UX ENGINEERING
+
+## Objective
+
+Make the application understandable and usable for non-technical beauty consumers.
+
+Preserve the established brand identity.
+
+Do not redesign for visual novelty alone.
+
+## 3.1 Main user journey
+
+Design and improve:
+
+Discover
+→ Understand the service
+→ Start consultation
+→ Choose image input
+→ Validate image
+→ Analyze
+→ Understand results
+→ Explore recommendations
+→ Save or continue shopping.
+
+Review navigation, repeated steps, dead ends, and unclear actions.
+
+## 3.2 First-time experience
+
+Improve:
+- Value proposition.
+- Feature explanation.
+- Privacy explanation.
+- Guest usage.
+- Photo instructions.
+- Consultation entry point.
+
+Do not require registration before users can experience useful functionality unless technically necessary.
+
+Explain camera permission before requesting it.
+
+## 3.3 Photo input and capture
+
+Support:
+- Upload.
+- Camera capture.
+- Permission denial.
+- Camera unavailable.
+- Invalid formats.
+- Oversized files.
+- Orientation issues.
+- Retaking.
+- Image quality feedback.
+
+Where supported, assess:
+- Brightness.
+- Face detection.
+- Face positioning.
+- Image dimensions.
+- Skin evidence.
+
+Only display checks actually implemented.
+
+Errors must provide actionable instructions.
+
+## 3.4 Analysis progress
+
+Provide meaningful progress states:
+
+- Preparing image.
+- Detecting face.
+- Extracting skin evidence.
+- Calculating color profile.
+- Generating analysis.
+- Preparing recommendations.
+
+Only show stages corresponding to actual processing.
+
+Never fabricate progress percentages.
+
+Handle slow processing, interruption, cancellation, and failures.
+
+## 3.5 Analysis results
+
+Organize results into:
+
+### Primary insight
+The most important finding in plain language.
+
+### Color profile
+Relevant measurements and visual representations.
+
+### Undertone
+Classification and limitations.
+
+### Seasonal palette
+Classification and supporting evidence.
+
+### Recommended colors
+Useful visual swatches and explanations.
+
+### Makeup guidance
+Only supported recommendations.
+
+### Reliability
+Explain uncertainty and when a retake is useful.
+
+### Technical details
+Keep Delta E, Lab values, and advanced measurements in an optional section.
+
+Do not overwhelm ordinary users with technical metrics.
+
+## 3.6 History and recovery
+
+Review existing persistence before implementing:
+
+- Return to previous analysis.
+- Distinguish previous and current results.
+- Retake.
+- Recover from storage failure.
+- Handle corrupted history.
+- Delete saved information.
+
+Do not introduce cloud synchronization or accounts without approval.
+
+## 3.7 Responsive and accessible UX
+
+Verify:
+- Mobile layouts.
+- Touch targets.
+- Keyboard navigation.
+- Focus visibility.
+- Screen readers.
+- Contrast.
+- Text scaling.
+- Reduced motion.
+
+## Acceptance criteria
+
+- First-time users understand the application.
+- Main journey has no unexplained dead ends.
+- Camera and upload failures have recovery actions.
+- Processing feedback is truthful.
+- Results distinguish findings from limitations.
+- Critical screens work on mobile.
+- Critical accessibility issues are addressed.
+
+Deliver:
+- `CONSULTATION_JOURNEY_MAP.md`
+- `CONSULTATION_SCREEN_SPEC.md`
+- `PHASE_3_REPORT.md`
+- Before/after screenshots.
+- Interaction and responsive test results.
+
+---
+
+# PHASE 4 — PRODUCT DISCOVERY AND SHOPPING EXPERIENCE
+
+## Objective
+
+Help users find, understand, and compare makeup products.
+
+## 4.1 Product discovery
+
+Implement or improve:
+
+- Catalog browsing.
+- Search.
+- Category filters.
+- Brand filters.
+- Shade filters.
+- Undertone filters.
+- Finish filters.
+- Price filters where verified prices exist.
+- Sorting.
+- Empty states.
+- Clear filters.
+- Loading states.
+- Error states.
+
+Browsing must work without personalized analysis.
+
+## 4.2 Product cards
+
+Prioritize:
+1. Product image.
+2. Brand.
+3. Product name.
+4. Exact shade.
+5. Category.
+6. Finish.
+7. Verified price.
+8. Valid recommendation information.
+
+Avoid excessive information density.
+
+## 4.3 Product details
+
+Provide:
+- Brand.
+- Product identity.
+- Category.
+- Product images.
+- Shade selection.
+- Shade swatches.
+- Finish.
+- Coverage.
+- Texture.
+- Size.
+- Price and source.
+- Verification status.
+- Official URL.
+- Retailer URLs.
+
+Only display available data.
+
+## 4.4 Personalized matching
+
+Integrate the approved Phase 1 recommendation engine.
+
+Show separate dimensions:
+- Color similarity.
+- Undertone.
+- Seasonal compatibility.
+- User preferences.
+
+Explain why a product appears.
+
+Do not display unsupported match percentages.
+
+## 4.5 Product comparison
+
+Allow comparison of up to three products.
+
+Compare:
+- Brand.
+- Name.
+- Shade.
+- Color.
+- Similarity.
+- Undertone.
+- Finish.
+- Coverage.
+- Texture.
+- Price.
+- Verification.
+
+Represent missing data honestly.
+
+## 4.6 Saved products
+
+If compatible with the existing architecture:
+
+- Add to wishlist.
+- Remove from wishlist.
+- View saved items.
+- Preserve selected shade.
+- Handle deleted products.
+- Handle catalog updates.
+
+Do not introduce cloud accounts or synchronization.
+
+## 4.7 Purchase links
+
+Validate:
+- Product identity.
+- Shade identity.
+- Retailer.
+- External navigation.
+- Official versus third-party source.
+
+Do not claim real-time availability without a verified source.
+
+Do not implement checkout, payment, or affiliate systems without approval.
+
+## Acceptance criteria
+
+- Browsing works without analysis.
+- Filters work correctly.
+- Product details use actual catalog data.
+- Comparison handles missing information.
+- Saved products persist reliably.
+- No fabricated prices or links.
+- Recommendation data comes from Phase 1.
+- Mobile shopping experience is usable.
+
+Deliver:
+- `PRODUCT_DISCOVERY_SPEC.md`
+- `SHOPPING_TEST_REPORT.md`
+- `PHASE_4_REPORT.md`
+
+---
+
+# PHASE 5 — PERFORMANCE, RELIABILITY AND PRIVACY
+
+## Objective
+
+Make the application stable, efficient, and transparent about data handling.
+
+Measure before optimizing.
+
+## 5.1 Performance baseline
+
+Measure where possible:
+- Production bundle size.
+- JavaScript chunk sizes.
+- CSS size.
+- WASM sizes.
+- Model sizes.
+- Initial load.
+- Time to interactive.
+- Image processing.
+- Analysis duration.
+- Memory usage.
+- LCP.
+- CLS.
+- INP.
+
+Document test environment and methodology.
+
+Separate measured values from estimates.
+
+## 5.2 Asset loading
+
+Trace:
+- WASM loading.
+- MediaPipe loading.
+- Model initialization.
+- Large static assets.
+- Product images.
+
+Determine:
+- When each asset loads.
+- Whether duplicate downloads occur.
+- Whether loading blocks the main thread.
+- Whether caching works.
+- Whether assets are needed on every route.
+
+Evaluate:
+- Lazy loading.
+- Dynamic imports.
+- Caching.
+- Preloading.
+- Resource management.
+- Failure recovery.
+
+Do not remove assets without proving they are unnecessary.
+
+## 5.3 Image processing performance
+
+Profile:
+- Image decoding.
+- Resizing.
+- Preprocessing.
+- Face detection.
+- Skin extraction.
+- Color calculations.
+- Virtual try-on rendering.
+
+Identify main-thread blocking.
+
+Evaluate workers or other optimizations where justified.
+
+Preserve analysis correctness.
+
+## 5.4 Failure recovery
+
+Test:
+- Camera unavailable.
+- Permission denied.
+- Image decoding failure.
+- WASM initialization failure.
+- Model loading failure.
+- Interrupted processing.
+- Browser backgrounding.
+- Offline.
+- IndexedDB unavailable.
+- Storage quota exceeded.
+- Corrupted profile.
+- Invalid catalog data.
+
+Critical failures must be detected, safely logged, explained, and recoverable where possible.
+
+## 5.5 Privacy and security
+
+Trace the complete lifecycle of photographs and analysis data.
+
+Verify:
+- Whether photographs leave the device.
+- External services receiving images.
+- Third-party scripts.
+- Storage locations.
+- Browser cache behavior.
+- Data deletion.
+- Sensitive logging.
+- Exposed frontend secrets.
+
+Do not claim the app is fully local or fully private without evidence.
+
+## 5.6 Device validation
+
+Test on real devices where available:
+
+- iOS Safari.
+- Android Chrome.
+- Small screens.
+- Low-memory conditions.
+- Slow networks.
+- Camera orientation.
+- App switching.
+- Reloads.
+
+If real devices are unavailable, mark the tests as not performed.
+
+Desktop emulation is not equivalent to real-device testing.
+
+## Acceptance criteria
+
+- Reproducible performance baseline.
+- Before/after measurements for optimizations.
+- No critical analysis regressions.
+- Large resources load appropriately.
+- Critical failures have recovery behavior.
+- Privacy behavior is documented accurately.
+- No unresolved critical privacy or security issue.
+- Tests and production build pass.
+
+Deliver:
+- `PERFORMANCE_BASELINE.md`
+- `PERFORMANCE_OPTIMIZATION_REPORT.md`
+- `PRIVACY_DATA_FLOW.md`
+- `DEVICE_COMPATIBILITY_REPORT.md`
+- `PHASE_5_REPORT.md`
+
+---
+
+# PHASE 6 — USER VALIDATION AND LAUNCH READINESS
+
+## Objective
+
+Determine whether the application is ready for real users.
+
+Automated tests alone are not sufficient.
+
+## 6.1 User research plan
+
+Prepare a controlled usability test for 10–20 voluntary participants.
+
+Seek diversity in:
+- Skin tones.
+- Undertones.
+- Makeup experience.
+- Devices.
+- Browsers.
+- Age groups.
+
+Do not collect unnecessary biometric or personal data.
+
+Clearly explain how photos and feedback will be handled.
+
+If participants are unavailable, prepare the research plan but do not fabricate results.
+
+## 6.2 Test scenarios
+
+Ask participants to complete these tasks without coaching:
+
+1. Explain what the application does.
+2. Start a consultation.
+3. Upload or capture a portrait.
+4. Recover from poor image quality.
+5. Complete an analysis.
+6. Explain the results.
+7. Find a recommended product.
+8. Compare two shades.
+9. Use virtual try-on.
+10. Save a product.
+11. Return to saved information.
+12. Identify application limitations.
+
+Observe confusion, hesitation, mistakes, and abandonment.
+
+## 6.3 Metrics
+
+Measure:
+
+### Usability
+- Task completion rate.
+- Completion time.
+- Errors.
+- Assistance requests.
+- Drop-off points.
+
+### Analysis
+- First-attempt success.
+- Retake rate.
+- Processing failure.
+- Understanding of limitations.
+
+### Recommendations
+- Usefulness.
+- Explanation clarity.
+- Trust concerns.
+- Perceived accuracy.
+
+### Shopping
+- Discovery completion.
+- Comparison completion.
+- Product detail engagement.
+- Purchase-link clarity.
+
+Do not equate engagement with usefulness.
+
+## 6.4 Qualitative feedback
+
+Ask:
+- What was immediately understandable?
+- What was confusing?
+- Which result did you trust least?
+- Did any result appear inaccurate?
+- Were recommendations useful?
+- Was virtual try-on realistic enough?
+- What would prevent future usage?
+- Would you use the application before buying makeup?
+
+Separate observations from opinions.
+
+## 6.5 Final issue prioritization
+
+Classify issues by:
+- Recommendation integrity.
+- Analysis quality.
+- Product data.
+- Usability.
+- Performance.
+- Privacy.
+- Accessibility.
+- Enhancement.
+
+Record severity, frequency, impact, reproducibility, and recommended action.
+
+## 6.6 Launch readiness verdict
+
+Review all previous reports.
+
+Choose exactly one:
+
+1. NOT READY FOR EXTERNAL USERS.
+2. READY FOR LIMITED CLOSED BETA.
+3. READY FOR PUBLIC BETA.
+4. READY FOR PUBLIC LAUNCH.
+
+Justify the verdict using evidence.
+
+If real-user validation has not occurred, explicitly state that limitation.
+
+## Deliverables
+
+Create:
+- `USER_RESEARCH_PLAN.md`
+- `USER_VALIDATION_REPORT.md`
+- `FINAL_ISSUE_REGISTER.md`
+- `LAUNCH_READINESS_REPORT.md`
+
+Include actual participant count, testing environment, metrics, feedback, remaining risks, and next steps.
+
+---
+
+# ADDITIONAL PRODUCT QUALITY REQUIREMENTS
+
+Throughout the project, continuously evaluate these areas.
+
+## A. Visual design consistency
+
+- Preserve brand identity.
+- Establish consistent spacing.
+- Establish consistent typography.
+- Use consistent colors.
+- Standardize buttons.
+- Standardize inputs.
+- Standardize cards.
+- Standardize modals.
+- Standardize loading states.
+- Standardize error states.
+- Standardize empty states.
+
+Avoid unnecessary gradients, shadows, animations, and decorative elements.
+
+Visual polish must support usability.
+
+## B. Component architecture
+
+- Keep business logic outside presentation components where practical.
+- Reuse components when behavior is genuinely shared.
+- Avoid excessive abstraction.
+- Keep components understandable.
+- Use explicit types.
+- Handle null and undefined safely.
+- Avoid unnecessary global state.
+
+## C. Error handling
+
+Every important asynchronous operation should have:
+- Loading state.
+- Success state.
+- Failure state.
+- Cancellation or retry where appropriate.
+- Safe error reporting.
+
+Never swallow important errors silently.
+
+## D. Documentation
+
+Update documentation when implementation changes.
+
+Document:
+- Architecture.
+- Data models.
+- Important algorithms.
+- Environment setup.
+- Development commands.
+- Testing.
+- Known limitations.
+- Deployment.
+
+Do not write documentation that describes functionality that does not exist.
+
+## E. Future product opportunities
+
+Do not implement these during the core roadmap unless explicitly approved, but evaluate them as future opportunities:
+
+1. Personal Beauty Profile.
+2. Makeup Look Builder.
+3. My Makeup Collection.
+4. Smart Shopping Assistant.
+5. Advanced shade comparison.
+6. Personalized beauty routines.
+7. Product alternatives.
+8. Saved color palettes.
+
+Prioritize foundational reliability before expanding functionality.
+
+---
+
+# GLOBAL DEFINITION OF DONE
+
+A task is complete only when:
+
+1. Requested behavior is implemented.
+2. Existing related behavior is preserved.
+3. Types and interfaces are consistent.
+4. Relevant tests are added or updated.
+5. Regression tests pass.
+6. TypeScript checks pass.
+7. Lint passes.
+8. Production build succeeds.
+9. No known critical regression remains.
+10. Documentation is updated where necessary.
+11. Actual test results are reported.
+12. Remaining limitations are disclosed.
+
+For every task, report:
+
+### Scope
+What was requested, implemented, and excluded.
+
+### Code changes
+Files created, modified, and important symbols changed.
+
+### Behavior changes
+Previous behavior, new behavior, and reason.
+
+### Testing
+Exact commands, actual outputs, passed/failed/skipped counts.
+
+### Regression
+Affected functionality, verified functionality, and untested paths.
+
+### Acceptance criteria
+PASS / FAIL / NOT VERIFIED / BLOCKED for every criterion.
+
+### Remaining work
+Known bugs, technical debt, and decisions requiring approval.
+
+### Final status
+Choose one:
+- COMPLETE.
+- PARTIALLY COMPLETE.
+- BLOCKED.
+- NEEDS OWNER DECISION.
+
+Never claim success without evidence.
+
+---
+
+# FINAL INSTRUCTION
+
+Start with PHASE 0 ONLY.
+
+First inspect the repository and current Git state.
+
+Produce the audit reports and the prioritized implementation roadmap.
+
+Do not modify application source code during Phase 0.
+
+After the audit, continue to Phase 1 and subsequent phases in order, respecting the approval restrictions and scope boundaries above.
+
+Do not skip tasks merely to finish faster.
+
+Do not implement unrelated features.
+
+Do not optimize code without understanding its behavior.
+
+Do not sacrifice recommendation correctness, user privacy, or data integrity for visual polish.
+
+Your ultimate goal is not simply to make Beauty AI Consultant look like a finished product.
+
+Your goal is to make it genuinely useful, reliable, honest, maintainable, and ready for real users.
+
+Begin with repository inspection and Phase 0.

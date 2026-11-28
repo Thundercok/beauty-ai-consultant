@@ -6,6 +6,12 @@ import {
   scoreMatchedProductsPopularity,
   type TrendingProductItem,
 } from "../lib/beauty/productMatcher";
+import type { AnalysisConfidenceResult } from "../lib/beauty/analysisConfidence";
+import type { AnalysisValidity } from "../lib/beauty/analysisValidity";
+import {
+  catalogProductToBrowseItem,
+  evaluateRecommendationEligibility,
+} from "../lib/beauty/recommendationIntegrity";
 import { deltaEToMatchPercent } from "../lib/beauty/virtualMakeup";
 import {
   buildVnShopLinks,
@@ -41,6 +47,8 @@ interface CatalogMatcherProps {
   lipBaseLab: [number, number, number] | null;
   skinMetrics: SkinMetrics | null;
   userSeason: SeasonName | null;
+  analysisValidity?: AnalysisValidity | null;
+  analysisConfidence?: AnalysisConfidenceResult | null;
   catalogIlluminant: IlluminantName;
   initialCategory?: CatalogFilterId;
   savedIds: Set<number>;
@@ -111,6 +119,8 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
   lipBaseLab,
   skinMetrics,
   userSeason,
+  analysisValidity = null,
+  analysisConfidence = null,
   catalogIlluminant,
   initialCategory = "vn_popular",
   savedIds,
@@ -119,7 +129,19 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
   onTryLipstick,
   onRequestAnalysis,
 }) => {
-  const hasPortraitProfile = Boolean(blendedTargets && lipBaseLab && skinMetrics && userSeason);
+  const hasPortraitData = Boolean(blendedTargets && lipBaseLab && skinMetrics && userSeason);
+  const eligibility = useMemo(
+    () =>
+      evaluateRecommendationEligibility({
+        catalogCount: products.length,
+        hasAnalysis: hasPortraitData,
+        analysisValidity,
+        confidence: analysisConfidence,
+        targetHex: blendedTargets?.lip,
+      }),
+    [products.length, hasPortraitData, analysisValidity, analysisConfidence, blendedTargets?.lip]
+  );
+  const hasPortraitProfile = eligibility.canPersonalize && hasPortraitData;
 
   const [activeType, setActiveType] = useState<CatalogFilterId>(initialCategory);
   const [budgetTier, setBudgetTier] = useState<PriceTierId>("all");
@@ -159,22 +181,11 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
             : products.filter((p) => p.product_type === activeType);
 
     if (!hasPortraitProfile || !blendedTargets || !lipBaseLab || !userSeason) {
-      // Guest browse mode: full catalog access without claiming personalized skin deltaE
+      // Guest / unpersonalized browse mode: explicit null deltaE & matchTier (zero fabricated scores)
       return sourceList.map((p) => ({
-        id: p.id,
-        brand: p.brand,
-        name: p.product_name,
-        shade: p.shade_name,
-        productType: p.product_type,
-        texture: p.texture_type,
-        hex: p.hex_color,
-        deltaE: 10,
-        matchTier: "Great Match" as const,
-        undertone: p.undertone,
-        bestSeasons: p.best_seasons,
+        ...catalogProductToBrowseItem(p),
         popularityScore: VN_POPULAR_BRANDS.has(p.brand) ? 80 : 50,
         isPopular: VN_POPULAR_BRANDS.has(p.brand),
-        popularityBadge: VN_POPULAR_BRANDS.has(p.brand) ? "Sinh viên hay dùng" : undefined,
         hotReason: "",
       }));
     }
@@ -220,7 +231,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
         .sort((a, b) => b.popularityScore - a.popularityScore);
     }
 
-    scored.sort((a, b) => a.deltaE - b.deltaE);
+    scored.sort((a, b) => (a.deltaE ?? Infinity) - (b.deltaE ?? Infinity));
     return scored;
   }, [
     hasPortraitProfile,
@@ -244,7 +255,7 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
           texture: item.texture,
           hex: item.hex,
           renderedHex: item.renderedHex,
-          deltaE: item.deltaE,
+          deltaE: typeof item.deltaE === "number" ? item.deltaE : undefined,
         });
         return { item, price, traits };
       })
@@ -285,10 +296,11 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
         >
           <div className="space-y-0.5">
             <div className="text-xs font-semibold text-[#111111]">
-              Đang xem toàn bộ {products.length} sản phẩm
+              {eligibility.bannerTitleVi ?? `Đang xem toàn bộ ${products.length} sản phẩm`}
             </div>
             <p className="text-xs text-[#666666]">
-              Bạn có thể lọc theo hãng, tông màu và lưu sản phẩm ngay. Tải ảnh để xếp hạng theo màu da của bạn.
+              {eligibility.bannerMessageVi ??
+                "Bạn có thể lọc theo hãng, tông màu và lưu sản phẩm ngay. Chưa tính độ gần màu theo da cho tới khi bạn phân tích ảnh chân dung."}
             </p>
           </div>
           {onRequestAnalysis && (
@@ -298,6 +310,30 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
               className="min-h-[36px] px-3.5 py-1.5 rounded-[4px] bg-[#111111] hover:bg-[#2B2B2B] text-white text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer"
             >
               Đo tông da
+            </button>
+          )}
+        </div>
+      )}
+
+      {eligibility.status === "caution" && eligibility.bannerMessageVi && (
+        <div
+          data-testid="catalog-caution-banner"
+          role="status"
+          className="bg-[#FFFBEB] border border-[#FDE68A] p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        >
+          <div className="space-y-0.5">
+            <div className="text-xs font-semibold text-[#78350F]">
+              {eligibility.bannerTitleVi}
+            </div>
+            <p className="text-xs text-[#92400E]">{eligibility.bannerMessageVi}</p>
+          </div>
+          {onRequestAnalysis && (
+            <button
+              type="button"
+              onClick={onRequestAnalysis}
+              className="min-h-[34px] px-3 py-1.5 rounded-[4px] bg-white border border-[#F59E0B] hover:bg-[#FEF3C7] text-[#92400E] text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              Chọn ảnh rõ hơn
             </button>
           )}
         </div>
@@ -495,7 +531,10 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
           {displayedItems.map(({ item, price, traits }) => {
             const typeLabel = PRODUCT_TYPE_VI_LABELS[item.productType] ?? item.productType;
             const textureLabel = TEXTURE_VI_LABELS[item.texture] ?? item.texture;
-            const matchPct = deltaEToMatchPercent(item.deltaE);
+            const matchPct =
+              hasPortraitProfile && typeof item.deltaE === "number"
+                ? deltaEToMatchPercent(item.deltaE)
+                : null;
             const isSaved = savedIds.has(item.id);
             const isLip = item.productType === "lipstick";
             const shopLinks = buildVnShopLinks(item.brand, item.name, item.shade);
@@ -566,24 +605,24 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
 
                     {/* Price + Match % (or Undertone in Guest mode) */}
                     <div className="pt-1 flex flex-wrap items-baseline justify-between gap-x-1.5 gap-y-0.5 text-[11px]">
-                      {hasPortraitProfile ? (
+                      {matchPct !== null ? (
                         <span
                           className={`font-semibold tabular-nums whitespace-nowrap ${
                             matchPct >= 90 ? "text-emerald-700" : "text-zinc-800"
                           }`}
                         >
-                          {matchPct}% hợp
+                          {matchPct}% hợp màu
                         </span>
                       ) : (
                         <span className="font-medium text-zinc-500 truncate">
-                          {item.undertone || "Đa tông"}
+                          {item.undertone || "Chưa rõ tông"}
                         </span>
                       )}
                       <span
-                        title="Giá ước tính tham khảo VN"
+                        title="Khoảng giá ước tính tham khảo tại Việt Nam (không phải giá bán trực tiếp)"
                         className="font-semibold text-zinc-900 tabular-nums whitespace-nowrap"
                       >
-                        ~{price.priceRangeLabel}
+                        {price.priceRangeLabel}
                       </span>
                     </div>
 
@@ -629,11 +668,11 @@ export const CatalogMatcher: React.FC<CatalogMatcherProps> = ({
                     href={shopLinks.shopeeUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label={`Tìm mua ${item.brand} ${item.name} trên Shopee`}
+                    aria-label={`Tìm kiếm ${item.brand} ${item.name} trên Shopee`}
                     className="min-h-[36px] sm:min-h-[34px] px-2.5 py-1.5 text-xs font-medium rounded-[4px] border border-[#E5E5E5] bg-white hover:border-[#111111] text-[#525252] hover:text-[#111111] inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Mua</span>
+                    <span className="hidden sm:inline">Tìm mua</span>
                   </a>
                 </div>
               </article>

@@ -90,7 +90,10 @@ export function hasActiveVirtualMakeup(options?: VirtualMakeupOptions): boolean 
 }
 
 /**
- * Converts a CIEDE2000 distance into a consumer-friendly 52–99% match score.
+ * Monotonic UI display rescaling of CIEDE2000 perceptual distance into [52, 99].
+ * IMPORTANT (Requirement 1): This is a relative color-proximity indicator for human readability,
+ * NOT a statistically calibrated probability of real-world cosmetic suitability. Raw `deltaE`
+ * and `classifyColorSimilarityTier(deltaE)` remain the authoritative colorimetric metrics.
  */
 export function deltaEToMatchPercent(deltaE: number): number {
   if (!Number.isFinite(deltaE) || deltaE <= 0) return 99;

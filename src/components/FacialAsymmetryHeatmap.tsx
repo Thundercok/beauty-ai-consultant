@@ -397,18 +397,24 @@ export const FacialAsymmetryHeatmap: React.FC<FacialAsymmetryHeatmapProps> = ({
                   </g>
                 )}
 
-                {/* Interactive Zone Hotspots (Hover / Focus / Tap) */}
+                {/* Interactive Zone Hotspots with Animated Pulsed Circular Indicators */}
                 {heatmap.zones.map((zone) => {
                   const isActive = activeZone?.id === zone.id;
+                  const isHovered = hoveredZoneId === zone.id;
                   const isHigh = zone.severity !== "balanced";
-                  const strokeHex =
-                    zone.severity === "notable"
-                      ? "#EF4444"
-                      : zone.severity === "mild"
-                        ? "#F59E0B"
-                        : "#E5E5E5";
-                  const rOuter = Math.max(14, zone.haloRadiusPx * (isActive ? 0.62 : 0.48));
-                  const rDot = Math.max(4.5, heatmap.faceWidthPx * (isActive ? 0.028 : 0.021));
+                  const isNotable = zone.severity === "notable";
+                  const strokeHex = isNotable
+                    ? "#EF4444"
+                    : zone.severity === "mild"
+                      ? "#F59E0B"
+                      : "#E5E5E5";
+                  const fillTint = isNotable
+                    ? "rgba(239,68,68,0.18)"
+                    : zone.severity === "mild"
+                      ? "rgba(245,158,11,0.16)"
+                      : "rgba(255,255,255,0.08)";
+                  const rOuter = Math.max(14, zone.haloRadiusPx * (isActive ? 0.56 : 0.48));
+                  const rDot = Math.max(4.5, heatmap.faceWidthPx * (isActive ? 0.026 : 0.021));
 
                   return (
                     <g
@@ -417,8 +423,12 @@ export const FacialAsymmetryHeatmap: React.FC<FacialAsymmetryHeatmapProps> = ({
                       tabIndex={0}
                       data-testid={`heatmap-zone-hotspot-${zone.id}`}
                       data-severity={zone.severity}
+                      data-pulsing={isHigh ? "true" : "false"}
+                      data-hovered={isHovered ? "true" : "false"}
+                      data-active={isActive ? "true" : "false"}
                       aria-label={`${zone.labelVi}: ${zone.severityLabelVi}, lệch ${zone.combinedDeltaPct.toFixed(1)}%`}
                       onMouseEnter={() => setHoveredZoneId(zone.id)}
+                      onMouseLeave={() => setHoveredZoneId((cur) => (cur === zone.id ? null : cur))}
                       onFocus={() => setHoveredZoneId(zone.id)}
                       onBlur={() => setHoveredZoneId((cur) => (cur === zone.id ? null : cur))}
                       onClick={() => setPinnedZoneId(zone.id)}
@@ -428,34 +438,64 @@ export const FacialAsymmetryHeatmap: React.FC<FacialAsymmetryHeatmapProps> = ({
                           setPinnedZoneId(zone.id);
                         }
                       }}
-                      className="cursor-pointer focus:outline-none"
+                      className="asymmetry-hotspot-group cursor-pointer focus:outline-none"
                     >
                       {/* Generous invisible hit area for effortless hover & mobile tap */}
                       <circle
                         cx={zone.hotspotPx.x}
                         cy={zone.hotspotPx.y}
-                        r={Math.max(22, zone.haloRadiusPx * 0.85)}
+                        r={Math.max(24, zone.haloRadiusPx * 0.9)}
                         fill="rgba(0,0,0,0.001)"
                       />
-                      {/* Crisp variance ring */}
-                      <circle
-                        cx={zone.hotspotPx.x}
-                        cy={zone.hotspotPx.y}
-                        r={rOuter}
-                        fill={isActive ? "rgba(220,38,38,0.12)" : "none"}
-                        stroke={isActive ? "#FFFFFF" : strokeHex}
-                        strokeWidth={Math.max(1.5, report.width * (isActive ? 0.0036 : 0.0024))}
-                        strokeOpacity={isActive ? 0.95 : isHigh ? 0.85 : 0.4}
-                      />
-                      {/* Center point */}
-                      <circle
-                        cx={zone.hotspotPx.x}
-                        cy={zone.hotspotPx.y}
-                        r={rDot}
-                        fill={isHigh ? strokeHex : "#111111"}
-                        stroke="#FFFFFF"
-                        strokeWidth={Math.max(1.5, report.width * 0.0026)}
-                      />
+
+                      {/* Animated pulsed concentric rings exclusively over high-variance zones */}
+                      {isHigh && (
+                        <>
+                          <circle
+                            cx={zone.hotspotPx.x}
+                            cy={zone.hotspotPx.y}
+                            r={rOuter}
+                            fill="none"
+                            stroke={strokeHex}
+                            strokeWidth={Math.max(1.8, report.width * 0.0034)}
+                            className="asymmetry-pulse-ring pointer-events-none"
+                          />
+                          {isNotable && (
+                            <circle
+                              cx={zone.hotspotPx.x}
+                              cy={zone.hotspotPx.y}
+                              r={rOuter}
+                              fill="none"
+                              stroke={strokeHex}
+                              strokeWidth={Math.max(1.4, report.width * 0.0024)}
+                              className="asymmetry-pulse-ring-delayed pointer-events-none"
+                            />
+                          )}
+                        </>
+                      )}
+
+                      {/* Smooth hover-expanding circular indicator group */}
+                      <g className="asymmetry-hotspot-visual pointer-events-none">
+                        {/* Outer variance ring */}
+                        <circle
+                          cx={zone.hotspotPx.x}
+                          cy={zone.hotspotPx.y}
+                          r={rOuter}
+                          fill={isHovered || isActive ? fillTint : "none"}
+                          stroke={isHovered || isActive ? "#FFFFFF" : strokeHex}
+                          strokeWidth={Math.max(1.6, report.width * (isHovered || isActive ? 0.0038 : 0.0026))}
+                          strokeOpacity={isHovered || isActive ? 0.98 : isHigh ? 0.88 : 0.42}
+                        />
+                        {/* Center point */}
+                        <circle
+                          cx={zone.hotspotPx.x}
+                          cy={zone.hotspotPx.y}
+                          r={rDot}
+                          fill={isHigh ? strokeHex : "#111111"}
+                          stroke="#FFFFFF"
+                          strokeWidth={Math.max(1.5, report.width * 0.0026)}
+                        />
+                      </g>
                     </g>
                   );
                 })}

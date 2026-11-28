@@ -128,9 +128,11 @@ export const TEXTURE_VI_LABELS: Record<string, string> = {
 };
 
 export function translateMatchTier(tier: MatchedProduct["matchTier"]): string {
-  if (tier === "Exact Match") return "Rất hợp với bạn";
-  if (tier === "Great Match") return "Hợp tự nhiên";
-  return "Gợi ý thêm";
+  if (tier === null) return "Chưa đo với da bạn";
+  if (tier === "Exact Match") return "Rất gần màu mục tiêu";
+  if (tier === "Great Match") return "Gần màu mục tiêu";
+  if (tier === "Close Alternative") return "Cùng họ sắc độ";
+  return "Khác sắc độ đáng kể";
 }
 
 export function describeCctVi(cct: number | null): string {

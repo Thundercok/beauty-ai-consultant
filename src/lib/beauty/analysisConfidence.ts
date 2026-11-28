@@ -69,7 +69,7 @@ export function computeAnalysisConfidence(
     lightingScore = Math.round(clamp(98 - cctPenalty - offLocusPenalty, 38, 98));
 
     if (distFromIdeal === 0 && offLocus <= 5) {
-      lightingNote = `Ánh sáng tự nhiên (~${roundedCct}K) cho độ chính xác cao nhất`;
+      lightingNote = `Ánh sáng tự nhiên (~${roundedCct}K) cho điều kiện đo màu ổn định nhất`;
       lightingValueLabel = `~${roundedCct}K (Chuẩn)`;
     } else if (cct < 5000) {
       lightingNote = wbDisabled
@@ -131,9 +131,9 @@ export function computeAnalysisConfidence(
   const label = noSkinEvidence
     ? "Không tìm thấy vùng da để đo"
     : level === "high"
-      ? "Độ tin cậy cao"
+      ? "Ảnh rõ nét"
       : level === "medium"
-        ? "Độ tin cậy khá"
+        ? "Ảnh khá ổn"
         : "Nên chụp lại nơi đủ sáng";
 
   return {

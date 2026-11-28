@@ -127,12 +127,13 @@ function toAsciiSlug(text: string): string {
 
 function mapProductToEntry(item: MatchedProduct): ReportProductEntry {
   const price = estimateProductPriceVn(item.brand, item.productType, item.name);
+  const validDelta = typeof item.deltaE === "number" && Number.isFinite(item.deltaE) ? item.deltaE : undefined;
   const traits = evaluateVnStudentTraits({
     productType: item.productType,
     texture: item.texture,
     hex: item.hex,
     renderedHex: item.renderedHex,
-    deltaE: item.deltaE,
+    deltaE: validDelta,
   });
   const tagsVi: string[] = [];
   if (traits.bareFaceFriendly) tagsVi.push("Hợp mặt mộc");
@@ -151,7 +152,7 @@ function mapProductToEntry(item: MatchedProduct): ReportProductEntry {
     textureVi: TEXTURE_VI_LABELS[item.texture] ?? item.texture,
     swatchHex: item.hex,
     renderedHex: item.renderedHex,
-    matchPercent: deltaEToMatchPercent(item.deltaE),
+    matchPercent: validDelta !== undefined ? deltaEToMatchPercent(validDelta) : 0,
     priceRangeVi: price.priceRangeLabel,
     tagsVi,
   };

@@ -329,7 +329,7 @@ export function evaluateHonestMakeupAudit(
 
   const measurementCaveatVi =
     caveatParts.length > 0
-      ? `Nói thật về độ tin cậy ảnh (${confidence.score}%): ${caveatParts.join(", ")} — nên chụp thêm 1 tấm sát cửa sổ ánh sáng trời để chốt màu chuẩn tuyệt đối.`
+      ? `Lưu ý về độ rõ ảnh (${confidence.score}%): ${caveatParts.join(", ")} — nên chụp thêm 1 tấm sát cửa sổ ánh sáng tự nhiên để so màu ổn định hơn.`
       : null;
 
   // Combine final honest score (NO fake 52% floor!)

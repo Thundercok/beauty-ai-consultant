@@ -5,14 +5,21 @@ import type { SkinEvidence } from "./types";
  * - pending:     the detector is still loading or running; only the quick face-box guess exists
  * - found:       a face with the full 478-point mesh was detected
  * - not_found:   the detector ran and saw no face
+ * - multiple_faces: more than one face was detected; withhold results so a bystander is never analyzed
  * - unavailable: the detector failed to load or crashed (offline, WASM timeout, old browser)
  */
-export type FaceDetectionOutcome = "pending" | "found" | "not_found" | "unavailable";
+export type FaceDetectionOutcome =
+  | "pending"
+  | "found"
+  | "not_found"
+  | "multiple_faces"
+  | "unavailable";
 
 export type AnalysisValidityStatus = "ok" | "warn" | "reject";
 
 export type AnalysisValidityReason =
   | "no_face"
+  | "multiple_faces"
   | "no_skin"
   | "few_skin_pixels"
   | "detector_unavailable";
@@ -42,6 +49,8 @@ export const MIN_FACE_SKIN_RATIO = 0.6;
 const MESSAGES: Record<AnalysisValidityReason, string> = {
   no_face:
     "Không tìm thấy khuôn mặt trong ảnh. Hãy chọn ảnh chụp chính diện, rõ mặt và đủ sáng.",
+  multiple_faces:
+    "Phát hiện nhiều khuôn mặt trong cùng một ảnh. Hãy chọn hoặc cắt ảnh chỉ có một khuôn mặt chính diện để đo tông da chính xác.",
   no_skin:
     "Không đo được vùng da trên ảnh (ảnh quá tối, quá sáng hoặc không phải ảnh chân dung). Hãy chụp lại nơi đủ sáng.",
   few_skin_pixels:
@@ -66,11 +75,14 @@ export function assessAnalysisValidity(input: AnalysisValidityInput): AnalysisVa
   const { verifiedSkinPixels, faceRegionPixels, usedRegionFallback } = skinEvidence;
   const skinRatio = faceRegionPixels > 0 ? verifiedSkinPixels / faceRegionPixels : 0;
 
-  // 1. No pixel looked like skin: every colour measured belongs to the background or shadow.
+  // 1. Multiple faces in frame: never silently score a random person in a group shot.
+  if (faceDetection === "multiple_faces") return verdict("reject", "multiple_faces");
+
+  // 2. No pixel looked like skin: every colour measured belongs to the background or shadow.
   //    This holds even when MediaPipe found a face (e.g. a portrait shot in near darkness).
   if (usedRegionFallback) return verdict("reject", "no_skin");
 
-  // 2. The detector ran to completion and saw no face.
+  // 3. The detector ran to completion and saw no face.
   if (faceDetection === "not_found") return verdict("reject", "no_face");
 
   // 3. The detector could not run. Fall back on the skin ratio as the only evidence of a face:

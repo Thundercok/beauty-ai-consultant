@@ -40,8 +40,11 @@ export interface MatchedProduct {
   texture: string;
   hex: string;
   renderedHex?: string;
-  deltaE: number;
-  matchTier: "Exact Match" | "Great Match" | "Close Alternative";
+  /** CIEDE2000 perceptual distance from target color, or null when browsing without a valid analysis */
+  deltaE: number | null;
+  matchTier: "Exact Match" | "Great Match" | "Close Alternative" | "Distant Shade" | null;
+  /** Explicitly distinguishes personalized matches from unanalyzed catalog browse items */
+  isPersonalized?: boolean;
   undertone: string;
   bestSeasons: string;
 }

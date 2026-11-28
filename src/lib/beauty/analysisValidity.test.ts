@@ -15,12 +15,16 @@ function check(faceDetection: FaceDetectionOutcome, skinEvidence: SkinEvidence) 
   return `${v.status}:${v.reason ?? "-"}`;
 }
 
-test("assessAnalysisValidity withholds results without skin or without a face", () => {
+test("assessAnalysisValidity withholds results without skin, without a face, or with multiple faces", () => {
   for (const outcome of ["pending", "found", "not_found", "unavailable"] as const) {
     assert.equal(check(outcome, noSkin), "reject:no_skin", outcome);
   }
   assert.equal(check("not_found", realFace), "reject:no_face");
+  assert.equal(check("multiple_faces", realFace), "reject:multiple_faces");
+  assert.equal(check("multiple_faces", noSkin), "reject:multiple_faces");
   assert.equal(check("unavailable", woodWall), "reject:no_face");
+  const multi = assessAnalysisValidity({ faceDetection: "multiple_faces", skinEvidence: realFace });
+  assert.ok(multi.message && multi.message.includes("nhiều khuôn mặt"));
 });
 
 test("assessAnalysisValidity shows confirmed faces and warns on weak evidence", () => {

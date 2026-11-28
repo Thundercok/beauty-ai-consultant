@@ -396,6 +396,7 @@ export default function App() {
       const autoBox = detectInitialFaceBox(buf.rgba, buf.width, buf.height);
       // Publish buffer immediately so full optical analysis renders in <20ms without waiting for WASM
       setImageBuffer(buf);
+      setDetailProduct(null);
       setIsDecodingImage(false);
       setFaceBox(autoBox);
       setNeuralLandmarks(null);
@@ -407,7 +408,7 @@ export default function App() {
 
       let outcome: FaceDetectionOutcome = "unavailable";
       try {
-        const { landmarks, enhancement } = await detectNeuralFaceLandmarks(
+        const { landmarks, enhancement, faceCount } = await detectNeuralFaceLandmarks(
           buf.rgba,
           buf.width,
           buf.height
@@ -416,7 +417,11 @@ export default function App() {
         setEnhancementStats(enhancement);
         setProcessingLabel("Hoàn tất nhận diện khuôn mặt");
         setProgressValue(0.92);
-        if (landmarks && landmarks.length >= 468) {
+        if (faceCount > 1) {
+          outcome = "multiple_faces";
+          setNeuralLandmarks(null);
+          setLandmarkStatus("fallback");
+        } else if (landmarks && landmarks.length >= 468) {
           outcome = "found";
           setNeuralLandmarks(landmarks);
           setLandmarkStatus("neural");
@@ -436,6 +441,7 @@ export default function App() {
           finishProgress();
           // The banner states the exact reason; the toast must not claim success when it isn't.
           if (outcome === "found") showToast("Phân tích hoàn tất", "success");
+          else if (outcome === "multiple_faces") showToast("Phát hiện nhiều khuôn mặt trong ảnh", "info");
           else if (outcome === "not_found") showToast("Không tìm thấy khuôn mặt trong ảnh", "info");
           else showToast("Đang dùng khung ước lượng khuôn mặt", "info");
         }
@@ -454,6 +460,7 @@ export default function App() {
     setNeuralLandmarks(null);
     setEnhancementStats(null);
     setLandmarkStatus("fallback");
+    setDetailProduct(null);
     setInspectedLipstick(null);
     setTryOnBlushEnabled(false);
     setTryOnBlushId(null);
@@ -681,6 +688,10 @@ export default function App() {
   );
   // A rejected analysis is withheld everywhere: no season, no products, no makeup advice.
   const report = analysisValidity?.status === "reject" ? null : rawReport;
+  const analysisConfidence = useMemo(
+    () => (report ? computeAnalysisConfidence(report) : null),
+    [report]
+  );
 
   // Never block the rendered analysis on slow MediaPipe WASM downloads; only show decoding state while reading a new file
   const isProcessingPortrait = isDecodingImage && !report;
@@ -1055,6 +1066,8 @@ export default function App() {
             lipBaseLab={report?.lipMetrics.lipBaseLab ?? null}
             skinMetrics={report?.skinMetrics ?? null}
             userSeason={report?.season.season ?? null}
+            analysisValidity={analysisValidity}
+            analysisConfidence={analysisConfidence}
             catalogIlluminant={catalogIlluminant}
             initialCategory={shopCategory}
             savedIds={savedIds}
@@ -1212,6 +1225,7 @@ export default function App() {
         skinHex={report ? skinSwatchHex : null}
         lipBaseHex={report?.lipMetrics.lipBaseHex ?? null}
         userSeason={report?.season.season ?? null}
+        userUndertone={report?.season.undertone ?? null}
         hasPortraitProfile={Boolean(report)}
         isSaved={detailProduct ? savedIds.has(detailProduct.id) : false}
         onClose={() => setDetailProduct(null)}
